@@ -1,0 +1,45 @@
+/* Base: fonts, reset, design tokens, app shell, screen visibility */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+/* ── Design tokens ─────────────────────────────────────────────────────────
+   Enterprise palette. Brand/ink is near-black (aligns with The Art Logic's
+   monochrome mark); BLUE is the only primary-action colour, GREEN is reserved
+   for success, RED for errors. */
+:root{
+  --brand:#0F172A;
+  --primary:#2563EB;      --primary-hover:#1D4ED8;  --primary-soft:#EFF6FF;  --primary-border:#BFDBFE;
+  --success:#16A34A;      --success-hover:#15803D;  --success-soft:#F0FDF4;  --success-border:#BBF7D0;
+  --danger:#DC2626;       --danger-soft:#FEF2F2;    --danger-border:#FECACA;
+  --warn:#B45309;         --warn-soft:#FFFBEB;      --warn-border:#FDE68A;
+
+  --bg:#F5F7FA;
+  --surface:#FFFFFF;
+  --ink:#0F172A;          --ink-2:#475569;          --muted:#94A3B8;
+  --border:#E8EDF3;       --border-strong:#DBE3EC;
+
+  --radius-sm:10px;  --radius:14px;  --radius-lg:18px;
+  --shadow-sm:0 1px 2px rgba(15,23,42,.04);
+  --shadow:0 1px 3px rgba(15,23,42,.05), 0 8px 20px -8px rgba(15,23,42,.10);
+  --shadow-lg:0 12px 32px -10px rgba(15,23,42,.18);
+  --ring:0 0 0 3px rgba(37,99,235,.15);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* Content shell — desktop-first, comfortable dashboard width */
+#app{max-width:1080px;margin:0 auto;padding:24px 24px 64px}
+
+/* Focused (single-column) screens read better constrained */
+#s-proc,#s-results,#s-error,#s-batch-results{max-width:780px;margin:0 auto}
+
+.screen{display:none}.screen.active{display:block}
+
+@media (max-width:640px){ #app{padding:16px 14px 48px} }

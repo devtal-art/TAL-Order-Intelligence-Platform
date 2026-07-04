@@ -1,0 +1,14 @@
+/* Product Catalog card */
+.cat-grid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:16px}
+.cat-cell{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.cat-label{font-size:11.5px;color:var(--muted);font-weight:500}
+.cat-value{font-size:13px;color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.cat-status{font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;white-space:nowrap}
+.cat-status.is-empty{background:var(--bg);color:var(--ink-2);border:1px solid var(--border-strong)}
+.cat-status.is-ready{background:var(--success-soft);color:var(--success-hover);border:1px solid var(--success-border)}
+.cat-actions{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+.btn-csv{display:inline-flex;align-items:center;gap:7px;background:var(--surface);color:var(--ink-2);border:1px solid var(--border-strong);border-radius:10px;padding:9px 15px;font-size:12.5px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;transition:background .18s,border-color .18s}
+.btn-csv:hover{background:var(--bg);border-color:var(--muted)}
+.btn-csv:disabled{opacity:.6;cursor:not-allowed}
+.btn-csv svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.cat-hint{font-size:11.5px;color:var(--muted)}

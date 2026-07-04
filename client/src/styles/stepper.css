@@ -1,0 +1,26 @@
+/* Enterprise cards. Used by the dashboard sections (catalog, upload, saved-order)
+   and the review/results panels. Soft shadow, minimal border, rounded. */
+.step-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:20px 22px;
+  box-shadow:var(--shadow-sm);
+  transition:box-shadow .2s, border-color .2s;
+}
+.step-card:hover{box-shadow:var(--shadow)}
+
+.step-head{display:flex;align-items:center;gap:12px}
+
+/* Icon badge (replaces the old big numbered circles) */
+.step-badge{
+  width:34px;height:34px;flex-shrink:0;border-radius:10px;
+  background:var(--primary-soft);
+  color:var(--primary);
+  display:flex;align-items:center;justify-content:center;
+}
+.step-badge svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.step-headings{flex:1;min-width:0}
+.step-title{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+.step-sub{font-size:12.5px;color:var(--ink-2);margin-top:2px;line-height:1.4}

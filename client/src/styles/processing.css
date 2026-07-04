@@ -1,0 +1,22 @@
+/* Processing screen: spinner, step list, step states */
+.proc-wrap{text-align:center;padding:20px 0 24px}
+.spin-ring{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.75s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.proc-title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:var(--ink)}
+.proc-sub{font-size:13px;color:var(--ink-2);margin-top:4px}
+.steps-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:20px;box-shadow:var(--shadow-sm)}
+.st{display:flex;align-items:center;gap:14px;padding:15px 18px;border-bottom:1px solid var(--border);transition:background 0.25s}
+.st:last-child{border-bottom:none}
+.st.run{background:var(--primary-soft)}.st.done{background:var(--success-soft)}
+.st-dot{width:32px;height:32px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.3s}
+.st.run .st-dot{background:#fff;border-color:var(--primary-border)}
+.st.done .st-dot{background:var(--success);border-color:var(--success)}
+.st-dot svg{width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2.5;stroke-linecap:round}
+.st.done .st-dot svg{stroke:#fff}
+.mini-spin{width:14px;height:14px;border:2px solid var(--primary-border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.7s linear infinite}
+.st-body{flex:1}.st-body strong{font-size:13px;font-weight:600;color:var(--ink);display:block}
+.st-body span{font-size:11px;color:var(--muted);display:block;margin-top:1px}
+.st-tag{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
+.st.run .st-tag{background:var(--primary-soft);color:var(--primary)}
+.st.done .st-tag{background:var(--success);color:#fff}
+.st:not(.run):not(.done) .st-tag{background:var(--bg);color:var(--muted)}

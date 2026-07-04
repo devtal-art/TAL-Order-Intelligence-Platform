@@ -1,0 +1,15 @@
+/* Aggregates the existing stylesheets, unchanged, in the original order.
+   base.css keeps the Google Fonts @import as its first rule. */
+@import './base.css';
+@import './topbar.css';
+@import './dashboard.css';
+@import './upload.css';
+@import './processing.css';
+@import './results.css';
+@import './error.css';
+@import './stepper.css';
+@import './catalog.css';
+@import './review.css';
+@import './review-screen.css';
+@import './batch.css';
+@import './saved-order.css';

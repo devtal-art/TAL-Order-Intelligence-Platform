@@ -1,0 +1,21 @@
+{
+  "name": "order-intelligence-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Express backend skeleton for the Order Intelligence Platform. No business logic yet.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "mongoose": "^8.7.0",
+    "multer": "^2.0.0"
+  }
+}

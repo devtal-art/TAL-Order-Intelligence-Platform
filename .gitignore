@@ -1,0 +1,40 @@
+# ── Dependencies ──────────────────────────────────────────────
+node_modules/
+
+# ── Environment / secrets ─────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Build output ──────────────────────────────────────────────
+dist/
+build/
+coverage/
+
+# ── Editor / OS ───────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ── Runtime uploads / temp ────────────────────────────────────
+uploads/
+temp/
+tmp/
+.cache/
+.parcel-cache/
+
+# ── Generated / local artifacts ───────────────────────────────
+*.zip
+*.xlsx
+*.csv
+*.bak
+*.old
+*.orig
+*.pid

@@ -1,0 +1,35 @@
+/* Enterprise app bar: brand mark + product title */
+.appbar{
+  position:sticky;top:0;z-index:20;
+  background:rgba(255,255,255,.85);
+  backdrop-filter:saturate(180%) blur(8px);
+  border-bottom:1px solid var(--border);
+}
+.appbar-inner{
+  max-width:1080px;margin:0 auto;
+  padding:14px 24px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+}
+.appbar-brand{display:flex;align-items:center;gap:16px;min-width:0}
+.appbar-logo{height:30px;width:auto;display:block;flex-shrink:0}
+.appbar-divider{width:1px;height:28px;background:var(--border-strong);flex-shrink:0}
+.appbar-titles{min-width:0}
+.appbar-title{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:16px;font-weight:600;color:var(--ink);line-height:1.2;
+  letter-spacing:-.01em;
+}
+.appbar-sub{font-size:12px;color:var(--muted);margin-top:1px;font-weight:500}
+.appbar-env{
+  font-size:11px;font-weight:600;letter-spacing:.02em;
+  color:var(--ink-2);background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:20px;
+  padding:4px 12px;flex-shrink:0;
+}
+
+@media (max-width:640px){
+  .appbar-inner{padding:12px 14px}
+  .appbar-logo{height:24px}
+  .appbar-sub{display:none}
+  .appbar-env{display:none}
+}
