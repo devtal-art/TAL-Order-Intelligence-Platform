@@ -11,7 +11,22 @@ import { errorHandler } from './middleware/errorHandler.js';
 export function createApp() {
   const app = express();
 
-  app.use(cors());
+  // Production-ready CORS. Allowed origins: localhost dev + the deployed client
+  // (process.env.CLIENT_URL, injected via Render env vars — never hardcoded).
+  // Requests with no Origin header (curl, Postman, health checks) are allowed.
+  const allowedOrigins = ['http://localhost:5173', process.env.CLIENT_URL].filter(Boolean);
+  app.use(
+    cors({
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+      credentials: true,
+    })
+  );
   app.use(express.json());
   app.use(requestId);
 

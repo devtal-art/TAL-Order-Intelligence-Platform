@@ -14,5 +14,5 @@ connectDB().catch((err) => {
 
 app.listen(env.port, () => {
   // eslint-disable-next-line no-console
-  console.log(`Order Intelligence API listening on http://localhost:${env.port} (${env.nodeEnv})`);
+  console.log(`Order Intelligence API started successfully on port ${env.port} (${env.nodeEnv})`);
 });
