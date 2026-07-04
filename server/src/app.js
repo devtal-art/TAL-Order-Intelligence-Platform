@@ -14,14 +14,20 @@ export function createApp() {
   // Production-ready CORS. Allowed origins: localhost dev + the deployed client
   // (process.env.CLIENT_URL, injected via Render env vars — never hardcoded).
   // Requests with no Origin header (curl, Postman, health checks) are allowed.
-  const allowedOrigins = ['http://localhost:5173', process.env.CLIENT_URL].filter(Boolean);
+  // Trailing slashes are trimmed so "https://site/" and "https://site" both match.
+  const stripSlash = (o) => o.replace(/\/+$/, '');
+  const allowedOrigins = ['http://localhost:5173', process.env.CLIENT_URL]
+    .filter(Boolean)
+    .map(stripSlash);
+  // eslint-disable-next-line no-console
+  console.log('CORS allowed origins:', allowedOrigins);
   app.use(
     cors({
       origin(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin || allowedOrigins.includes(stripSlash(origin))) {
           callback(null, true);
         } else {
-          callback(new Error('Not allowed by CORS'));
+          callback(new Error(`Not allowed by CORS: ${origin}`));
         }
       },
       credentials: true,
