@@ -10,6 +10,16 @@ const app = createApp();
 connectDB().catch((err) => {
   // eslint-disable-next-line no-console
   console.error(`MongoDB connection failed: ${err.message}`);
+  // Diagnostics: reveal the real cause the generic driver message hides.
+  try {
+    const host = new URL(env.mongoUri).host;
+    // eslint-disable-next-line no-console
+    console.error(`  → connecting to host: ${host}  (URI came from env: ${Boolean(process.env.MONGODB_URI)})`);
+  } catch {
+    /* ignore URI parse errors */
+  }
+  // eslint-disable-next-line no-console
+  if (err.reason) console.error('  → underlying reason:', err.reason);
 });
 
 app.listen(env.port, () => {
