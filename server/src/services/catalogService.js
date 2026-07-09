@@ -3,6 +3,7 @@ import { Product } from '../models/product.model.js';
 import { CatalogMeta } from '../models/catalogMeta.model.js';
 import { parseCatalogCsv } from './catalogCsv.js';
 import { normalizeName } from '../utils/normalizeName.js';
+import { productDisplayName } from '../utils/displayName.js';
 
 function makeVersion() {
   const day = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
@@ -70,11 +71,14 @@ export async function searchProducts(query, limit) {
   const qNorm = normalizeName(query);
   const qTokens = qNorm.split(' ').filter(Boolean);
 
-  const products = await Product.find({}, { item_no: 1, name: 1, _id: 0 }).lean();
+  const products = await Product.find({}, { item_no: 1, name: 1, option: 1, _id: 0 }).lean();
 
   const scored = [];
   for (const p of products) {
-    const nNorm = normalizeName(p.name);
+    // Search (and display) over the display name so the Option text
+    // ("Box10") is both visible and findable.
+    const display = productDisplayName(p.name, p.option);
+    const nNorm = normalizeName(display);
     const contains = nNorm.includes(qNorm);
     let hits = 0;
     for (const t of qTokens) {
@@ -82,7 +86,7 @@ export async function searchProducts(query, limit) {
     }
     if (!contains && hits === 0) continue;
     const matchPercent = qTokens.length ? Math.round((hits / qTokens.length) * 100) : contains ? 100 : 0;
-    scored.push({ websiteProductName: p.name, itemNo: p.item_no, matchPercent, _c: contains ? 1 : 0, _len: nNorm.length });
+    scored.push({ websiteProductName: display, itemNo: p.item_no, matchPercent, _c: contains ? 1 : 0, _len: nNorm.length });
   }
 
   scored.sort(

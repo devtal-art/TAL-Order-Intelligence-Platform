@@ -18,6 +18,8 @@ export function useOrderProcessor() {
   const [resolution, setResolution] = useState(null); // resolve API response
   const [result, setResult] = useState(null); // { data, workbook }
   const [error, setError] = useState('');
+  const [comments, setComments] = useState({}); // { [lineId]: 'Released' | 'OS' | 'N/A' } (V1.3)
+  const [fulfillment, setFulfillment] = useState({}); // { [lineId]: { pendingQty, status } } (V1.4)
   const orderRefRef = useRef(null); // Portal Order Ref of the persisted order (for approval updates)
 
   const setStepStatus = (i, status) =>
@@ -33,6 +35,8 @@ export function useOrderProcessor() {
     if (!file) return;
     setScreen('proc');
     setSteps(['', '', '']);
+    setComments({});
+    setFulfillment({});
     try {
       setStepStatus(0, 'run');
       const html = await new Promise((res, rej) => {
@@ -121,6 +125,36 @@ export function useOrderProcessor() {
     return updated;
   }, []);
 
+  // Set (or clear, with '') the fulfilment comment of one product on the
+  // Preview/Review screen. Mirrors to the persisted Order (best-effort, like
+  // the other order writes) so the value is saved together with the order.
+  const setProductComment = useCallback((lineId, value) => {
+    setComments((prev) => {
+      const next = { ...prev };
+      if (value) next[lineId] = value;
+      else delete next[lineId];
+      return next;
+    });
+    if (orderRefRef.current) {
+      orderService
+        .setComments(orderRefRef.current, { [lineId]: value || null })
+        .catch((e) => console.warn('Order comment update failed:', e.message));
+    }
+  }, []);
+
+  // Set one product's delivery tracking on the Preview/Review screen (V1.4).
+  // `patch` = { pendingQty?, status? } — merged into the line's entry. Mirrors
+  // to the persisted Order (best-effort, like comments) so it is saved with
+  // the order.
+  const setProductFulfillment = useCallback((lineId, patch) => {
+    setFulfillment((prev) => ({ ...prev, [lineId]: { ...prev[lineId], ...patch } }));
+    if (orderRefRef.current) {
+      orderService
+        .setFulfillment(orderRefRef.current, { [lineId]: patch })
+        .catch((e) => console.warn('Order fulfillment update failed:', e.message));
+    }
+  }, []);
+
   // Build the Excel workbook from the parsed data plus resolution (extended
   // buildXLSX) and show the results screen. Triggered from the Review screen.
   const generateExcel = useCallback(() => {
@@ -136,9 +170,11 @@ export function useOrderProcessor() {
     setResolution(null);
     setResult(null);
     setError('');
+    setComments({});
+    setFulfillment({});
     setSteps(['', '', '']);
     setScreen('upload');
   }, []);
 
-  return { screen, file, steps, parsed, resolution, result, error, pickFile, run, approveProduct, generateExcel, reset };
+  return { screen, file, steps, parsed, resolution, result, error, comments, fulfillment, pickFile, run, approveProduct, setProductComment, setProductFulfillment, generateExcel, reset };
 }

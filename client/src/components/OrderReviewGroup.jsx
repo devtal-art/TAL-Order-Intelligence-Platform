@@ -11,7 +11,12 @@ import { deriveOrderStatus, statusMeta } from '../utils/order.js';
 //   portalOrderRef, hasRef, filename, customer, currency,
 //   rows: [{ result, item }]   // result = resolve result, item = email line item
 // }
-export default function OrderReviewGroup({ order, onApprove, defaultOpen = true }) {
+// `comments` + `onComment` are optional (V1.3): when `onComment` is provided
+// (single-file review), each row gets a Comment selector; the batch review
+// passes nothing and renders exactly as before.
+// `fulfillment` + `onFulfillment` are optional (V1.4): when `onFulfillment` is
+// provided, each row gets Pending Qty + Order Status delivery tracking.
+export default function OrderReviewGroup({ order, onApprove, comments, onComment, fulfillment, onFulfillment, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
 
   const results = order.rows.map((r) => r.result);
@@ -57,6 +62,8 @@ export default function OrderReviewGroup({ order, onApprove, defaultOpen = true 
                 <tr className="rt-groups">
                   <th className="rt-grp rt-grp-email" colSpan={5}>Order details · from email</th>
                   <th className="rt-grp rt-grp-match" colSpan={4}>Website match · from catalog</th>
+                  {onFulfillment && <th className="rt-grp rt-grp-fulfil" colSpan={2}>Delivery</th>}
+                  {onComment && <th className="rt-grp rt-grp-comment" rowSpan={2}>Comment</th>}
                   <th className="rt-grp rt-grp-act" rowSpan={2}>Action</th>
                 </tr>
                 <tr className="rt-cols">
@@ -69,6 +76,8 @@ export default function OrderReviewGroup({ order, onApprove, defaultOpen = true 
                   <th className="rt-match">Product Name</th>
                   <th className="rt-match rt-num">Match</th>
                   <th className="rt-match">Status</th>
+                  {onFulfillment && <th className="rt-fulfil rt-num">Pending Qty</th>}
+                  {onFulfillment && <th className="rt-fulfil">Order Status</th>}
                 </tr>
               </thead>
               <tbody>
@@ -79,6 +88,10 @@ export default function OrderReviewGroup({ order, onApprove, defaultOpen = true 
                     item={item}
                     currency={order.currency}
                     onApprove={onApprove}
+                    comment={comments ? comments[result.lineId] || '' : ''}
+                    onComment={onComment}
+                    fulfillment={fulfillment ? fulfillment[result.lineId] : undefined}
+                    onFulfillment={onFulfillment}
                   />
                 ))}
               </tbody>

@@ -18,7 +18,7 @@ function StepDot({ status }) {
     );
   }
   return (
-    <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', fill: 'none', stroke: '#94A3B8', strokeWidth: 2, strokeLinecap: 'round' }}>
+    <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', fill: 'none', stroke: '#A8A29E', strokeWidth: 2, strokeLinecap: 'round' }}>
       <circle cx="11" cy="11" r="8" />
     </svg>
   );

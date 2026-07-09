@@ -6,6 +6,10 @@ const productSchema = new mongoose.Schema(
   {
     item_no: { type: String, required: true, trim: true },
     name: { type: String, required: true, trim: true },
+    // Optional "Option" column from the website sheet (pack/variant, e.g.
+    // "Box10"). Display-only: shown as "Name (Option)"; never used for
+    // matching or normalization.
+    option: { type: String, default: '', trim: true },
     normalized_name: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
   },

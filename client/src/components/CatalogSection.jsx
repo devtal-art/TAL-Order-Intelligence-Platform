@@ -104,7 +104,7 @@ export default function CatalogSection() {
           {uploading ? 'Uploading…' : 'Upload CSV'}
         </button>
         {error ? (
-          <span className="cat-hint" style={{ color: '#B91C1C' }}>
+          <span className="cat-hint" style={{ color: '#B42318' }}>
             {error}
           </span>
         ) : (

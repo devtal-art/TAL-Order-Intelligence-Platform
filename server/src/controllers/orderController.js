@@ -63,6 +63,44 @@ export async function getOrder(req, res, next) {
   }
 }
 
+// PATCH /api/v1/orders/:ref/comments — set/clear per-product comments.
+// Body: { comments: { [lineId]: 'Released' | 'OS' | 'N/A' | null } }
+export async function setOrderComments(req, res, next) {
+  try {
+    ensureDb();
+    const { comments } = req.body || {};
+    if (!comments || typeof comments !== 'object' || Array.isArray(comments)) {
+      throw new AppError('VALIDATION_ERROR', 'Missing required field.', {
+        status: 400,
+        details: [{ field: 'comments', issue: 'required object of { lineId: comment }' }],
+      });
+    }
+    const order = await orderService.setProductComments(req.params.ref, comments);
+    res.status(200).json(order);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/v1/orders/:ref/fulfillment — set/clear per-product delivery tracking.
+// Body: { fulfillment: { [lineId]: { pendingQty?, status? } | null } }
+export async function setOrderFulfillment(req, res, next) {
+  try {
+    ensureDb();
+    const { fulfillment } = req.body || {};
+    if (!fulfillment || typeof fulfillment !== 'object' || Array.isArray(fulfillment)) {
+      throw new AppError('VALIDATION_ERROR', 'Missing required field.', {
+        status: 400,
+        details: [{ field: 'fulfillment', issue: 'required object of { lineId: { pendingQty, status } }' }],
+      });
+    }
+    const order = await orderService.setProductFulfillment(req.params.ref, fulfillment);
+    res.status(200).json(order);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // PATCH /api/v1/orders/:ref — update resolution snapshot + derived status.
 export async function updateOrder(req, res, next) {
   try {

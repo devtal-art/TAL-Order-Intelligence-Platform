@@ -1,5 +1,12 @@
 import { Router } from 'express';
-import { saveOrder, listOrders, getOrder, updateOrder } from '../../controllers/orderController.js';
+import {
+  saveOrder,
+  listOrders,
+  getOrder,
+  updateOrder,
+  setOrderComments,
+  setOrderFulfillment,
+} from '../../controllers/orderController.js';
 
 // Mounted at /api/v1/orders (V1.2 — new, additive).
 export const orderRouter = Router();
@@ -7,4 +14,6 @@ export const orderRouter = Router();
 orderRouter.post('/', saveOrder);
 orderRouter.get('/', listOrders);
 orderRouter.get('/:ref', getOrder);
+orderRouter.patch('/:ref/comments', setOrderComments);
+orderRouter.patch('/:ref/fulfillment', setOrderFulfillment);
 orderRouter.patch('/:ref', updateOrder);

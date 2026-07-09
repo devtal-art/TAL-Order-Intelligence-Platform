@@ -17,8 +17,9 @@ const orderSchema = new mongoose.Schema(
   {
     _id: { type: String, default: () => `order_${randomUUID()}` },
 
-    // Primary business identifier (Portal Order Ref No.).
-    portal_order_ref: { type: String, required: true, unique: true, trim: true, index: true },
+    // Primary business identifier (Portal Order Ref No.). `unique` already
+    // creates the index — no separate `index: true` needed.
+    portal_order_ref: { type: String, required: true, unique: true, trim: true },
 
     filename: { type: String, default: '' },
     customer_name: { type: String, default: '' },
@@ -37,6 +38,21 @@ const orderSchema = new mongoose.Schema(
     // resolution snapshot ({ catalogVersion, results }). Stored as-is.
     parsed_data: { type: mongoose.Schema.Types.Mixed, default: {} },
     resolution_data: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+    // Per-product fulfilment comment, keyed by the product's lineId (the same
+    // String(index + 1) key resolution results use): 'Released' | 'OS' | 'N/A'.
+    // Deliberately a SIBLING of parsed_data/resolution_data — both of those are
+    // snapshot blobs that get fully replaced on re-upload/approval, so a value
+    // stored inside them would be silently wiped. This field is only ever
+    // touched by the comments endpoint.
+    product_comments: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+    // Per-product delivery tracking (V1.4), keyed by lineId like
+    // product_comments and a sibling for the same wipe-on-reupload reason:
+    // { [lineId]: { pendingQty: Number, status: 'delivered' | 'half_delivered'
+    // | 'not_delivered' } }. Entries are user-entered and optional — orders
+    // saved before V1.4 simply have no entry for any line.
+    product_fulfillment: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { versionKey: false, minimize: false }
 );

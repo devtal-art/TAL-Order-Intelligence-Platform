@@ -33,9 +33,13 @@ export default function Home() {
     resolution,
     result,
     error: singleError,
+    comments,
+    fulfillment,
     pickFile,
     run,
     approveProduct,
+    setProductComment,
+    setProductFulfillment,
     generateExcel,
     reset: resetSingle,
   } = useOrderProcessor();
@@ -194,7 +198,11 @@ export default function Home() {
           filename={file?.name || ''}
           lineItems={parsed?.line_items || []}
           currency={parsed?.financials?.currency || 'GBP'}
+          comments={comments}
+          fulfillment={fulfillment}
           onApprove={approveProduct}
+          onComment={setProductComment}
+          onFulfillment={setProductFulfillment}
           onGenerate={generateExcel}
           onReset={handleResetAll}
         />

@@ -1,72 +1,67 @@
 # Order Intelligence Platform
 
-Internal tool that turns saved HTML order emails into formatted Excel workbooks —
-migrated from a single static HTML file to a **React + Vite** frontend and a
-**Node + Express** backend skeleton.
+Internal tool that turns saved HTML order emails into formatted Excel workbooks,
+with a product catalog, an approved-mapping database, delivery tracking, and a
+searchable order history — **React + Vite** frontend, **Node + Express +
+MongoDB** backend.
 
-> This migration is structural only. The UI, user experience, HTML parser, and
-> Excel generation behave exactly as before. No new features (CSV upload,
-> MongoDB, product matching, mappings, APIs, auth) have been implemented.
+## Features
+
+- **HTML order upload** — single file or a batch of up to 50; parsing happens
+  fully client-side.
+- **Product resolution** — each email product is matched against the Approved
+  Mapping database (instant 100% match) or scored against the website catalog
+  by a hybrid matching engine (suggestion only, never auto-approved).
+- **Manual approval** — approve the suggestion or search the catalog; approvals
+  are remembered as mappings and apply to all future orders.
+- **Website product catalog** — CSV upload (item_no, name, optional option
+  column shown as "Name (Option)").
+- **Order history** — every upload is saved to MongoDB keyed by Portal Order
+  Ref; searchable, viewable, re-exportable.
+- **Delivery tracking** — per-product Pending Quantity and Order Status
+  (Delivered / Half Delivered / Not Delivered), editable on saved orders.
+- **Product comments** — Released / OS / N/A per product.
+- **Excel export** — one workbook per order (or a ZIP for batches).
 
 ## Monorepo layout
 
 ```
 .
-├── client/     # React + Vite frontend (the app)
-└── server/     # Express + MongoDB backend (REST API)
+├── client/     # React + Vite frontend (Vercel)
+└── server/     # Express + MongoDB REST API (Render)
 ```
 
-## Frontend (`client/`)
-
-```
-client/
-├── index.html                 # Vite entry
-├── vite.config.js
-├── .env.example               # VITE_API_BASE_URL (unused for now)
-└── src/
-    ├── main.jsx               # React root + router + global styles
-    ├── App.jsx                # routes: / (Home), /review, /result
-    ├── parser/parseOrderHTML.js   # PRESERVED — parser logic unchanged
-    ├── excel/buildXLSX.js         # PRESERVED — workbook logic unchanged (XLSX now from npm)
-    ├── hooks/useOrderProcessor.js # the original run() flow (parse → build → results/error)
-    ├── components/            # TopBar, Layout, UploadStep, ProcessingView,
-    │                          # ResultsView, ErrorView, CatalogSection,
-    │                          # ReviewPlaceholderCard, DownloadStepCard, StepArrow
-    ├── pages/                 # Home (working flow), Review + Result (placeholders)
-    ├── services/              # apiClient — foundation for future API calls (unused)
-    ├── utils/                 # format.js, timing.js (preserved)
-    └── styles/                # the existing CSS, unchanged, aggregated by index.css
-```
-
-### Run
+## Development
 
 ```bash
-cd client
-npm install
-npm run dev      # http://localhost:5173
+# API — http://localhost:4000  (needs MongoDB; see server/.env.example)
+cd server && npm install && npm run dev
+
+# App — http://localhost:5173
+cd client && npm install && npm run dev
 ```
 
-Build: `npm run build` → `dist/`.
+Server tests: `cd server && npm test`.
 
-## Backend (`server/`)
+## Deployment
 
-Express app factory with config, a health check, and error/404 middleware.
-See [server/README.md](server/README.md). No business logic yet.
+**Backend (Render)** — root `server`, build `npm install`, start `npm start`,
+health check `/api/v1/health`. Env vars: `MONGODB_URI`, `MONGODB_DB`,
+`CLIENT_URL` (the Vercel origin, for CORS), `NODE_ENV=production`, and
+optionally `API_KEY` (see below).
 
-The v1 REST API contract (what both apps will build against) is specified in
-[docs/api/v1.md](docs/api/v1.md) — documentation only, not yet implemented.
+**Frontend (Vercel)** — root `client`, framework Vite (build `npm run build`,
+output `dist`; `vercel.json` provides the SPA rewrite). Env vars:
+`VITE_API_BASE_URL=https://<render-service>.onrender.com/api` and, if the
+server sets one, `VITE_API_KEY`.
 
-```bash
-cd server
-npm install
-npm run dev      # http://localhost:4000/api/health
-```
+**API key (optional)** — setting `API_KEY` on the server requires every API
+request to carry a matching `X-API-Key` header; the client sends it when
+`VITE_API_KEY` is set. Leave both unset for open access during development.
 
-## What was preserved exactly
+## Operational scripts (`server/scripts/`)
 
-- **Parser** (`parseOrderHTML`) — copied verbatim; output object identical.
-- **Excel generator** (`buildXLSX`) — logic verbatim; only the `XLSX` import
-  changed from the CDN global to the `xlsx` npm package (same version, 0.18.5).
-- **UI/CSS** — the same stylesheets and markup, ported to JSX class-for-class.
-- **Flow & timings** — the upload → processing (animated steps) → results/error
-  sequence, including the original delays and empty-data guard.
+- `sync-approved-products.js` — sync the ApprovedMapping collection with an
+  "Approved Products" sheet (dry run by default, `--apply` to write).
+- `backfill-order-resolutions.js` — re-sync saved orders' resolution snapshots
+  with the current mappings after a mapping correction (dry run by default).

@@ -12,7 +12,11 @@ export default function ReviewView({
   filename = '',
   lineItems = [],
   currency = 'GBP',
+  comments = {},
+  fulfillment = {},
   onApprove,
+  onComment,
+  onFulfillment,
   onGenerate,
   onReset,
 }) {
@@ -65,7 +69,14 @@ export default function ReviewView({
       <OrderSearchBar value={search} onChange={setSearch} matchCount={visible ? 1 : 0} totalCount={1} />
 
       {visible ? (
-        <OrderReviewGroup order={order} onApprove={onApprove} />
+        <OrderReviewGroup
+          order={order}
+          onApprove={onApprove}
+          comments={comments}
+          onComment={onComment}
+          fulfillment={fulfillment}
+          onFulfillment={onFulfillment}
+        />
       ) : (
         <div className="og-empty">No order matches “{search}”.</div>
       )}

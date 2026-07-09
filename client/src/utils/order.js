@@ -27,6 +27,60 @@ export function deriveOrderStatus(results) {
   return 'partially_resolved';
 }
 
+// The per-product fulfilment comments the platform knows (V1.3).
+//   'Released' — in stock, order line released
+//   'OS'       — out of stock
+//   'N/A'      — not available on the website
+export const PRODUCT_COMMENTS = ['Released', 'OS', 'N/A'];
+
+// Human label + style token for a product comment (badge rendering).
+export function commentMeta(comment) {
+  switch (comment) {
+    case 'Released':
+      return { label: 'Released', tone: 'released' };
+    case 'OS':
+      return { label: 'OS', tone: 'os' };
+    case 'N/A':
+      return { label: 'N/A', tone: 'na' };
+    default:
+      return null;
+  }
+}
+
+// Per-product delivery statuses (V1.4): stored value + display label.
+export const DELIVERY_STATUSES = [
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'half_delivered', label: 'Half Delivered' },
+  { value: 'not_delivered', label: 'Not Delivered' },
+];
+
+// Human label + style token for a delivery status (badge rendering).
+//   delivered → green, half_delivered → yellow, not_delivered → red.
+export function deliveryMeta(status) {
+  switch (status) {
+    case 'delivered':
+      return { label: 'Delivered', tone: 'delivered' };
+    case 'half_delivered':
+      return { label: 'Half Delivered', tone: 'half' };
+    case 'not_delivered':
+      return { label: 'Not Delivered', tone: 'not' };
+    default:
+      return null;
+  }
+}
+
+// Clamp a raw Pending Quantity input to a valid value: integer, ≥ 0 and
+// ≤ orderedQty (when the ordered quantity is known). '' stays '' (unset).
+export function clampPendingQty(raw, orderedQty) {
+  if (raw === '' || raw === null || raw === undefined) return '';
+  let n = Math.floor(Number(raw));
+  if (!Number.isFinite(n)) return '';
+  if (n < 0) n = 0;
+  const max = Number(orderedQty);
+  if (Number.isFinite(max) && n > max) n = max;
+  return n;
+}
+
 // Human label + style token for a status.
 export function statusMeta(status) {
   switch (status) {

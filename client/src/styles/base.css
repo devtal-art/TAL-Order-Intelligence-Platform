@@ -1,45 +1,98 @@
 /* Base: fonts, reset, design tokens, app shell, screen visibility */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Schibsted+Grotesk:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
 
 /* ── Design tokens ─────────────────────────────────────────────────────────
-   Enterprise palette. Brand/ink is near-black (aligns with The Art Logic's
-   monochrome mark); BLUE is the only primary-action colour, GREEN is reserved
-   for success, RED for errors. */
+   The Art Logic brand system: BLACK is the anchor (dark app bar, dark
+   download card — matching theartlogic.com), BRAND BLUE #2F4FA2 drives
+   primary actions, focus and highlights. GREEN = success, AMBER =
+   review/warning, RED = errors. */
 :root{
-  --brand:#0F172A;
-  --primary:#2563EB;      --primary-hover:#1D4ED8;  --primary-soft:#EFF6FF;  --primary-border:#BFDBFE;
-  --success:#16A34A;      --success-hover:#15803D;  --success-soft:#F0FDF4;  --success-border:#BBF7D0;
-  --danger:#DC2626;       --danger-soft:#FEF2F2;    --danger-border:#FECACA;
-  --warn:#B45309;         --warn-soft:#FFFBEB;      --warn-border:#FDE68A;
+  /* Type */
+  --font-ui:'Inter',system-ui,-apple-system,sans-serif;
+  --font-display:'Schibsted Grotesk','Inter',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;
 
-  --bg:#F5F7FA;
+  /* Neutrals (warm stone) */
+  --bg:#F5F5F3;
+  --bg-deep:#EDEDEA;
   --surface:#FFFFFF;
-  --ink:#0F172A;          --ink-2:#475569;          --muted:#94A3B8;
-  --border:#E8EDF3;       --border-strong:#DBE3EC;
+  --surface-2:#FAFAF8;
+  --ink:#1C1917;
+  --ink-2:#57534E;
+  --muted:#A8A29E;
+  --border:#E9E7E3;
+  --border-strong:#D9D6D1;
 
-  --radius-sm:10px;  --radius:14px;  --radius-lg:18px;
-  --shadow-sm:0 1px 2px rgba(15,23,42,.04);
-  --shadow:0 1px 3px rgba(15,23,42,.05), 0 8px 20px -8px rgba(15,23,42,.10);
-  --shadow-lg:0 12px 32px -10px rgba(15,23,42,.18);
-  --ring:0 0 0 3px rgba(37,99,235,.15);
+  /* Brand black (app bar, download card, deep surfaces) */
+  --brand-black:#0C0C0E;
+  --btn-dark:linear-gradient(180deg,#37342F 0%,#1E1B18 100%);
+  --btn-dark-hover:linear-gradient(180deg,#45423C 0%,#2A2724 100%);
+
+  /* Brand blue (theartlogic.com #2F4FA2) — primary CTAs, focus, links */
+  --accent:#2F4FA2;         --accent-hover:#27428C;
+  --accent-soft:#EDF2FA;    --accent-border:#C5D2EC;
+  --btn-brand:linear-gradient(180deg,#3D60C0 0%,#2F4FA2 100%);
+  --btn-brand-hover:linear-gradient(180deg,#4A6DCD 0%,#3859AE 100%);
+  --btn-brand-border:#27428C;
+
+  /* Semantics */
+  --success:#059669;        --success-hover:#047857;
+  --success-strong:#067647; --success-soft:#ECFDF3;   --success-border:#ABEFC6;
+  --warn:#B54708;           --warn-icon:#F79009;
+  --warn-soft:#FFFAEB;      --warn-border:#FEDF89;
+  --danger:#D92D20;         --danger-strong:#B42318;
+  --danger-soft:#FEF3F2;    --danger-border:#FECDCA;
+
+  /* Review-table column provenance tints (email vs. catalog match) */
+  --email-hd:#FAF1DD;  --email-hd-ink:#8F5E0A;  --email-cell:#FEFBF3;
+  --match-hd:#E2F6EB;  --match-hd-ink:#0F6B43;  --match-cell:#F7FCF9;
+
+  /* Shape & depth */
+  --radius-sm:8px; --radius:12px; --radius-lg:16px; --radius-xl:20px;
+  --shadow-xs:0 1px 2px rgba(28,25,23,.05);
+  --shadow-sm:0 1px 2px rgba(28,25,23,.05),0 1px 4px rgba(28,25,23,.04);
+  --shadow:0 1px 2px rgba(28,25,23,.04),0 8px 24px -8px rgba(28,25,23,.10);
+  --shadow-lg:0 2px 6px rgba(28,25,23,.06),0 20px 44px -12px rgba(28,25,23,.18);
+  --ring:0 0 0 3px rgba(47,79,162,.22);
 }
 
 *{margin:0;padding:0;box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{
-  font-family:'Inter',system-ui,sans-serif;
-  background:var(--bg);
+  font-family:var(--font-ui);
+  background:
+    radial-gradient(1100px 420px at 50% -180px, rgba(47,79,162,.06), transparent 65%),
+    var(--bg);
+  background-attachment:fixed;
   color:var(--ink);
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
+  font-feature-settings:'cv11','ss01';
 }
 
-/* Content shell — desktop-first, comfortable dashboard width */
-#app{max-width:1080px;margin:0 auto;padding:24px 24px 64px}
+/* Brand selection colour, matching theartlogic.com */
+::selection{background:var(--accent);color:#fff}
+
+button{font-family:var(--font-ui)}
+button:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible{outline:none;box-shadow:var(--ring)}
+
+/* Content shell — comfortable dashboard width */
+#app{max-width:1120px;margin:0 auto;padding:28px 28px 88px}
 
 /* Focused (single-column) screens read better constrained */
-#s-proc,#s-results,#s-error,#s-batch-results{max-width:780px;margin:0 auto}
+#s-proc,#s-results,#s-error,#s-batch-results{max-width:800px;margin:0 auto}
 
-.screen{display:none}.screen.active{display:block}
+.screen{display:none}
+.screen.active{display:block;animation:screen-in .38s cubic-bezier(.21,.75,.35,1) both}
+@keyframes screen-in{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:none}
+}
 
-@media (max-width:640px){ #app{padding:16px 14px 48px} }
+@media (max-width:640px){ #app{padding:18px 16px 64px} }
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}

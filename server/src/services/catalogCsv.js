@@ -32,6 +32,8 @@ export function parseCatalogCsv(buffer) {
   const headers = Object.keys(records[0]);
   const itemKey = headers.find((h) => h.toLowerCase().trim() === 'item_no');
   const nameKey = headers.find((h) => h.toLowerCase().trim() === 'name');
+  // Optional pack/variant column ("Option", e.g. "Box10") — display-only.
+  const optionKey = headers.find((h) => h.toLowerCase().trim() === 'option');
 
   const missing = [];
   if (!itemKey) missing.push('item_no');
@@ -54,7 +56,8 @@ export function parseCatalogCsv(buffer) {
       failedRows += 1;
       continue;
     }
-    products.push({ item_no, name, normalized_name: normalizeName(name), createdAt: now });
+    const option = optionKey ? String(row[optionKey] ?? '').trim() : '';
+    products.push({ item_no, name, option, normalized_name: normalizeName(name), createdAt: now });
   }
 
   if (!products.length) {

@@ -6,10 +6,11 @@ node_modules/
 .env.*
 !.env.example
 
-# ── Build output ──────────────────────────────────────────────
+# ── Build output / deploy metadata ────────────────────────────
 dist/
 build/
 coverage/
+.vercel/
 
 # ── Editor / OS ───────────────────────────────────────────────
 .vscode/

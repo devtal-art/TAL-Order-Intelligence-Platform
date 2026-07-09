@@ -110,9 +110,9 @@ export default function ResultsView({ data, workbook, resolution, filename = '',
           <tbody>
             {prev.map((it, i) => (
               <tr key={i}>
-                <td style={{ color: '#94A3B8', fontSize: '11px' }}>{i + 1}</td>
+                <td style={{ color: '#A8A29E', fontSize: '11px' }}>{i + 1}</td>
                 <td title={it.description || ''}>{it.description || ''}</td>
-                <td style={{ color: '#64748B', fontSize: '11px' }}>{it.package || ''}</td>
+                <td style={{ color: '#78716C', fontSize: '11px' }}>{it.package || ''}</td>
                 <td className="nr">{it.qty || 0}</td>
                 <td className="nr">
                   {sym}
@@ -143,7 +143,7 @@ export default function ResultsView({ data, workbook, resolution, filename = '',
           </div>
           <div className="ti">
             Total{' '}
-            <strong style={{ color: '#16A34A' }}>
+            <strong style={{ color: '#067647' }}>
               {sym}
               {Math.abs(fin.total || 0).toFixed(2)}
             </strong>

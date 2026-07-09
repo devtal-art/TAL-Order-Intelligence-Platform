@@ -2,6 +2,7 @@ import { ApprovedMapping } from '../models/approvedMapping.model.js';
 import { Product } from '../models/product.model.js';
 import { getStatus as getCatalogStatus } from './catalogService.js';
 import { normalizeName } from '../utils/normalizeName.js';
+import { productDisplayName } from '../utils/displayName.js';
 import { AppError } from '../utils/AppError.js';
 
 // ────────────────────────────────────────────────
@@ -110,7 +111,9 @@ export function findBestMatch(emailName, catalogEntries) {
     const pSim = partialSimilarity(aTokens, entry.norm);
     const matchScore = Math.round((WEIGHTS.token * tSim + WEIGHTS.string * sSim + WEIGHTS.partial * pSim) * 100);
     if (!best || matchScore > best.matchScore) {
-      best = { websiteProductName: entry.name, itemNo: entry.item_no, matchScore };
+      // Scoring uses the raw name; the surfaced name is the display name
+      // ("Name (Option)") when the entry carries one.
+      best = { websiteProductName: entry.displayName ?? entry.name, itemNo: entry.item_no, matchScore };
     }
   }
   return best;
@@ -137,14 +140,30 @@ export async function resolveProducts(products) {
   }).lean();
   const byNorm = new Map(found.map((m) => [m.normalized_email_name, m]));
 
+  // Live catalog products for the mapped lines (V1.5): the displayed website
+  // name is derived from the current catalog — "Name (Option)" — rather than
+  // the name snapshotted on the mapping at approval time. Items no longer in
+  // the catalog fall back to the mapping's stored name.
+  const mappedItemNos = [...new Set(found.map((m) => m.item_no))];
+  const mappedProducts = mappedItemNos.length
+    ? await Product.find({ item_no: { $in: mappedItemNos } }, { item_no: 1, name: 1, option: 1, _id: 0 }).lean()
+    : [];
+  const productByItemNo = new Map(mappedProducts.map((p) => [p.item_no, p]));
+
   // 2) Load the catalog once, only if something actually needs matching.
   const needMatching = products.some((p, i) => !byNorm.get(normalizedList[i]));
   let catalogEntries = [];
   if (needMatching) {
-    const prods = await Product.find({}, { item_no: 1, name: 1, _id: 0 }).lean();
+    const prods = await Product.find({}, { item_no: 1, name: 1, option: 1, _id: 0 }).lean();
     catalogEntries = prods.map((p) => {
       const norm = normalizeForMatch(p.name);
-      return { name: p.name, item_no: p.item_no, norm, tokens: tokenize(norm) };
+      return {
+        name: p.name,
+        displayName: productDisplayName(p.name, p.option),
+        item_no: p.item_no,
+        norm,
+        tokens: tokenize(norm),
+      };
     });
   }
 
@@ -153,6 +172,7 @@ export async function resolveProducts(products) {
 
     // Approved mapping exists → return it. Matching is NOT run.
     if (mapping) {
+      const product = productByItemNo.get(mapping.item_no);
       return {
         lineId: p.lineId,
         emailProductName: p.name,
@@ -161,7 +181,9 @@ export async function resolveProducts(products) {
         reason: 'Previously approved manually.',
         source: 'approved_mapping',
         match: {
-          websiteProductName: mapping.website_product_name,
+          websiteProductName: product
+            ? productDisplayName(product.name, product.option)
+            : mapping.website_product_name,
           itemNo: mapping.item_no,
           mappingId: mapping._id,
         },

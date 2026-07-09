@@ -1,6 +1,14 @@
 /* Error screen: error card, icon, title, message */
-.err-card{background:#FFF5F5;border:1.5px solid #FECACA;border-radius:14px;padding:28px;text-align:center}
-.err-icon{width:52px;height:52px;background:#FEE2E2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
-.err-icon svg{width:26px;height:26px;fill:none;stroke:#EF4444;stroke-width:2;stroke-linecap:round}
-.err-title{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:#7F1D1D}
-.err-msg{font-size:12px;color:#991B1B;margin-top:6px;line-height:1.6}
+.err-card{
+  background:var(--danger-soft);border:1px solid var(--danger-border);
+  border-radius:var(--radius-lg);padding:34px 28px;text-align:center;
+  box-shadow:var(--shadow-sm);
+}
+.err-icon{
+  width:54px;height:54px;background:#FEE4E2;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;margin:0 auto 14px;
+  box-shadow:0 0 0 8px rgba(217,45,32,.06);
+}
+.err-icon svg{width:26px;height:26px;fill:none;stroke:var(--danger);stroke-width:2;stroke-linecap:round}
+.err-title{font-family:var(--font-display);font-size:17px;font-weight:700;color:#912018;letter-spacing:-.01em}
+.err-msg{font-size:12.5px;color:var(--danger-strong);margin-top:7px;line-height:1.65;max-width:460px;margin-left:auto;margin-right:auto}

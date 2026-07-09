@@ -1,0 +1,26 @@
+/* ── Product comments (V1.3): Released / OS / N/A ──────────────────────────
+   cm-badge   — read-only badge (saved-order detail table)
+   cm-select  — selector on the review screen's Comment column */
+
+/* Badges */
+.cm-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 10px;border-radius:999px;
+  font-size:11.5px;font-weight:700;white-space:nowrap;
+}
+.cm-badge::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.cm-released{background:var(--success-soft);color:var(--success-strong);border:1px solid var(--success-border)}
+.cm-released::before{background:var(--success)}
+.cm-os{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-border)}
+.cm-os::before{background:var(--warn-icon)}
+.cm-na{background:var(--danger-soft);color:var(--danger-strong);border:1px solid var(--danger-border)}
+.cm-na::before{background:var(--danger)}
+
+/* Review-table comment cell */
+.rt-comment{white-space:nowrap}
+.cm-select{
+  padding:6px 8px;border:1px solid var(--border);border-radius:8px;
+  background:var(--surface);color:inherit;
+  font:inherit;font-size:12.5px;cursor:pointer;
+}
+.cm-select:focus{outline:2px solid var(--accent);outline-offset:1px}

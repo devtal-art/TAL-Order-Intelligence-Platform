@@ -55,7 +55,7 @@ export default function BatchResultsView({ batchResult, batchStats, batchSession
 
       {/* ZIP download card */}
       <div className="dl-card">
-        <svg viewBox="0 0 24 24" style={{ width: '36px', height: '36px', fill: 'none', stroke: '#16A34A', strokeWidth: 1.8, strokeLinecap: 'round', flexShrink: 0 }}>
+        <svg viewBox="0 0 24 24" style={{ width: '36px', height: '36px', fill: 'none', stroke: '#7DD8A8', strokeWidth: 1.8, strokeLinecap: 'round', flexShrink: 0 }}>
           {/* Zip/archive icon */}
           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
           <polyline points="14 2 14 8 20 8" />
@@ -110,14 +110,14 @@ export default function BatchResultsView({ batchResult, batchStats, batchSession
               const needs = order.products.length - approved;
               return (
                 <tr key={i}>
-                  <td style={{ color: '#94A3B8', fontSize: '11px' }}>{i + 1}</td>
-                  <td style={{ color: '#0F172A', fontSize: '11px', fontFamily: 'monospace', fontWeight: 600 }}>
+                  <td style={{ color: '#A8A29E', fontSize: '11px' }}>{i + 1}</td>
+                  <td style={{ color: '#1C1917', fontSize: '11px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
                     {inf.order_ref || '—'}
                   </td>
                   <td title={order.filename} style={{ fontSize: '12px' }}>{order.filename}</td>
                   <td className="nr">{order.products.length}</td>
-                  <td className="nr" style={{ color: approved ? '#15803D' : '#94A3B8' }}>{approved}</td>
-                  <td className="nr" style={{ color: needs ? '#B45309' : '#94A3B8' }}>{needs}</td>
+                  <td className="nr" style={{ color: approved ? '#067647' : '#A8A29E' }}>{approved}</td>
+                  <td className="nr" style={{ color: needs ? '#B54708' : '#A8A29E' }}>{needs}</td>
                 </tr>
               );
             })}
