@@ -28,6 +28,12 @@ export function deriveStatus(resolutionData) {
   return 'partially_resolved';
 }
 
+// Delivery postcode lives inside the stored parsed email snapshot, so every
+// order — including ones saved before this field was surfaced — has it.
+function deliveryPostcode(doc) {
+  return doc.parsed_data?.delivery_address?.post_code || '';
+}
+
 // Map the stored (snake_case) document to the API DTO (camelCase).
 export function toDto(doc) {
   return {
@@ -35,6 +41,7 @@ export function toDto(doc) {
     portalOrderRef: doc.portal_order_ref,
     filename: doc.filename,
     customerName: doc.customer_name,
+    deliveryPostcode: deliveryPostcode(doc),
     orderDate: doc.order_date,
     uploadTimestamp:
       doc.upload_timestamp instanceof Date ? doc.upload_timestamp.toISOString() : doc.upload_timestamp,
@@ -54,6 +61,7 @@ export function toSummaryDto(doc) {
     portalOrderRef: doc.portal_order_ref,
     filename: doc.filename,
     customerName: doc.customer_name,
+    deliveryPostcode: deliveryPostcode(doc),
     orderDate: doc.order_date,
     uploadTimestamp:
       doc.upload_timestamp instanceof Date ? doc.upload_timestamp.toISOString() : doc.upload_timestamp,

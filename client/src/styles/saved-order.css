@@ -69,6 +69,13 @@
 .sol-dl-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .sol-table{min-width:640px}
 
+/* ── Order detail modal ──
+   The detail table is wide; showing it inline stretched the page sideways.
+   In the modal the table scrolls inside .rt-scroll instead. */
+.sol-modal{max-width:min(1080px,calc(100vw - 32px))}
+.sol-modal-body{overflow-y:auto;min-height:0}
+.sol-modal .sol-detail{border-top:1px solid var(--border)}
+
 @media (max-width:480px){
   .sol-search{flex-direction:column}
   .sol-btn{width:100%}

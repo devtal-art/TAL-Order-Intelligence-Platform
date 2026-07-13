@@ -48,6 +48,10 @@
 .ds-not{background:var(--danger-soft);color:var(--danger-strong);border:1px solid var(--danger-border)}
 .ds-not::before{background:var(--danger)}
 
+/* Saved-order detail: delivery status summary badges under the order header */
+.sol-status-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.sol-status-summary .ds-badge{font-size:12px;padding:4px 12px}
+
 /* Saved-order detail: Edit Delivery / Save / Cancel next to Download Excel */
 .sol-detail-actions{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
 .sol-edit-btn{

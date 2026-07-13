@@ -43,6 +43,11 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
             <span className="og-meta-item" title={order.customer}>
               <span className="og-meta-k">Customer</span> {order.customer || '—'}
             </span>
+            {order.postcode && (
+              <span className="og-meta-item" title={order.postcode}>
+                <span className="og-meta-k">Postcode</span> {order.postcode}
+              </span>
+            )}
           </div>
         </div>
         <div className="og-head-right">

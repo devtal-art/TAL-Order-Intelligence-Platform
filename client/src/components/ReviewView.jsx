@@ -35,6 +35,7 @@ export default function ReviewView({
       hasRef: hasRealRef(parsedData),
       filename,
       customer: parsedData?.billing_address?.company_name || '',
+      postcode: parsedData?.delivery_address?.post_code || '',
       currency,
       rows: results.map((r) => ({ result: r, item: lineItems[Number(r.lineId) - 1] || null })),
     }),

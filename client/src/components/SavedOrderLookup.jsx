@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { orderService } from '../services/orderService.js';
 import { buildXLSX } from '../excel/buildXLSX.js';
@@ -35,12 +36,8 @@ export default function SavedOrderLookup() {
     }
   };
 
-  // Load full detail (parsed + resolution) for a ref, then toggle its panel.
-  const toggle = async (ref) => {
-    if (openRef === ref) {
-      setOpenRef(null);
-      return;
-    }
+  // Load full detail (parsed + resolution) for a ref, then open it in a modal.
+  const openDetail = async (ref) => {
     if (!details[ref]) {
       setBusyRef(ref);
       setError('');
@@ -111,8 +108,6 @@ export default function SavedOrderLookup() {
               </div>
               {results.map((o) => {
                 const meta = statusMeta(o.resolutionStatus);
-                const isOpen = openRef === o.portalOrderRef;
-                const full = details[o.portalOrderRef];
                 return (
                   <div key={o.id} className="sol-row-wrap">
                     <div className="sol-row">
@@ -124,6 +119,7 @@ export default function SavedOrderLookup() {
                         <div className="sol-row-meta">
                           <span title={o.filename}>{o.filename || '—'}</span>
                           <span>· {o.customerName || 'No customer'}</span>
+                          {o.deliveryPostcode && <span>· {o.deliveryPostcode}</span>}
                           <span>· {o.totalProducts} products</span>
                           <span>· saved {fmtDate(o.uploadTimestamp)}</span>
                         </div>
@@ -131,20 +127,12 @@ export default function SavedOrderLookup() {
                       <button
                         className="sol-view-btn"
                         type="button"
-                        onClick={() => toggle(o.portalOrderRef)}
+                        onClick={() => openDetail(o.portalOrderRef)}
                         disabled={busyRef === o.portalOrderRef}
                       >
-                        {busyRef === o.portalOrderRef ? 'Loading…' : isOpen ? 'Hide' : 'View'}
+                        {busyRef === o.portalOrderRef ? 'Loading…' : 'View'}
                       </button>
                     </div>
-
-                    {isOpen && full && (
-                      <SavedOrderDetail
-                        order={full}
-                        onDownload={() => download(full)}
-                        onSaved={(updated) => setDetails((d) => ({ ...d, [o.portalOrderRef]: updated }))}
-                      />
-                    )}
                   </div>
                 );
               })}
@@ -152,7 +140,62 @@ export default function SavedOrderLookup() {
           )}
         </div>
       )}
+
+      {openRef && details[openRef] && (
+        <SavedOrderDetailModal
+          order={details[openRef]}
+          onClose={() => setOpenRef(null)}
+          onDownload={() => download(details[openRef])}
+          onSaved={(updated) => setDetails((d) => ({ ...d, [openRef]: updated }))}
+        />
+      )}
     </section>
+  );
+}
+
+// Modal shell around the order detail: keeps the wide product table inside its
+// own scroll container instead of stretching (and breaking) the page layout.
+function SavedOrderDetailModal({ order, onClose, onDownload, onSaved }) {
+  // Escape closes; the page behind must not scroll while the modal is open.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  // Portalled to <body>: the screen container animates `transform`, which
+  // would otherwise trap this fixed overlay inside it (partial-cover backdrop).
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className="modal sol-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Saved order ${order.portalOrderRef}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-head">
+          <div className="modal-heads">
+            <div className="modal-title">Order {order.portalOrderRef}</div>
+            <div className="modal-sub" title={order.filename}>{order.filename || '—'}</div>
+          </div>
+          <button className="modal-x" type="button" onClick={onClose} aria-label="Close order detail">
+            ×
+          </button>
+        </div>
+        <div className="sol-modal-body">
+          <SavedOrderDetail order={order} onDownload={onDownload} onSaved={onSaved} />
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -176,7 +219,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
   // resolve results carry lineId = String(index + 1) for single uploads and
   // "<orderIdx>-<index + 1>" for batch uploads — the email line index is
   // always the last hyphen-separated segment.
-  const rows = results.map((r) => {
+  const rows = useMemo(() => results.map((r) => {
     const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
     const item = (Number.isInteger(lineIndex) && lineIndex >= 0 && items[lineIndex]) || null;
     const approved = r.status === 'approved';
@@ -195,7 +238,22 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       pendingQty: f.pendingQty,
       deliveryStatus: f.status || '',
     };
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- results/items/fulfillment/comments/sym all derive from `order`
+  }), [order]);
+
+  // Delivery summary: how many products sit in each Order Status. Derived
+  // live — from the draft while editing (so changing a dropdown updates the
+  // badges instantly), from the stored values otherwise. Products without a
+  // status are not counted; statuses with a count of zero are not rendered.
+  const statusCounts = useMemo(() => {
+    const counts = { delivered: 0, half_delivered: 0, not_delivered: 0 };
+    for (const row of rows) {
+      const s = editing ? draft[row.lineId]?.status : row.deliveryStatus;
+      if (s && counts[s] !== undefined) counts[s] += 1;
+    }
+    return counts;
+  }, [rows, editing, draft]);
+  const hasStatuses = Object.values(statusCounts).some((n) => n > 0);
 
   const startEdit = () => {
     const d = {};
@@ -244,6 +302,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       <div className="sol-detail-top">
         <div className="sol-detail-meta">
           <span><b>Customer:</b> {order.customerName || '—'}</span>
+          <span><b>Postcode:</b> {order.deliveryPostcode || parsed.delivery_address?.post_code || '—'}</span>
           <span><b>Order date:</b> {order.orderDate || '—'}</span>
           <span><b>File:</b> {order.filename || '—'}</span>
         </div>
@@ -275,6 +334,21 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           </button>
         </div>
       </div>
+
+      {hasStatuses && (
+        <div className="sol-status-summary" aria-label="Delivery status summary">
+          {DELIVERY_STATUSES.map(({ value }) => {
+            const count = statusCounts[value];
+            if (!count) return null;
+            const meta = deliveryMeta(value);
+            return (
+              <span key={value} className={`ds-badge ds-${meta.tone}`}>
+                {count} {meta.label}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {saveError && <div className="sol-error">{saveError}</div>}
 

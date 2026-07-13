@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { catalogService } from '../services/catalogService.js';
 
 // Searchable product picker. Live-filters the active catalog and, on selection,
@@ -45,7 +46,9 @@ export default function SearchProductModal({ emailProductName, onSelect, onClose
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  // Portalled to <body>: the screen container animates `transform`, which
+  // would otherwise trap this fixed overlay inside it (partial-cover backdrop).
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" role="dialog" aria-modal="true" aria-label="Search products" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
@@ -91,6 +94,7 @@ export default function SearchProductModal({ emailProductName, onSelect, onClose
             ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

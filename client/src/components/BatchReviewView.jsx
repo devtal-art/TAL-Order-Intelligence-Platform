@@ -29,6 +29,7 @@ export default function BatchReviewView({ batchSession, uniqueResults, batchStat
           hasRef: hasRealRef(order.parsedData),
           filename: order.filename,
           customer: order.parsedData.billing_address?.company_name || '',
+          postcode: order.parsedData.delivery_address?.post_code || '',
           currency: order.parsedData.financials?.currency || 'GBP',
           orderDate: inf.order_date || '',
           rows: order.products.map((p, i) => {
