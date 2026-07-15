@@ -1,6 +1,7 @@
 import Layout from '../components/Layout.jsx';
 import CatalogSection from '../components/CatalogSection.jsx';
-import SavedOrderLookup from '../components/SavedOrderLookup.jsx';
+import SavedOrderLookup, { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
+import DuplicateOrderView from '../components/DuplicateOrderView.jsx';
 import UploadStep from '../components/UploadStep.jsx';
 import ProcessingView from '../components/ProcessingView.jsx';
 import ReviewView from '../components/ReviewView.jsx';
@@ -35,11 +36,22 @@ export default function Home() {
     error: singleError,
     comments,
     fulfillment,
+    notes,
+    processedBy,
+    saved,
+    pending,
     pickFile,
     run,
     approveProduct,
+    addProduct,
+    removeProduct,
     setProductComment,
     setProductFulfillment,
+    setProductNote,
+    chooseProcessedBy,
+    saveOrder,
+    continueDuplicate,
+    updateDuplicateOrder,
     generateExcel,
     reset: resetSingle,
   } = useOrderProcessor();
@@ -61,6 +73,10 @@ export default function Home() {
 
   // Local state: the batch files array (cleared when reset)
   const [batchFiles, setBatchFiles] = useState(null); // File[] | null
+
+  // Duplicate-upload flow (V1.9): whether the existing order's detail modal
+  // is open on top of the duplicate screen.
+  const [dupOpen, setDupOpen] = useState(false);
 
   // Determines which mode we are in
   const isBatchMode = batchFiles && batchFiles.length > 0;
@@ -91,6 +107,7 @@ export default function Home() {
 
   const handleResetAll = useCallback(() => {
     setBatchFiles(null);
+    setDupOpen(false);
     resetSingle();
     resetBatch();
   }, [resetSingle, resetBatch]);
@@ -191,6 +208,25 @@ export default function Home() {
 
       {singleScreen === 'proc' && <ProcessingView steps={steps} />}
 
+      {singleScreen === 'duplicate' && pending && (
+        <>
+          <DuplicateOrderView
+            order={pending.prev}
+            onOpenExisting={() => setDupOpen(true)}
+            onContinue={continueDuplicate}
+            onCancel={handleResetAll}
+          />
+          {dupOpen && (
+            <SavedOrderDetailModal
+              order={pending.prev}
+              onClose={() => setDupOpen(false)}
+              onDownload={() => downloadOrderExcel(pending.prev)}
+              onSaved={updateDuplicateOrder}
+            />
+          )}
+        </>
+      )}
+
       {singleScreen === 'review' && (
         <ReviewView
           results={resolution.results}
@@ -200,9 +236,17 @@ export default function Home() {
           currency={parsed?.financials?.currency || 'GBP'}
           comments={comments}
           fulfillment={fulfillment}
+          notes={notes}
+          processedBy={processedBy}
           onApprove={approveProduct}
+          onAddProduct={addProduct}
+          onRemoveProduct={removeProduct}
           onComment={setProductComment}
           onFulfillment={setProductFulfillment}
+          onNote={setProductNote}
+          onProcessedBy={chooseProcessedBy}
+          onSave={saveOrder}
+          saved={saved}
           onGenerate={generateExcel}
           onReset={handleResetAll}
         />

@@ -1,7 +1,9 @@
 // ────────────────────────────────────────────────
 //  CORE PARSER — 100% client-side, no API
-//  NOTE: Parser logic is UNCHANGED from the original single-file build.
-//        Only `export` was added. Do not modify the parsing rules here.
+//  NOTE: Parser logic is UNCHANGED from the original single-file build,
+//        except one ADDITIVE V1.8 extension: the Additional Comment is also
+//        captured when it shares the label's row/cell, and the first captured
+//        value wins. Everything else must not be modified.
 // ────────────────────────────────────────────────
 export function parseOrderHTML(htmlText){
   const doc=new DOMParser().parseFromString(htmlText,'text/html');
@@ -67,7 +69,20 @@ export function parseOrderHTML(htmlText){
     if(/^billing address$/i.test(row.trim())){mode='billing';return}
     if(/^delivery address$/i.test(row.trim())){mode='delivery';return}
     if(/unit price/i.test(row)&&/qty|quantity/i.test(row)){mode='items';return}
-    if(/additional comment/i.test(row)){mode='comments';return}
+    // V1.8 (additive): also capture a comment that shares the LABEL's row —
+    // either in a sibling cell or in the same cell ("Additional Comment: …").
+    // The original behaviour (value on a following row) is unchanged below.
+    if(/additional comment/i.test(row)){
+      mode='comments';
+      if(!R.order_info.additional_comments){
+        const inline=cells
+          .map(c=>/additional comment/i.test(c)?c.replace(/[\s\S]*?additional comments?\s*[:\-]?\s*/i,''):c)
+          .map(c=>c.trim())
+          .find(c=>c&&c!==':');
+        if(inline) R.order_info.additional_comments=inline;
+      }
+      return;
+    }
 
     // Detect side-by-side address row (has both billing and delivery fields in one row)
     if(cells.length>=8&&/company name/i.test(cells[0])&&/company name/i.test(cells[3]||'')){
@@ -82,9 +97,22 @@ export function parseOrderHTML(htmlText){
     if(/transport/i.test(low)&&/charge/i.test(low)){
       R.financials.transportation_charges=Math.abs(parseNum(cells[cells.length-1]));return;
     }
-    if(/discount/i.test(low)&&cells.length<=4&&!/product|desc/i.test(low)){
-      R.financials.discount_label=cells[0];
-      R.financials.discount=parseNum(cells[cells.length-1]);return;
+    // V1.8: shape-proof discount capture. Email layouts vary — the row can
+    // carry leading/trailing EMPTY cells, or split the long label across two
+    // cells — so work on the non-empty cells only: the last one is the
+    // amount, everything before it is the label. A label that starts with
+    // "Discount" is always a totals row, never an item row, so it is accepted
+    // even when the label itself contains the word "products" (e.g.
+    // "DISCOUNT (… MIN 10 FROZEN PRODUCTS: 2% …)"), which the old
+    // product/desc guard wrongly rejected.
+    if(/discount/i.test(low)){
+      const ne=cells.filter(c=>c&&c!==':');
+      const label=ne.length>1?ne.slice(0,-1).join(' '):(ne[0]||'');
+      const amount=ne.length?parseNum(ne[ne.length-1]):0;
+      if(ne.length>=1&&ne.length<=4&&(/^discount/i.test(label.trim())||!/product|desc/i.test(low))){
+        R.financials.discount_label=label;
+        R.financials.discount=amount;return;
+      }
     }
     if(/^total[:\s]*$/i.test(low.trim())||(cells.length<=3&&/total/i.test(cells[0])&&!/sub|transport|discount/i.test(low))){
       const v=parseNum(cells[cells.length-1]);
@@ -127,7 +155,9 @@ export function parseOrderHTML(htmlText){
 
     if(mode==='comments'){
       const v=cells.find(c=>c&&!/additional comment/i.test(c));
-      if(v) R.order_info.additional_comments=v;
+      // V1.8: first match wins — later table rows (e.g. footer text) must not
+      // overwrite the comment, which the previous last-wins behaviour allowed.
+      if(v&&!R.order_info.additional_comments) R.order_info.additional_comments=v;
     }
   });
 

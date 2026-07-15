@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import SearchProductModal from './SearchProductModal.jsx';
 import { currencySymbol } from '../utils/format.js';
-import { PRODUCT_COMMENTS, DELIVERY_STATUSES, clampPendingQty } from '../utils/order.js';
+import { PRODUCT_COMMENTS, DELIVERY_STATUSES, clampPendingQty, isMatchingSkipped } from '../utils/order.js';
 
 // One extracted product rendered as a table row.
 //   • Yellow cells  = order detail extracted from the email (line item).
@@ -10,13 +10,27 @@ import { PRODUCT_COMMENTS, DELIVERY_STATUSES, clampPendingQty } from '../utils/o
 // Row-local state (chosen/busy/error/searchOpen) mirrors the former card.
 //
 // `comment` + `onComment` (V1.3, optional): when `onComment` is provided the
-// row gets a Comment selector (Released / OS / N/A) saved with the order.
+// row gets a Comment selector (Released / OS / N/A / Not Found) saved with the
+// order. 'Not Found' (V2.1) additionally disables the row's matching controls
+// — see the `skipped` flag below.
 //
 // `fulfillment` + `onFulfillment` (V1.4, optional): when `onFulfillment` is
 // provided the row gets delivery tracking — a Pending Qty input (0 ≤ n ≤ the
 // line's ordered quantity) and an Order Status selector — saved with the order.
-export default function ReviewTableRow({ result, item, currency, onApprove, comment = '', onComment, fulfillment, onFulfillment }) {
+//
+// `note` + `onNote` (V1.7, optional): free-text Additional Comment, saved with
+// the order; independent from `comment`. `onRemove` (V1.7, optional): delete
+// button rendered ONLY for manually added products (source 'manual_addition')
+// — HTML-parsed lines never get one.
+export default function ReviewTableRow({ result, item, currency, onApprove, comment = '', onComment, fulfillment, onFulfillment, note = '', onNote, onRemove }) {
   const approved = result.status === 'approved';
+  const isManual = result.source === 'manual_addition';
+  // 'Not Found' comment (V2.1): matching is intentionally skipped for THIS
+  // order — every matching control (Search / Approve / product selection) is
+  // disabled while it applies. Purely presentational + order-level: changing
+  // the comment back re-enables everything, and nothing is ever mapped.
+  // Already-approved rows have no matching controls, so nothing to disable.
+  const skipped = !approved && isMatchingSkipped(comment);
   const [chosen, setChosen] = useState(null); // product picked from search (overrides suggestion)
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -34,7 +48,7 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
   const matchScore = approved ? 100 : candidate && candidate.matchScore != null ? candidate.matchScore : null;
 
   const doApprove = async () => {
-    if (busy || !candidate) return; // prevent duplicate submissions
+    if (busy || !candidate || skipped) return; // prevent duplicate submissions; no approval while Not Found
     setBusy(true);
     setError('');
     try {
@@ -51,7 +65,7 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
   };
 
   return (
-    <tr className={approved ? 'rt-row is-approved' : 'rt-row is-review'}>
+    <tr className={approved ? 'rt-row is-approved' : `rt-row is-review${skipped ? ' is-skipped' : ''}`}>
       {/* ── Email (yellow) ── */}
       <td className="rt-email rt-name" title={item ? item.description : result.emailProductName}>
         {item ? item.description : result.emailProductName}
@@ -72,9 +86,16 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
         {matchScore != null ? <span className={`rt-score ${approved ? 'is-full' : ''}`}>{matchScore}%</span> : '—'}
       </td>
       <td className="rt-match">
-        <span className={`rt-badge ${approved ? 'approved' : 'needs'}`}>
-          {approved ? 'Approved' : 'Needs Review'}
-        </span>
+        {skipped ? (
+          // Neutral grey — matching was intentionally skipped for this order.
+          <span className="rt-badge skipped" title="Matching intentionally skipped for this order (Not Found)">
+            Not Found
+          </span>
+        ) : (
+          <span className={`rt-badge ${approved ? 'approved' : 'needs'}`}>
+            {approved ? 'Approved' : 'Needs Review'}
+          </span>
+        )}
       </td>
 
       {/* ── Delivery tracking (V1.4, only when the flow supports it) ── */}
@@ -140,24 +161,65 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
         </td>
       )}
 
+      {/* ── Additional Comment (V1.7, free text, only when the flow supports it) ── */}
+      {onNote && (
+        <td className="rt-note">
+          <textarea
+            className="note-input"
+            rows={1}
+            placeholder="Add note…"
+            value={note}
+            onChange={(e) => onNote(result.lineId, e.target.value, false)}
+            onBlur={(e) => onNote(result.lineId, e.target.value, true)}
+            aria-label="Additional comment"
+          />
+        </td>
+      )}
+
       {/* ── Actions ── */}
       <td className="rt-actions">
         {approved ? (
-          <span className="rt-done">✓ Confirmed</span>
+          <span className="rt-done-wrap">
+            <span className="rt-done">✓ Confirmed</span>
+            {isManual && onRemove && (
+              <button
+                className="rt-del"
+                type="button"
+                title="Remove manually added product"
+                aria-label="Remove manually added product"
+                onClick={() => onRemove(result.lineId)}
+              >
+                🗑
+              </button>
+            )}
+          </span>
         ) : (
           <div className="rt-actions-wrap">
             <div className="rt-btns">
-              <button className="btn-search" type="button" onClick={() => setSearchOpen(true)} disabled={busy}>
+              <button
+                className="btn-search"
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                disabled={busy || skipped}
+                title={skipped ? 'Matching is skipped while the comment is Not Found' : undefined}
+              >
                 Search
               </button>
-              <button className="btn-approve" type="button" onClick={doApprove} disabled={!candidate || busy}>
+              <button
+                className="btn-approve"
+                type="button"
+                onClick={doApprove}
+                disabled={!candidate || busy || skipped}
+                title={skipped ? 'Matching is skipped while the comment is Not Found' : undefined}
+              >
                 {busy ? 'Approving…' : 'Approve'}
               </button>
             </div>
+            {skipped && <div className="rt-skip-note">Matching skipped for this order</div>}
             {error && <div className="rt-error">{error}</div>}
           </div>
         )}
-        {searchOpen && (
+        {searchOpen && !skipped && (
           <SearchProductModal
             emailProductName={result.emailProductName}
             onSelect={(product) => {

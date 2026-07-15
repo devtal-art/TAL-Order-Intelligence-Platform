@@ -23,6 +23,11 @@ const orderSchema = new mongoose.Schema(
 
     filename: { type: String, default: '' },
     customer_name: { type: String, default: '' },
+
+    // Team member who processed the order (V1.9). Order-level, plain string —
+    // deliberately NOT authentication/user management. '' = Not Assigned
+    // (all orders saved before V1.9).
+    processed_by: { type: String, default: '', trim: true },
     order_date: { type: String, default: '' },
     upload_timestamp: { type: Date, default: Date.now },
     total_products: { type: Number, default: 0 },
@@ -40,7 +45,8 @@ const orderSchema = new mongoose.Schema(
     resolution_data: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     // Per-product fulfilment comment, keyed by the product's lineId (the same
-    // String(index + 1) key resolution results use): 'Released' | 'OS' | 'N/A'.
+    // String(index + 1) key resolution results use): 'Released' | 'OS' | 'N/A'
+    // | 'Not Found' (V2.1 — matching intentionally skipped for this order only).
     // Deliberately a SIBLING of parsed_data/resolution_data — both of those are
     // snapshot blobs that get fully replaced on re-upload/approval, so a value
     // stored inside them would be silently wiped. This field is only ever
@@ -53,6 +59,13 @@ const orderSchema = new mongoose.Schema(
     // | 'not_delivered' } }. Entries are user-entered and optional — orders
     // saved before V1.4 simply have no entry for any line.
     product_fulfillment: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+    // Per-product free-text "Additional Comment" (V1.7), keyed by lineId and a
+    // sibling for the same wipe-on-reupload reason. Completely independent
+    // from product_comments (the Released/OS/N/A business status): this holds
+    // user-written notes ("Damaged packaging.", "Urgent delivery."). Optional;
+    // orders saved before V1.7 simply have no entry for any line.
+    product_notes: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { versionKey: false, minimize: false }
 );

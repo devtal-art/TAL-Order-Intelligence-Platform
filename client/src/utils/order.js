@@ -27,11 +27,30 @@ export function deriveOrderStatus(results) {
   return 'partially_resolved';
 }
 
+// Team members who can be assigned as an order's processor (V1.9). Order-level
+// identification only — deliberately NOT authentication or user management.
+export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil'];
+
 // The per-product fulfilment comments the platform knows (V1.3).
-//   'Released' — in stock, order line released
-//   'OS'       — out of stock
-//   'N/A'      — not available on the website
-export const PRODUCT_COMMENTS = ['Released', 'OS', 'N/A'];
+//   'Released'  — in stock, order line released
+//   'OS'        — out of stock
+//   'N/A'       — not available on the website
+//   'Not Found' — product doesn't exist in our records and matching is
+//                 INTENTIONALLY skipped for THIS order only (V2.1). Never
+//                 creates a mapping and never affects future orders — it is
+//                 stored exactly like the other comments (product_comments).
+export const PRODUCT_COMMENTS = ['Released', 'OS', 'N/A', 'Not Found'];
+
+// The comment value that intentionally skips matching for the order (V2.1).
+export const NOT_FOUND_COMMENT = 'Not Found';
+
+// Whether a product's comment marks matching as intentionally skipped for
+// this order (V2.1). Purely order-level: drives the disabled state of the
+// matching controls (Search / Approve / product selection) and the Save gate
+// — it never touches the matching engine or Approved Mappings.
+export function isMatchingSkipped(comment) {
+  return comment === NOT_FOUND_COMMENT;
+}
 
 // Human label + style token for a product comment (badge rendering).
 export function commentMeta(comment) {
@@ -42,6 +61,9 @@ export function commentMeta(comment) {
       return { label: 'OS', tone: 'os' };
     case 'N/A':
       return { label: 'N/A', tone: 'na' };
+    case 'Not Found':
+      // Neutral (grey) — an order-level decision, not an inventory status.
+      return { label: 'Not Found', tone: 'notfound' };
     default:
       return null;
   }

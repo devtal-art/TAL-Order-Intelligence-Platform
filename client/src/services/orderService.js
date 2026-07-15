@@ -25,4 +25,12 @@ export const orderService = {
   // fulfillment: { [lineId]: { pendingQty?, status? } | null } (V1.4)
   setFulfillment: (portalOrderRef, fulfillment) =>
     apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/fulfillment`, { fulfillment }),
+
+  // notes: { [lineId]: string | null } — free-text Additional Comments (V1.7)
+  setNotes: (portalOrderRef, notes) =>
+    apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/notes`, { notes }),
+
+  // processedBy: one of PROCESSED_BY_USERS, or '' to clear (V1.9)
+  setProcessedBy: (portalOrderRef, processedBy) =>
+    apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/processed-by`, { processedBy }),
 };

@@ -16,7 +16,9 @@ import { deriveOrderStatus, statusMeta } from '../utils/order.js';
 // passes nothing and renders exactly as before.
 // `fulfillment` + `onFulfillment` are optional (V1.4): when `onFulfillment` is
 // provided, each row gets Pending Qty + Order Status delivery tracking.
-export default function OrderReviewGroup({ order, onApprove, comments, onComment, fulfillment, onFulfillment, defaultOpen = true }) {
+// `notes` + `onNote` are optional (V1.7): free-text Additional Comment column.
+// `onRemove` is optional (V1.7): delete action for manually added rows only.
+export default function OrderReviewGroup({ order, onApprove, comments, onComment, fulfillment, onFulfillment, notes, onNote, onRemove, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
 
   const results = order.rows.map((r) => r.result);
@@ -48,6 +50,11 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
                 <span className="og-meta-k">Postcode</span> {order.postcode}
               </span>
             )}
+            {order.orderTotal && (
+              <span className="og-meta-item" title={order.orderTotal}>
+                <span className="og-meta-k">Order Total</span> {order.orderTotal}
+              </span>
+            )}
           </div>
         </div>
         <div className="og-head-right">
@@ -69,6 +76,7 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
                   <th className="rt-grp rt-grp-match" colSpan={4}>Website match · from catalog</th>
                   {onFulfillment && <th className="rt-grp rt-grp-fulfil" colSpan={2}>Delivery</th>}
                   {onComment && <th className="rt-grp rt-grp-comment" rowSpan={2}>Comment</th>}
+                  {onNote && <th className="rt-grp rt-grp-note" rowSpan={2}>Additional Comment</th>}
                   <th className="rt-grp rt-grp-act" rowSpan={2}>Action</th>
                 </tr>
                 <tr className="rt-cols">
@@ -97,6 +105,9 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
                     onComment={onComment}
                     fulfillment={fulfillment ? fulfillment[result.lineId] : undefined}
                     onFulfillment={onFulfillment}
+                    note={notes ? notes[result.lineId] || '' : ''}
+                    onNote={onNote}
+                    onRemove={onRemove}
                   />
                 ))}
               </tbody>

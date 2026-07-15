@@ -103,6 +103,15 @@
 .rt-badge.approved::before{background:var(--success)}
 .rt-badge.needs{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-border)}
 .rt-badge.needs::before{background:var(--warn-icon)}
+/* 'Not Found' (V2.1) — neutral grey: matching intentionally skipped for this order. */
+.rt-badge.skipped{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--border-strong)}
+.rt-badge.skipped::before{background:var(--muted)}
+
+/* Row marked 'Not Found' (V2.1): dim the match cells so the disabled matching
+   controls read as intentional; the editable cells (Pending Qty / Order
+   Status / Comment / Additional Comment) keep full contrast. */
+.rt-row.is-skipped .rt-match{opacity:.55}
+.rt-skip-note{font-size:11px;color:var(--muted);font-style:italic;white-space:nowrap}
 
 .rt-actions{white-space:nowrap}
 .rt-actions-wrap{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
@@ -171,6 +180,34 @@
   border-radius:10px;padding:11px 16px;
 }
 .rev-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px}
+
+/* Save Order group (V2.0): wraps the save / saved+generate states */
+.rev-save-group{display:flex;align-items:center;gap:10px}
+
+/* Primary Save Order CTA — green, mirrors .btn-generate structure */
+.btn-save{
+  background:var(--success);color:#fff;border:1px solid var(--success);border-radius:10px;
+  padding:12px 24px;font-size:13px;font-weight:600;font-family:var(--font-ui);
+  cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(6,118,71,.3);
+  transition:background .2s,transform .15s,box-shadow .2s;
+}
+.btn-save:hover{background:var(--success-hover);transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 4px 12px -2px rgba(6,118,71,.5)}
+.btn-save:active{transform:translateY(0) scale(.99)}
+.btn-save:disabled{background:var(--bg-deep);border-color:var(--bg-deep);color:var(--muted);cursor:not-allowed;box-shadow:none;transform:none}
+
+/* ✓ Saved confirmation badge (shown after save, before Generate Excel) */
+.rev-saved-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12.5px;font-weight:700;color:var(--success-strong);
+  background:var(--success-soft);border:1.5px solid var(--success-border);
+  border-radius:9px;padding:6px 14px;user-select:none;
+}
+.rev-saved-badge svg{
+  width:14px;height:14px;flex-shrink:0;
+  fill:none;stroke:var(--success-strong);stroke-width:3;stroke-linecap:round;
+}
+
 .btn-generate{
   background:var(--btn-brand);color:#fff;border:1px solid var(--btn-brand-border);border-radius:10px;
   padding:12px 24px;font-size:13px;font-weight:600;font-family:var(--font-ui);
@@ -181,6 +218,9 @@
 .btn-generate:hover{background:var(--btn-brand-hover);transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 4px 12px -2px rgba(47,79,162,.5)}
 .btn-generate:active{transform:translateY(0) scale(.99)}
 .btn-generate:disabled{background:var(--bg-deep);border-color:var(--bg-deep);color:var(--muted);cursor:not-allowed;box-shadow:none;transform:none}
+
+/* Plain label next to the locked Processed By pill on the Review screen */
+.pb-label{font-size:12px;font-weight:600;color:var(--ink-2);margin-right:2px}
 
 .rev-card-error{margin-top:10px;font-size:12px;color:var(--danger-strong);background:var(--danger-soft);border:1px solid var(--danger-border);border-radius:8px;padding:8px 12px}
 

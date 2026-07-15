@@ -1,7 +1,11 @@
 import { useState, useMemo } from 'react';
 import OrderReviewGroup from './OrderReviewGroup.jsx';
 import OrderSearchBar from './OrderSearchBar.jsx';
-import { portalOrderRef, hasRealRef } from '../utils/order.js';
+import AddProductModal from './AddProductModal.jsx';
+import OrderFinancials from './OrderFinancials.jsx';
+import { portalOrderRef, hasRealRef, PROCESSED_BY_USERS, isMatchingSkipped } from '../utils/order.js';
+import { approvedItemNos } from '../utils/manualProduct.js';
+import { currencySymbol } from '../utils/format.js';
 
 // Review screen (single-file). Order-centric (V1.2): the products are wrapped in
 // one Order group keyed by its Portal Order Ref No, with an instant ref search.
@@ -14,18 +18,52 @@ export default function ReviewView({
   currency = 'GBP',
   comments = {},
   fulfillment = {},
+  notes = {},
+  processedBy = '',
   onApprove,
+  onAddProduct,
+  onRemoveProduct,
   onComment,
   onFulfillment,
+  onNote,
+  onProcessedBy,
+  onSave,        // V2.0 — called when user clicks Save Order
+  saved = false, // V2.0 — true once the order has been written to the DB
   onGenerate,
   onReset,
 }) {
   const [search, setSearch] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+
+  // Item numbers already approved in the order — informational "In order"
+  // tag in the Add Product search (duplicates are allowed, V1.9).
+  const existingItemNos = useMemo(() => approvedItemNos(results), [results]);
+
+  // Order-level extras already produced by the parser (V1.8, display-only):
+  // the customer's Additional Comment and the parsed Order Total. Both are
+  // optional — absent/zero values render nothing.
+  const additionalComment = String(parsedData?.order_info?.additional_comments || '').trim();
+  const totalNum = Number(parsedData?.financials?.total);
+  const orderTotal = Number.isFinite(totalNum) && totalNum > 0 ? `${currencySymbol(currency)}${totalNum.toFixed(2)}` : '';
 
   const total = results.length;
   const approved = results.filter((r) => r.status === 'approved').length;
   const needsReview = results.filter((r) => r.status === 'needs_review').length;
-  const canGenerate = needsReview === 0;
+  // Unresolved products explicitly marked 'Not Found' (V2.1) don't block the
+  // order: matching was intentionally skipped for them, so they can't be
+  // approved — requiring approval would make the order unsaveable. They still
+  // show in the Needs Review count above (matching genuinely didn't happen).
+  const blockingReview = results.filter(
+    (r) => r.status === 'needs_review' && !isMatchingSkipped(comments[r.lineId])
+  ).length;
+  // Processed By is mandatory (V1.9): the order isn’t saved and Excel can’t
+  // be generated until a team member is selected.
+  const needsProcessedBy = Boolean(onProcessedBy) && !processedBy;
+  // Save is enabled once all products are resolved (or intentionally skipped
+  // via 'Not Found') and a name is selected. Generate is enabled only after
+  // the order has been explicitly saved (V2.0).
+  const canSave = !saved && blockingReview === 0 && !needsProcessedBy;
+  const canGenerate = saved && blockingReview === 0;
 
   // A single upload is exactly one order. Resolve results carry lineId =
   // String(index + 1); the email line items are in the same order.
@@ -37,9 +75,10 @@ export default function ReviewView({
       customer: parsedData?.billing_address?.company_name || '',
       postcode: parsedData?.delivery_address?.post_code || '',
       currency,
+      orderTotal,
       rows: results.map((r) => ({ result: r, item: lineItems[Number(r.lineId) - 1] || null })),
     }),
-    [results, parsedData, filename, lineItems, currency]
+    [results, parsedData, filename, lineItems, currency, orderTotal]
   );
 
   const q = search.trim().toLowerCase();
@@ -67,7 +106,63 @@ export default function ReviewView({
         </div>
       </div>
 
+      {additionalComment && (
+        <div className="oc-note" role="note" aria-label="Order additional comment">
+          <div className="oc-note-title">Additional Comment</div>
+          <div className="oc-note-text">{additionalComment}</div>
+        </div>
+      )}
+
       <OrderSearchBar value={search} onChange={setSearch} matchCount={visible ? 1 : 0} totalCount={1} />
+
+      {(onAddProduct || onProcessedBy) && (
+        <div className="apm-bar">
+          {onProcessedBy ? (
+            saved ? (
+              // Once saved, Processed By is immutable — show locked badge.
+              <div className="pb-field">
+                <span className="pb-label">Processed By</span>
+                <span className="pb-locked" title="Processed By cannot be changed once the order is saved">
+                  {processedBy}
+                  <svg className="pb-lock-icon" viewBox="0 0 24 24" aria-label="Locked">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </span>
+              </div>
+            ) : (
+              <div className={`pb-field${needsProcessedBy ? ' pb-missing' : ''}`}>
+                <label htmlFor="rv-processed-by">
+                  Processed By <span className="pb-req" aria-hidden="true">*</span>
+                </label>
+                <select
+                  id="rv-processed-by"
+                  className="pb-select"
+                  value={processedBy}
+                  onChange={(e) => onProcessedBy(e.target.value)}
+                >
+                  <option value="">Select User…</option>
+                  {PROCESSED_BY_USERS.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+                {needsProcessedBy && <span className="pb-hint">Required before saving.</span>}
+              </div>
+            )
+          ) : (
+            <span />
+          )}
+          {onAddProduct && (
+            <button className="btn-add-product" type="button" onClick={() => setAddOpen(true)}>
+              <svg viewBox="0 0 24 24">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add Product
+            </button>
+          )}
+        </div>
+      )}
 
       {visible ? (
         <OrderReviewGroup
@@ -77,14 +172,21 @@ export default function ReviewView({
           onComment={onComment}
           fulfillment={fulfillment}
           onFulfillment={onFulfillment}
+          notes={notes}
+          onNote={onNote}
+          onRemove={onRemoveProduct}
         />
       ) : (
         <div className="og-empty">No order matches “{search}”.</div>
       )}
 
-      {!canGenerate && (
+      <OrderFinancials financials={parsedData?.financials} />
+
+      {(blockingReview > 0 || needsProcessedBy) && (
         <div className="rev-gate-note">
-          {needsReview} product{needsReview > 1 ? 's' : ''} still need review before Excel can be generated.
+          {blockingReview > 0
+            ? `${blockingReview} product${blockingReview > 1 ? 's' : ''} still need${blockingReview === 1 ? 's' : ''} review before the order can be saved.`
+            : 'Select who processed this order (Processed By) before saving.'}
         </div>
       )}
 
@@ -96,14 +198,44 @@ export default function ReviewView({
           </svg>
           Process another file
         </button>
-        <button className="btn-generate" onClick={onGenerate} disabled={!canGenerate}>
-          <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round' }}>
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M3 9h18M9 21V9" />
-          </svg>
-          Generate Excel
-        </button>
+
+        <div className="rev-save-group">
+          {saved ? (
+            <>
+              <span className="rev-saved-badge" aria-label="Order saved">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Saved
+              </span>
+              <button className="btn-generate" onClick={onGenerate} disabled={!canGenerate}>
+                <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round' }}>
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M3 9h18M9 21V9" />
+                </svg>
+                Generate Excel
+              </button>
+            </>
+          ) : (
+            <button className="btn-save" onClick={onSave} disabled={!canSave}>
+              <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+              Save Order
+            </button>
+          )}
+        </div>
       </div>
+
+      {addOpen && (
+        <AddProductModal
+          existingItemNos={existingItemNos}
+          onAdd={onAddProduct}
+          onClose={() => setAddOpen(false)}
+        />
+      )}
     </div>
   );
 }

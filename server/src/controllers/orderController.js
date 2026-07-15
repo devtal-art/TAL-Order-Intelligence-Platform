@@ -16,6 +16,7 @@ export async function saveOrder(req, res, next) {
       totalProducts,
       parsedData,
       resolutionData,
+      processedBy,
     } = req.body || {};
 
     if (isBlank(portalOrderRef)) {
@@ -33,6 +34,7 @@ export async function saveOrder(req, res, next) {
       totalProducts: Number.isFinite(Number(totalProducts)) ? Number(totalProducts) : 0,
       parsedData: parsedData ?? {},
       resolutionData: resolutionData ?? {},
+      processedBy: processedBy || '',
     });
 
     res.status(200).json(order);
@@ -64,7 +66,7 @@ export async function getOrder(req, res, next) {
 }
 
 // PATCH /api/v1/orders/:ref/comments — set/clear per-product comments.
-// Body: { comments: { [lineId]: 'Released' | 'OS' | 'N/A' | null } }
+// Body: { comments: { [lineId]: 'Released' | 'OS' | 'N/A' | 'Not Found' | null } }
 export async function setOrderComments(req, res, next) {
   try {
     ensureDb();
@@ -95,6 +97,44 @@ export async function setOrderFulfillment(req, res, next) {
       });
     }
     const order = await orderService.setProductFulfillment(req.params.ref, fulfillment);
+    res.status(200).json(order);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/v1/orders/:ref/notes — set/clear per-product Additional Comments.
+// Body: { notes: { [lineId]: string | null } } (V1.7 — additive)
+export async function setOrderNotes(req, res, next) {
+  try {
+    ensureDb();
+    const { notes } = req.body || {};
+    if (!notes || typeof notes !== 'object' || Array.isArray(notes)) {
+      throw new AppError('VALIDATION_ERROR', 'Missing required field.', {
+        status: 400,
+        details: [{ field: 'notes', issue: 'required object of { lineId: note }' }],
+      });
+    }
+    const order = await orderService.setProductNotes(req.params.ref, notes);
+    res.status(200).json(order);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/v1/orders/:ref/processed-by — assign/clear the order's processor.
+// Body: { processedBy: 'Jasmeet' | 'Shubham' | 'Alpa' | 'Sahil' | '' | null } (V1.9)
+export async function setOrderProcessedBy(req, res, next) {
+  try {
+    ensureDb();
+    const { processedBy } = req.body || {};
+    if (processedBy === undefined) {
+      throw new AppError('VALIDATION_ERROR', 'Missing required field.', {
+        status: 400,
+        details: [{ field: 'processedBy', issue: 'required (empty string clears the assignment)' }],
+      });
+    }
+    const order = await orderService.setProcessedBy(req.params.ref, processedBy);
     res.status(200).json(order);
   } catch (err) {
     next(err);

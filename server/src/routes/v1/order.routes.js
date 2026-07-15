@@ -6,6 +6,8 @@ import {
   updateOrder,
   setOrderComments,
   setOrderFulfillment,
+  setOrderNotes,
+  setOrderProcessedBy,
 } from '../../controllers/orderController.js';
 
 // Mounted at /api/v1/orders (V1.2 — new, additive).
@@ -16,4 +18,6 @@ orderRouter.get('/', listOrders);
 orderRouter.get('/:ref', getOrder);
 orderRouter.patch('/:ref/comments', setOrderComments);
 orderRouter.patch('/:ref/fulfillment', setOrderFulfillment);
+orderRouter.patch('/:ref/notes', setOrderNotes);
+orderRouter.patch('/:ref/processed-by', setOrderProcessedBy);
 orderRouter.patch('/:ref', updateOrder);

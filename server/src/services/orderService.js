@@ -34,6 +34,9 @@ function deliveryPostcode(doc) {
   return doc.parsed_data?.delivery_address?.post_code || '';
 }
 
+// The team members who can be assigned as an order's processor (V1.9).
+export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil'];
+
 // Map the stored (snake_case) document to the API DTO (camelCase).
 export function toDto(doc) {
   return {
@@ -41,6 +44,8 @@ export function toDto(doc) {
     portalOrderRef: doc.portal_order_ref,
     filename: doc.filename,
     customerName: doc.customer_name,
+    // '' for orders saved before V1.9 — the client renders "Not Assigned".
+    processedBy: doc.processed_by || '',
     deliveryPostcode: deliveryPostcode(doc),
     orderDate: doc.order_date,
     uploadTimestamp:
@@ -51,6 +56,8 @@ export function toDto(doc) {
     resolutionData: doc.resolution_data,
     productComments: doc.product_comments || {},
     productFulfillment: doc.product_fulfillment || {},
+    // Older orders have no product_notes field — treat as empty (V1.7).
+    productNotes: doc.product_notes || {},
   };
 }
 
@@ -61,6 +68,7 @@ export function toSummaryDto(doc) {
     portalOrderRef: doc.portal_order_ref,
     filename: doc.filename,
     customerName: doc.customer_name,
+    processedBy: doc.processed_by || '',
     deliveryPostcode: deliveryPostcode(doc),
     orderDate: doc.order_date,
     uploadTimestamp:
@@ -80,27 +88,79 @@ export async function upsertOrder({
   totalProducts = 0,
   parsedData = {},
   resolutionData = {},
+  processedBy = '',
 }) {
   const resolution_status = deriveStatus(resolutionData);
+
+  const set = {
+    filename,
+    customer_name: customerName,
+    order_date: orderDate,
+    total_products: totalProducts,
+    resolution_status,
+    parsed_data: parsedData ?? {},
+    resolution_data: resolutionData ?? {},
+    upload_timestamp: new Date(),
+  };
+
+  // Processed By (V1.9): set only when explicitly provided — saves that omit
+  // it (manual add/remove product, resolution mirrors) must never clear an
+  // existing assignment.
+  const pb = String(processedBy ?? '').trim();
+  if (pb) {
+    if (!PROCESSED_BY_USERS.includes(pb)) {
+      throw new AppError('VALIDATION_ERROR', `Processed By must be one of: ${PROCESSED_BY_USERS.join(', ')}.`, {
+        status: 400,
+        details: [{ field: 'processedBy', issue: 'invalid value' }],
+      });
+    }
+    set.processed_by = pb;
+  }
 
   const doc = await Order.findOneAndUpdate(
     { portal_order_ref: portalOrderRef },
     {
-      $set: {
-        filename,
-        customer_name: customerName,
-        order_date: orderDate,
-        total_products: totalProducts,
-        resolution_status,
-        parsed_data: parsedData ?? {},
-        resolution_data: resolutionData ?? {},
-        upload_timestamp: new Date(),
-      },
+      $set: set,
       $setOnInsert: { portal_order_ref: portalOrderRef },
     },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
 
+  return toDto(doc);
+}
+
+// Assign the order's Processed By (V1.9). ONE-SHOT by business rule (V1.9.1):
+// the value can be set only while the order is unassigned (legacy orders show
+// "Not Assigned" and can be assigned once) — after that it is immutable and
+// any change attempt is rejected. Assigning the identical value again is an
+// idempotent no-op.
+export async function setProcessedBy(portalOrderRef, processedBy) {
+  const value = processedBy === null || processedBy === undefined ? '' : String(processedBy).trim();
+  if (!value || !PROCESSED_BY_USERS.includes(value)) {
+    throw new AppError('VALIDATION_ERROR', `Processed By must be one of: ${PROCESSED_BY_USERS.join(', ')}.`, {
+      status: 400,
+      details: [{ field: 'processedBy', issue: 'invalid value' }],
+    });
+  }
+
+  const existing = await Order.findOne({ portal_order_ref: portalOrderRef }, { processed_by: 1 }).lean();
+  if (!existing) {
+    throw new AppError('NOT_FOUND', `No order found with Portal Order Ref "${portalOrderRef}".`, {
+      status: 404,
+    });
+  }
+  if (existing.processed_by && existing.processed_by !== value) {
+    throw new AppError('CONFLICT', `Processed By is already assigned to ${existing.processed_by} and cannot be changed.`, {
+      status: 409,
+      details: [{ field: 'processedBy', issue: 'immutable once assigned' }],
+    });
+  }
+
+  const doc = await Order.findOneAndUpdate(
+    { portal_order_ref: portalOrderRef },
+    { $set: { processed_by: value } },
+    { new: true }
+  );
   return toDto(doc);
 }
 
@@ -123,12 +183,16 @@ export async function updateResolution(portalOrderRef, resolutionData) {
   return toDto(doc);
 }
 
-// The only per-product comment values the platform knows.
-export const PRODUCT_COMMENTS = ['Released', 'OS', 'N/A'];
+// The only per-product comment values the platform knows. 'Not Found' (V2.1)
+// marks matching as intentionally skipped for THIS order only — it is stored
+// exactly like the other comments and deliberately has NO effect anywhere
+// else: it never creates an Approved Mapping, never touches the Product
+// Catalog, and never influences the matching engine or future orders.
+export const PRODUCT_COMMENTS = ['Released', 'OS', 'N/A', 'Not Found'];
 
 // Merge per-product comments into an order without touching anything else.
-// `comments` = { [lineId]: 'Released' | 'OS' | 'N/A' | null } — null/'' clears
-// the comment for that line. Other lines' comments are preserved.
+// `comments` = { [lineId]: 'Released' | 'OS' | 'N/A' | 'Not Found' | null } —
+// null/'' clears the comment for that line. Other lines' comments are preserved.
 export async function setProductComments(portalOrderRef, comments) {
   const set = {};
   const unset = {};
@@ -154,6 +218,58 @@ export async function setProductComments(portalOrderRef, comments) {
     throw new AppError('VALIDATION_ERROR', 'No comments provided.', {
       status: 400,
       details: [{ field: 'comments', issue: 'required' }],
+    });
+  }
+
+  const doc = await Order.findOneAndUpdate({ portal_order_ref: portalOrderRef }, update, { new: true });
+  if (!doc) {
+    throw new AppError('NOT_FOUND', `No order found with Portal Order Ref "${portalOrderRef}".`, {
+      status: 404,
+    });
+  }
+  return toDto(doc);
+}
+
+// Longest accepted Additional Comment (free-text per-product note, V1.7).
+export const NOTE_MAX_LENGTH = 2000;
+
+// Merge per-product free-text notes ("Additional Comment", V1.7) into an order
+// without touching anything else — mirrors setProductComments exactly.
+// `notes` = { [lineId]: string | null } — null/'' clears the note for that
+// line. Values are trimmed at the ends only, so line breaks inside the note
+// are preserved. Other lines' notes are untouched.
+export async function setProductNotes(portalOrderRef, notes) {
+  const set = {};
+  const unset = {};
+  for (const [lineId, value] of Object.entries(notes || {})) {
+    const key = `product_notes.${lineId}`;
+    if (value === null || value === undefined || String(value).trim() === '') {
+      unset[key] = '';
+    } else {
+      if (typeof value !== 'string') {
+        throw new AppError('VALIDATION_ERROR', 'Additional comment must be text.', {
+          status: 400,
+          details: [{ field: `notes.${lineId}`, issue: 'must be a string' }],
+        });
+      }
+      const trimmed = value.trim();
+      if (trimmed.length > NOTE_MAX_LENGTH) {
+        throw new AppError('VALIDATION_ERROR', `Additional comment must be ${NOTE_MAX_LENGTH} characters or fewer.`, {
+          status: 400,
+          details: [{ field: `notes.${lineId}`, issue: `max ${NOTE_MAX_LENGTH} characters` }],
+        });
+      }
+      set[key] = trimmed;
+    }
+  }
+
+  const update = {};
+  if (Object.keys(set).length) update.$set = set;
+  if (Object.keys(unset).length) update.$unset = unset;
+  if (!Object.keys(update).length) {
+    throw new AppError('VALIDATION_ERROR', 'No notes provided.', {
+      status: 400,
+      details: [{ field: 'notes', issue: 'required' }],
     });
   }
 

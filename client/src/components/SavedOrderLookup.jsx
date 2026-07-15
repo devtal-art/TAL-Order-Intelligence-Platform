@@ -3,8 +3,22 @@ import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { orderService } from '../services/orderService.js';
 import { buildXLSX } from '../excel/buildXLSX.js';
-import { statusMeta, commentMeta, deliveryMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, clampPendingQty } from '../utils/order.js';
+import { statusMeta, commentMeta, deliveryMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, PROCESSED_BY_USERS, clampPendingQty } from '../utils/order.js';
+import { approvedItemNos, appendManualProduct, removeManualProduct, remapAfterRemoval } from '../utils/manualProduct.js';
 import { currencySymbol } from '../utils/format.js';
+import AddProductModal from './AddProductModal.jsx';
+import OrderFinancials from './OrderFinancials.jsx';
+
+// Build and download the Excel workbook for a saved order DTO. Exported so
+// the duplicate-upload flow (V1.9) can reuse it outside this component.
+export function downloadOrderExcel(order) {
+  const parsed = order.parsedData || {};
+  const resolution = order.resolutionData || { results: [] };
+  const wb = buildXLSX(parsed, resolution);
+  const inf = parsed.order_info || {};
+  const fname = `Order_${inf.order_ref || order.portalOrderRef}_${(inf.order_date || '').replace(/\//g, '-') || 'data'}.xlsx`;
+  XLSX.writeFile(wb, fname, { bookType: 'xlsx', type: 'binary', cellStyles: true });
+}
 
 // Home-page lookup for previously processed orders (V1.2). Every uploaded HTML
 // is saved to MongoDB keyed by Portal Order Ref No, so an order can be found
@@ -54,14 +68,7 @@ export default function SavedOrderLookup() {
     setOpenRef(ref);
   };
 
-  const download = (order) => {
-    const parsed = order.parsedData || {};
-    const resolution = order.resolutionData || { results: [] };
-    const wb = buildXLSX(parsed, resolution);
-    const inf = parsed.order_info || {};
-    const fname = `Order_${inf.order_ref || order.portalOrderRef}_${(inf.order_date || '').replace(/\//g, '-') || 'data'}.xlsx`;
-    XLSX.writeFile(wb, fname, { bookType: 'xlsx', type: 'binary', cellStyles: true });
-  };
+  const download = (order) => downloadOrderExcel(order);
 
   const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
 
@@ -122,6 +129,14 @@ export default function SavedOrderLookup() {
                           {o.deliveryPostcode && <span>· {o.deliveryPostcode}</span>}
                           <span>· {o.totalProducts} products</span>
                           <span>· saved {fmtDate(o.uploadTimestamp)}</span>
+                          <span className="sol-row-pb">
+                            · <b>By:</b> 
+                            {o.processedBy ? (
+                              <span className="sol-row-pb-name">{o.processedBy}</span>
+                            ) : (
+                              <span className="sol-row-pb-empty">Not Assigned</span>
+                            )}
+                          </span>
                         </div>
                       </div>
                       <button
@@ -155,7 +170,9 @@ export default function SavedOrderLookup() {
 
 // Modal shell around the order detail: keeps the wide product table inside its
 // own scroll container instead of stretching (and breaking) the page layout.
-function SavedOrderDetailModal({ order, onClose, onDownload, onSaved }) {
+// Exported so the duplicate-upload flow (V1.9) can open an existing order
+// directly, without a manual search.
+export function SavedOrderDetailModal({ order, onClose, onDownload, onSaved }) {
   // Escape closes; the page behind must not scroll while the modal is open.
   useEffect(() => {
     const onKey = (e) => {
@@ -209,12 +226,84 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
   const results = order.resolutionData?.results || [];
   const comments = order.productComments || {};
   const fulfillment = order.productFulfillment || {};
+  const notes = order.productNotes || {}; // older orders have no notes — empty (V1.7)
   const sym = currencySymbol(parsed.financials?.currency);
+
+  // Order-level extras from the stored parsed snapshot (V1.8, display-only).
+  // Older orders without them simply don't render the field/section.
+  const additionalComment = String(parsed.order_info?.additional_comments || '').trim();
+  const totalNum = Number(parsed.financials?.total);
+  const orderTotal = Number.isFinite(totalNum) && totalNum > 0 ? `${sym}${totalNum.toFixed(2)}` : '';
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({}); // { [lineId]: { pendingQty, status } }
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+
+  // Item numbers already approved in the order — informational "In order"
+  // tag in the Add Product search (duplicates are allowed, V1.9).
+  const existingItemNos = useMemo(() => approvedItemNos(results), [results]);
+
+  // Manually add one catalog product to this saved order (V1.6). Appends the
+  // line + an already-approved result (catalog product → Approved, 100%) via
+  // the shared helper the Review screen also uses, then re-persists through
+  // the existing order upsert. Comments and fulfilment entries are siblings of
+  // the snapshots, so they are untouched. Errors surface inside the modal.
+  const addProduct = async (input) => {
+    const appended = appendManualProduct(parsed, order.resolutionData || { results: [] }, input);
+    const updated = await orderService.save({
+      portalOrderRef: order.portalOrderRef,
+      filename: order.filename || '',
+      customerName: order.customerName || '',
+      orderDate: order.orderDate || '',
+      totalProducts: appended.parsed.line_items.length,
+      parsedData: appended.parsed,
+      resolutionData: appended.resolution,
+    });
+    onSaved(updated);
+  };
+
+  const [deletingId, setDeletingId] = useState('');
+
+  // Processed By is set only at order creation time (Review screen Save
+  // workflow, V2.0) and is immutable afterwards — no assignment or edit
+  // function is exposed here.
+
+  // Remove one MANUALLY ADDED product from this saved order (V1.7) — the
+  // shared helper refuses HTML-parsed lines, so only manual additions can go.
+  // Later manual lines are renumbered; entries in the lineId-keyed maps
+  // (comments/fulfillment/notes) are moved via the PATCH endpoints AFTER the
+  // snapshot save, so server-side validation reads the updated line items.
+  const removeProduct = async (lineId) => {
+    const removed = removeManualProduct(parsed, order.resolutionData || { results: [] }, lineId);
+    if (!removed) return;
+    setDeletingId(lineId);
+    setSaveError('');
+    try {
+      const cm = remapAfterRemoval(comments, lineId, removed.remap);
+      const fl = remapAfterRemoval(fulfillment, lineId, removed.remap, ['pendingQty', 'status']);
+      const nt = remapAfterRemoval(notes, lineId, removed.remap);
+
+      let updated = await orderService.save({
+        portalOrderRef: order.portalOrderRef,
+        filename: order.filename || '',
+        customerName: order.customerName || '',
+        orderDate: order.orderDate || '',
+        totalProducts: removed.parsed.line_items.length,
+        parsedData: removed.parsed,
+        resolutionData: removed.resolution,
+      });
+      if (Object.keys(cm.patch).length) updated = await orderService.setComments(order.portalOrderRef, cm.patch);
+      if (Object.keys(fl.patch).length) updated = await orderService.setFulfillment(order.portalOrderRef, fl.patch);
+      if (Object.keys(nt.patch).length) updated = await orderService.setNotes(order.portalOrderRef, nt.patch);
+      onSaved(updated);
+    } catch (e) {
+      setSaveError(e.message || 'Could not remove the product.');
+    } finally {
+      setDeletingId('');
+    }
+  };
 
   // resolve results carry lineId = String(index + 1) for single uploads and
   // "<orderIdx>-<index + 1>" for batch uploads — the email line index is
@@ -230,11 +319,13 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       product: item ? item.description : r.emailProductName,
       qty: item ? item.qty : '—',
       orderedQty: item ? Number(item.qty) : NaN,
-      total: item ? `${sym}${Number(item.total || 0).toFixed(2)}` : '—',
+      unitPrice: item ? `${sym}${Number(item.unit_price || 0).toFixed(2)}` : '—',
       itemNo: matched ? matched.itemNo : '—',
       website: matched ? matched.websiteProductName : '—',
       approved,
+      manual: r.source === 'manual_addition', // only these lines are deletable (V1.7)
       comment: comments[r.lineId] || '',
+      note: notes[r.lineId] || '',
       pendingQty: f.pendingQty,
       deliveryStatus: f.status || '',
     };
@@ -254,6 +345,9 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
     return counts;
   }, [rows, editing, draft]);
   const hasStatuses = Object.values(statusCounts).some((n) => n > 0);
+  // The remove column only exists when the order has manually added lines, so
+  // orders without them render exactly as before (V1.7).
+  const hasManual = rows.some((r) => r.manual);
 
   const startEdit = () => {
     const d = {};
@@ -262,6 +356,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
         pendingQty: row.pendingQty ?? '',
         status: row.deliveryStatus,
         comment: row.comment,
+        note: row.note,
       };
     }
     setDraft(d);
@@ -279,15 +374,18 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       // Send every line's draft; ''/null fields clear the stored value.
       const fulfillmentPayload = {};
       const commentsPayload = {};
+      const notesPayload = {};
       for (const [lineId, f] of Object.entries(draft)) {
         fulfillmentPayload[lineId] = {
           pendingQty: f.pendingQty === '' ? null : Number(f.pendingQty),
           status: f.status || null,
         };
         commentsPayload[lineId] = f.comment || null;
+        notesPayload[lineId] = f.note?.trim() || null;
       }
       await orderService.setFulfillment(order.portalOrderRef, fulfillmentPayload);
-      const updated = await orderService.setComments(order.portalOrderRef, commentsPayload);
+      await orderService.setComments(order.portalOrderRef, commentsPayload);
+      const updated = await orderService.setNotes(order.portalOrderRef, notesPayload);
       onSaved(updated);
       setEditing(false);
     } catch (e) {
@@ -305,6 +403,30 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           <span><b>Postcode:</b> {order.deliveryPostcode || parsed.delivery_address?.post_code || '—'}</span>
           <span><b>Order date:</b> {order.orderDate || '—'}</span>
           <span><b>File:</b> {order.filename || '—'}</span>
+          {orderTotal && <span><b>Order Total:</b> {orderTotal}</span>}
+          <span className="sol-pb">
+            <b>Processed By:</b>
+            {order.processedBy ? (
+              // Assigned — immutable. Display as locked pill.
+              <span className="pb-locked" title="Processed By is fixed at order creation and cannot be changed">
+                {order.processedBy}
+                <svg
+                  className="pb-lock-icon"
+                  viewBox="0 0 24 24"
+                  aria-label="Locked"
+                >
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </span>
+            ) : (
+              // Not assigned — read-only plain text. Processed By can only be
+              // set at order creation time via the Review screen Save workflow.
+              <span className="pb-not-assigned" title="Processed By was not set when this order was created">
+                Not Assigned
+              </span>
+            )}
+          </span>
         </div>
         <div className="sol-detail-actions">
           {editing ? (
@@ -317,12 +439,21 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
               </button>
             </>
           ) : (
-            <button className="sol-edit-btn" type="button" onClick={startEdit}>
-              <svg viewBox="0 0 24 24">
-                <path d="M17 3a2.85 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5z" />
-              </svg>
-              Edit
-            </button>
+            <>
+              <button className="sol-edit-btn" type="button" onClick={() => setAddOpen(true)}>
+                <svg viewBox="0 0 24 24">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Add Product
+              </button>
+              <button className="sol-edit-btn" type="button" onClick={startEdit}>
+                <svg viewBox="0 0 24 24">
+                  <path d="M17 3a2.85 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5z" />
+                </svg>
+                Edit
+              </button>
+            </>
           )}
           <button className="sol-dl-btn" type="button" onClick={onDownload}>
             <svg viewBox="0 0 24 24">
@@ -334,6 +465,13 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           </button>
         </div>
       </div>
+
+      {additionalComment && (
+        <div className="oc-note" role="note" aria-label="Order additional comment">
+          <div className="oc-note-title">Additional Comment</div>
+          <div className="oc-note-text">{additionalComment}</div>
+        </div>
+      )}
 
       {hasStatuses && (
         <div className="sol-status-summary" aria-label="Delivery status summary">
@@ -358,13 +496,15 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
             <tr className="rt-cols">
               <th>Product (from email)</th>
               <th className="rt-num">QTY</th>
-              <th className="rt-num">Total</th>
+              <th className="rt-num">Unit Price</th>
               <th>Item No</th>
               <th>Website Product</th>
               <th>Status</th>
               <th className="rt-num">Pending Qty</th>
               <th>Order Status</th>
               <th>Comment</th>
+              <th>Additional Comment</th>
+              {hasManual && <th aria-label="Remove product" />}
             </tr>
           </thead>
           <tbody>
@@ -372,7 +512,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
               <tr key={row.lineId} className="rt-row">
                 <td className="rt-name">{row.product}</td>
                 <td className="rt-num">{row.qty}</td>
-                <td className="rt-num">{row.total}</td>
+                <td className="rt-num">{row.unitPrice}</td>
                 <td className="rt-itemno">
                   {row.itemNo && row.itemNo !== '—' ? (
                     <span className="item-chip">{row.itemNo}</span>
@@ -465,11 +605,53 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                     <span className="rt-empty">—</span>
                   )}
                 </td>
+                <td className="rt-note">
+                  {editing ? (
+                    <textarea
+                      className="note-input"
+                      rows={1}
+                      placeholder="Add note…"
+                      value={draft[row.lineId]?.note ?? ''}
+                      onChange={(e) => editLine(row.lineId, { note: e.target.value })}
+                      aria-label="Additional comment"
+                    />
+                  ) : row.note ? (
+                    <span className="note-text" title={row.note}>{row.note}</span>
+                  ) : (
+                    <span className="rt-empty">—</span>
+                  )}
+                </td>
+                {hasManual && (
+                  <td className="rt-del-cell">
+                    {row.manual && !editing && (
+                      <button
+                        className="rt-del"
+                        type="button"
+                        title="Remove manually added product"
+                        aria-label="Remove manually added product"
+                        onClick={() => removeProduct(row.lineId)}
+                        disabled={deletingId === row.lineId}
+                      >
+                        {deletingId === row.lineId ? '…' : '🗑'}
+                      </button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <OrderFinancials financials={parsed.financials} />
+
+      {addOpen && (
+        <AddProductModal
+          existingItemNos={existingItemNos}
+          onAdd={addProduct}
+          onClose={() => setAddOpen(false)}
+        />
+      )}
     </div>
   );
 }

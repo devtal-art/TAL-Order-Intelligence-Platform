@@ -5,13 +5,14 @@ import { resolveService } from '../services/resolveService.js';
 import { mappingService } from '../services/mappingService.js';
 import { orderService } from '../services/orderService.js';
 import { portalOrderRef } from '../utils/order.js';
+import { appendManualProduct, removeManualProduct, remapAfterRemoval } from '../utils/manualProduct.js';
 import { sleep } from '../utils/timing.js';
 
 // Orchestrates the flow: upload → parse → resolve → review → (generate) Excel.
 // The parser and Excel builder are used unchanged; resolution is inserted
 // between parsing and Excel generation.
 export function useOrderProcessor() {
-  const [screen, setScreen] = useState('upload'); // 'upload' | 'proc' | 'review' | 'results' | 'error'
+  const [screen, setScreen] = useState('upload'); // 'upload' | 'proc' | 'duplicate' | 'review' | 'results' | 'error'
   const [file, setFile] = useState(null);
   const [steps, setSteps] = useState(['', '', '']); // '' | 'run' | 'done'
   const [parsed, setParsed] = useState(null); // parseOrderHTML output
@@ -20,7 +21,12 @@ export function useOrderProcessor() {
   const [error, setError] = useState('');
   const [comments, setComments] = useState({}); // { [lineId]: 'Released' | 'OS' | 'N/A' } (V1.3)
   const [fulfillment, setFulfillment] = useState({}); // { [lineId]: { pendingQty, status } } (V1.4)
-  const orderRefRef = useRef(null); // Portal Order Ref of the persisted order (for approval updates)
+  const [notes, setNotes] = useState({}); // { [lineId]: string } — free-text Additional Comments (V1.7)
+  const [processedBy, setProcessedBy] = useState(''); // who processed the order (V1.9, mandatory before save)
+  const [pending, setPending] = useState(null); // duplicate upload awaiting a decision: { data, resolved, prev, ref }
+  const [saved, setSaved] = useState(false); // true once the order has been explicitly saved to the DB (V2.0)
+  const orderRefRef = useRef(null); // Portal Order Ref of the PERSISTED order (set only after the first save)
+  const plannedRefRef = useRef(null); // Portal Order Ref of the order being reviewed (before its first save)
 
   const setStepStatus = (i, status) =>
     setSteps((prev) => {
@@ -31,12 +37,112 @@ export function useOrderProcessor() {
 
   const pickFile = useCallback((f) => setFile(f), []);
 
+  // Explicitly persist the order being reviewed to MongoDB (V2.0). This is
+  // the ONLY function that writes the order for the first time — it is called
+  // exclusively when the user clicks the "Save Order" button on the Review
+  // screen. An order is NEVER written to the DB before that deliberate action.
+  //
+  // After the initial save, any per-product edits made while the order was
+  // still unsaved (comments / fulfillment / notes) are flushed as best-effort
+  // PATCH calls. From that point on, orderRefRef is set and subsequent edits
+  // go straight to the live mirrors as before.
+  const saveOrder = useCallback(async () => {
+    const ref = plannedRefRef.current;
+    if (!ref || !parsed || !resolution || !processedBy) return;
+    orderRefRef.current = ref;
+    try {
+      await orderService.save({
+        portalOrderRef: ref,
+        filename: file?.name || '',
+        customerName: parsed.billing_address?.company_name || '',
+        orderDate: parsed.order_info?.order_date || '',
+        totalProducts: (parsed.line_items || []).length,
+        parsedData: parsed,
+        resolutionData: resolution,
+        processedBy,
+      });
+      setSaved(true);
+      // Flush per-product edits made before the save (best-effort — a DB
+      // failure must NOT block the review → Excel flow).
+      if (Object.keys(comments).length) {
+        orderService.setComments(ref, comments).catch((e) => console.warn('Order comment flush failed:', e.message));
+      }
+      if (Object.keys(fulfillment).length) {
+        const payload = {};
+        for (const [lineId, f] of Object.entries(fulfillment)) {
+          payload[lineId] = {
+            pendingQty: f?.pendingQty === '' || f?.pendingQty === undefined ? null : Number(f.pendingQty),
+            status: f?.status || null,
+          };
+        }
+        orderService.setFulfillment(ref, payload).catch((e) => console.warn('Order fulfillment flush failed:', e.message));
+      }
+      if (Object.keys(notes).length) {
+        const payload = {};
+        for (const [lineId, v] of Object.entries(notes)) payload[lineId] = v ? v.trim() : null;
+        orderService.setNotes(ref, payload).catch((e) => console.warn('Order notes flush failed:', e.message));
+      }
+    } catch (e) {
+      console.warn('Order save failed:', e.message);
+    }
+  }, [file, parsed, resolution, processedBy, comments, fulfillment, notes]);
+
+  // Show the Review screen for a parsed + resolved order (V2.0). Carries over
+  // manual lines from the previously saved order (`prev`, re-upload path).
+  // Does NOT auto-save under any circumstance — the user must click "Save
+  // Order" to commit the order to the DB. A re-upload that previously had a
+  // Processed By will pre-populate the dropdown but still requires an explicit
+  // save click.
+  const finalizeReview = useCallback(
+    (data, resolved, prev, ref) => {
+      // V1.8: re-uploading an order's HTML must not silently drop products
+      // that were manually added to the previously saved order — they exist
+      // only in the stored snapshot, not in the email. Carry them over by
+      // re-appending them (same product/qty/price, fresh lineIds after the
+      // new HTML lines).
+      let mergedData = data;
+      let mergedResolved = resolved;
+      const prevItems = prev?.parsedData?.line_items || [];
+      for (const r of prev?.resolutionData?.results || []) {
+        if (r?.source !== 'manual_addition' || !r.match?.itemNo) continue;
+        const item = prevItems[Number(r.lineId) - 1];
+        if (!item) continue;
+        const appended = appendManualProduct(mergedData, mergedResolved, {
+          websiteProductName: r.match.websiteProductName,
+          itemNo: r.match.itemNo,
+          emailProductName: r.emailProductName || item.description,
+          qty: item.qty,
+          unitPrice: item.unit_price,
+        });
+        mergedData = appended.parsed;
+        mergedResolved = appended.resolution;
+      }
+
+      setParsed(mergedData);
+      setResolution(mergedResolved);
+      plannedRefRef.current = ref;
+
+      // Pre-populate Processed By from the previously saved order (re-upload
+      // path) so the user only needs to click Save — not re-select the name.
+      setProcessedBy(prev?.processedBy || '');
+
+      setScreen('review');
+    },
+    [] // no external deps — refs and setters are stable
+  );
+
   const run = useCallback(async () => {
     if (!file) return;
     setScreen('proc');
     setSteps(['', '', '']);
     setComments({});
     setFulfillment({});
+    setNotes({});
+    setProcessedBy(''); // mandatory per order — always an explicit choice (V1.9)
+    setSaved(false); // reset saved flag for the new upload (V2.0)
+    setPending(null);
+    orderRefRef.current = null;
+    plannedRefRef.current = null;
     try {
       setStepStatus(0, 'run');
       const html = await new Promise((res, rej) => {
@@ -73,31 +179,56 @@ export function useOrderProcessor() {
       setStepStatus(2, 'done');
 
       await sleep(300);
-      setParsed(data);
-      setResolution(resolved);
 
-      // Persist the order (V1.2). Best-effort: a DB/API failure must not block
-      // the existing parse → review → Excel flow.
+      // V1.9: duplicate order detection. When this Portal Order Ref is
+      // already saved, nothing is persisted yet — show the duplicate screen
+      // (existing order's details + Open / Update / Cancel) and let the user
+      // decide. A fetch failure (or 404 = genuinely new order) proceeds as a
+      // fresh order, exactly like before.
       const ref = portalOrderRef(data, file.name);
-      orderRefRef.current = ref;
-      orderService
-        .save({
-          portalOrderRef: ref,
-          filename: file.name,
-          customerName: data.billing_address?.company_name || '',
-          orderDate: data.order_info?.order_date || '',
-          totalProducts: (data.line_items || []).length,
-          parsedData: data,
-          resolutionData: resolved,
-        })
-        .catch((e) => console.warn('Order persist failed:', e.message));
+      let prev = null;
+      try {
+        prev = await orderService.get(ref);
+      } catch {
+        /* no previously saved order */
+      }
 
-      setScreen('review');
+      if (prev) {
+        setPending({ data, resolved, prev, ref });
+        setScreen('duplicate');
+        return;
+      }
+
+      finalizeReview(data, resolved, null, ref);
     } catch (e) {
       setError(e.message || String(e));
       setScreen('error');
     }
-  }, [file]);
+  }, [file, finalizeReview]);
+
+  // Duplicate screen actions (V1.9). "Update" continues into the normal
+  // review flow (with the manual-line carry-over and the previous order's
+  // Processed By); the modal's edits flow back via updateDuplicateOrder so a
+  // subsequent Update uses fresh data. Cancel is handled by reset().
+  const continueDuplicate = useCallback(() => {
+    if (!pending) return;
+    const { data, resolved, prev, ref } = pending;
+    setPending(null);
+    finalizeReview(data, resolved, prev, ref);
+  }, [pending, finalizeReview]);
+
+  const updateDuplicateOrder = useCallback((updated) => {
+    setPending((p) => (p ? { ...p, prev: updated } : p));
+  }, []);
+
+  // Set the team member who processed this order (V2.0 — mandatory before
+  // saving). This is a PURE STATE SETTER — it does not touch the DB. The
+  // first DB write happens only when the user explicitly clicks "Save Order"
+  // (see saveOrder). Once an order is saved, Processed By is immutable on
+  // both the server and the UI, so this is only ever called pre-save.
+  const chooseProcessedBy = useCallback((value) => {
+    setProcessedBy(value);
+  }, []);
 
   // Manual approval for a single product. Creates the mapping, tolerates a
   // duplicate (409) silently, then re-runs Resolve for ONLY that product and
@@ -142,6 +273,99 @@ export function useOrderProcessor() {
     }
   }, []);
 
+  // Manually add one catalog product to the order on the Review screen (V1.6).
+  // Appends the line to the parsed snapshot and an already-approved result
+  // (catalog product → Approved, 100%) to the resolution snapshot, then
+  // re-persists the order through the same upsert the initial save uses.
+  // Comments/fulfillment live as siblings of the snapshots, so they survive.
+  const addProduct = useCallback(
+    async (input) => {
+      const appended = appendManualProduct(parsed, resolution, input);
+      setParsed(appended.parsed);
+      setResolution(appended.resolution);
+
+      // Best-effort persist, like the initial save: a DB/API failure must not
+      // block the review → Excel flow.
+      if (orderRefRef.current) {
+        orderService
+          .save({
+            portalOrderRef: orderRefRef.current,
+            filename: file?.name || '',
+            customerName: appended.parsed.billing_address?.company_name || '',
+            orderDate: appended.parsed.order_info?.order_date || '',
+            totalProducts: appended.parsed.line_items.length,
+            parsedData: appended.parsed,
+            resolutionData: appended.resolution,
+          })
+          .catch((e) => console.warn('Order persist failed:', e.message));
+      }
+    },
+    [parsed, resolution, file]
+  );
+
+  // Remove one MANUALLY ADDED product from the order on the Review screen
+  // (V1.7). HTML-parsed lines are untouched — removeManualProduct refuses
+  // anything whose result is not source 'manual_addition'. Later manual lines
+  // are renumbered, so the lineId-keyed maps (comments/fulfillment/notes) are
+  // remapped locally and mirrored to the persisted order (best-effort, and
+  // sequenced AFTER the snapshot save so server-side fulfillment validation
+  // reads the updated line items).
+  const removeProduct = useCallback(
+    (lineId) => {
+      const removed = removeManualProduct(parsed, resolution, lineId);
+      if (!removed) return;
+
+      const cm = remapAfterRemoval(comments, lineId, removed.remap);
+      const fl = remapAfterRemoval(fulfillment, lineId, removed.remap, ['pendingQty', 'status']);
+      const nt = remapAfterRemoval(notes, lineId, removed.remap);
+
+      setParsed(removed.parsed);
+      setResolution(removed.resolution);
+      setComments(cm.next);
+      setFulfillment(fl.next);
+      setNotes(nt.next);
+
+      if (orderRefRef.current) {
+        const ref = orderRefRef.current;
+        orderService
+          .save({
+            portalOrderRef: ref,
+            filename: file?.name || '',
+            customerName: removed.parsed.billing_address?.company_name || '',
+            orderDate: removed.parsed.order_info?.order_date || '',
+            totalProducts: removed.parsed.line_items.length,
+            parsedData: removed.parsed,
+            resolutionData: removed.resolution,
+          })
+          .then(() => {
+            if (Object.keys(cm.patch).length) orderService.setComments(ref, cm.patch).catch((e) => console.warn('Order comment update failed:', e.message));
+            if (Object.keys(fl.patch).length) orderService.setFulfillment(ref, fl.patch).catch((e) => console.warn('Order fulfillment update failed:', e.message));
+            if (Object.keys(nt.patch).length) orderService.setNotes(ref, nt.patch).catch((e) => console.warn('Order note update failed:', e.message));
+          })
+          .catch((e) => console.warn('Order persist failed:', e.message));
+      }
+    },
+    [parsed, resolution, comments, fulfillment, notes, file]
+  );
+
+  // Set (or clear, with '') one product's free-text Additional Comment (V1.7).
+  // `persist: false` updates only local state (used while typing); the blur
+  // handler persists with the default true. Mirrors to the persisted Order
+  // best-effort, like comments — the two fields are fully independent.
+  const setProductNote = useCallback((lineId, value, persist = true) => {
+    setNotes((prev) => {
+      const next = { ...prev };
+      if (value) next[lineId] = value;
+      else delete next[lineId];
+      return next;
+    });
+    if (persist && orderRefRef.current) {
+      orderService
+        .setNotes(orderRefRef.current, { [lineId]: value ? value.trim() : null })
+        .catch((e) => console.warn('Order note update failed:', e.message));
+    }
+  }, []);
+
   // Set one product's delivery tracking on the Preview/Review screen (V1.4).
   // `patch` = { pendingQty?, status? } — merged into the line's entry. Mirrors
   // to the persisted Order (best-effort, like comments) so it is saved with
@@ -172,9 +396,15 @@ export function useOrderProcessor() {
     setError('');
     setComments({});
     setFulfillment({});
+    setNotes({});
+    setProcessedBy('');
+    setSaved(false); // V2.0
+    setPending(null);
+    orderRefRef.current = null;
+    plannedRefRef.current = null;
     setSteps(['', '', '']);
     setScreen('upload');
   }, []);
 
-  return { screen, file, steps, parsed, resolution, result, error, comments, fulfillment, pickFile, run, approveProduct, setProductComment, setProductFulfillment, generateExcel, reset };
+  return { screen, file, steps, parsed, resolution, result, error, comments, fulfillment, notes, processedBy, saved, pending, pickFile, run, approveProduct, addProduct, removeProduct, setProductComment, setProductFulfillment, setProductNote, chooseProcessedBy, saveOrder, continueDuplicate, updateDuplicateOrder, generateExcel, reset };
 }
