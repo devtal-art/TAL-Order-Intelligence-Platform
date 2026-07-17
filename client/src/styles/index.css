@@ -2,6 +2,7 @@
    base.css keeps the Google Fonts @import as its first rule. */
 @import './base.css';
 @import './topbar.css';
+@import './sidenav.css';
 @import './dashboard.css';
 @import './upload.css';
 @import './processing.css';
@@ -16,3 +17,4 @@
 @import './fulfillment.css';
 @import './add-product.css';
 @import './order-extras.css';
+@import './dash-widgets.css';

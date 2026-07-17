@@ -1,0 +1,252 @@
+/* ── Dashboard page + widgets (V2.2) ────────────────────────────────────────
+   dbp-*  — Dashboard page shell (search left, widgets right)
+   dw-*   — widget cards (Order Status / Comments buckets)
+   dl-*   — "View All" filtered list page
+   Tones reuse the platform semantics: delivered/released → green,
+   half/OS → amber, not delivered/N-A → red, Not Found → neutral grey. */
+
+/* Page shell */
+.dbp-top{margin-bottom:18px}
+.dbp-top h2{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.02em}
+.dbp-top p{color:var(--ink-2);font-size:13px;margin-top:4px}
+
+/* Overview stat cards atop the dashboard — Total Orders / Today's Orders /
+   Released orders broken down by processor. CSS Grid stretches every card
+   in a row to the same height (and width) by default, so the processor
+   list card no longer dictates a taller look than its neighbours; each
+   card's body content is centred in the space it's given instead. */
+.dw-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:22px}
+.dw-stat-card{
+  position:relative;overflow:hidden;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);
+  padding:18px 20px 16px;display:flex;flex-direction:column;gap:10px;
+  transition:box-shadow .15s,transform .15s;
+}
+.dw-stat-card:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
+/* Top accent bar + icon tint, one hue per card — purely decorative grouping,
+   not a status tone (unlike the bucket cards below), so reusing the
+   platform's existing accent/success/warn colors here doesn't clash with
+   their meaning elsewhere. */
+.dw-stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+}
+.dw-stat-card--orders::before{background:var(--accent)}
+.dw-stat-card--orders .dw-stat-icon{background:var(--accent-soft)}
+.dw-stat-card--orders .dw-stat-icon svg{stroke:var(--accent)}
+.dw-stat-card--today::before{background:var(--success)}
+.dw-stat-card--today .dw-stat-icon{background:var(--success-soft)}
+.dw-stat-card--today .dw-stat-icon svg{stroke:var(--success)}
+.dw-stat-card--released::before{background:var(--warn-icon)}
+.dw-stat-card--released .dw-stat-icon{background:var(--warn-soft)}
+.dw-stat-card--released .dw-stat-icon svg{stroke:var(--warn-icon)}
+
+.dw-stat-top{display:flex;align-items:center;gap:10px;min-width:0}
+.dw-stat-icon{
+  width:34px;height:34px;border-radius:9px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.dw-stat-icon svg{
+  width:18px;height:18px;fill:none;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+}
+.dw-stat-label{
+  font-size:11.5px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.03em;min-width:0;
+}
+.dw-stat-value{font-family:var(--font-display);font-size:32px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
+.dw-stat-caption{font-size:11.5px;color:var(--muted)}
+/* Fills the remaining height below the icon/label row and centres its
+   contents vertically, so the value/caption pair (or the processor list)
+   sits mid-card no matter how tall the row ends up being. */
+.dw-stat-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px}
+/* Two columns of two — column-major (grid-auto-flow:column) so the 4
+   processors read top-to-bottom then wrap to the next column, matching the
+   order they're listed in. */
+.dw-stat-list{
+  list-style:none;margin:0;padding:0;
+  display:grid;grid-template-rows:repeat(2,auto);grid-auto-flow:column;gap:9px 26px;
+}
+.dw-stat-list li{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2)}
+.dw-stat-pill{
+  font-size:10.5px;font-weight:700;color:var(--warn);
+  background:var(--warn-soft);border:1px solid var(--warn-border);
+  border-radius:6px;padding:1px 7px;
+}
+/* Widget groups — Order Status and Comments side by side (V2.3), stacked on
+   narrow screens. Cards flow within each column. */
+.dw-wrap{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
+@media (max-width:900px){ .dw-wrap{grid-template-columns:1fr} }
+.dw-wrap.is-refreshing{opacity:.65;transition:opacity .15s}
+/* Each widget group is its own panel — a bounded surface with a divided
+   header, so Order Status and Comments read as two separate sections. */
+.dw-section{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);
+  padding:16px 16px 18px;min-width:0;
+}
+.dw-section-head{
+  padding-bottom:12px;margin-bottom:14px;
+  border-bottom:1px solid var(--border);
+}
+.dw-section-title{
+  font-family:var(--font-display);
+  font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.01em;
+}
+.dw-section-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.dw-cards{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+  gap:14px;align-items:start; /* empty buckets stay compact, never stretched */
+}
+/* Inside the two-column layout each section is ~half the content width —
+   let the bucket cards breathe as full-width stacked cards. */
+@media (min-width:901px){ .dw-cards{grid-template-columns:1fr} }
+.dw-loading{font-size:13px;color:var(--muted);padding:24px;text-align:center}
+
+/* Bucket card */
+.dw-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow-sm);
+  display:flex;flex-direction:column;overflow:hidden;min-width:0;
+}
+.dw-card-head{
+  display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;
+  padding:11px 14px;border:none;border-bottom:1px solid var(--border);
+  background:var(--surface-2);font:inherit;text-align:left;cursor:pointer;
+}
+.dw-card.is-collapsed .dw-card-head{border-bottom:none}
+.dw-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.dw-card-title{font-size:13px;font-weight:700;flex:1;min-width:0;color:var(--ink-2)}
+.dw-count{
+  font-size:11px;font-weight:700;color:var(--ink-2);
+  background:#fff;border:1px solid var(--border-strong);
+  border-radius:999px;padding:2px 9px;flex-shrink:0;
+}
+.dw-chevron{
+  width:15px;height:15px;flex-shrink:0;
+  fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;
+  color:var(--muted);transition:transform .15s;
+}
+.dw-card.is-open .dw-chevron{transform:rotate(180deg)}
+
+/* Tone treatments — tinted header + dot + count, matching the platform's
+   badge palette. Status: green / amber / red. Comments: green / amber /
+   red / neutral grey (Not Found is a decision, not an inventory state). */
+.dw-delivered .dw-card-head,.dw-released .dw-card-head{background:var(--success-soft);border-bottom-color:var(--success-border)}
+.dw-delivered .dw-card-title,.dw-released .dw-card-title{color:var(--success-strong)}
+.dw-delivered .dw-dot,.dw-released .dw-dot{background:var(--success)}
+.dw-delivered .dw-count,.dw-released .dw-count{color:var(--success-strong);border-color:var(--success-border)}
+
+.dw-half .dw-card-head,.dw-os .dw-card-head{background:var(--warn-soft);border-bottom-color:var(--warn-border)}
+.dw-half .dw-card-title,.dw-os .dw-card-title{color:var(--warn)}
+.dw-half .dw-dot,.dw-os .dw-dot{background:var(--warn-icon)}
+.dw-half .dw-count,.dw-os .dw-count{color:var(--warn);border-color:var(--warn-border)}
+
+.dw-not .dw-card-head,.dw-na .dw-card-head{background:var(--danger-soft);border-bottom-color:var(--danger-border)}
+.dw-not .dw-card-title,.dw-na .dw-card-title{color:var(--danger-strong)}
+.dw-not .dw-dot,.dw-na .dw-dot{background:var(--danger)}
+.dw-not .dw-count,.dw-na .dw-count{color:var(--danger-strong);border-color:var(--danger-border)}
+
+.dw-notfound .dw-card-head{background:var(--surface-2)}
+.dw-notfound .dw-dot{background:var(--muted)}
+
+/* Order preview rows — two compact lines: (ref + customer + date), processor */
+.dw-list{list-style:none;margin:0;padding:0}
+.dw-row{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 14px;border-bottom:1px solid var(--border);
+  transition:background .12s;
+}
+.dw-row:hover{background:var(--surface-2)}
+.dw-row:last-child{border-bottom:none}
+.dw-row-main{flex:1;min-width:0}
+.dw-row-top{display:flex;align-items:baseline;gap:8px}
+.dw-ref{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;flex-shrink:0}
+.dw-date{font-size:10.5px;color:var(--muted);white-space:nowrap;flex-shrink:0;margin-left:auto}
+.dw-cust{
+  font-size:12px;color:var(--ink);font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
+}
+.dw-by{font-size:10.5px;color:var(--muted);margin-top:2px}
+.dw-by b{font-weight:600;color:var(--ink-2)}
+.dw-by-empty{font-style:italic}
+.dw-empty{
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+  padding:24px 14px;font-size:12px;color:var(--muted);text-align:center;
+}
+.dw-empty svg{width:20px;height:20px;fill:none;stroke:var(--border-strong);stroke-width:2;stroke-linecap:round}
+
+.dw-view{
+  background:var(--surface);color:var(--ink-2);
+  border:1px solid var(--border-strong);border-radius:8px;
+  padding:4px 12px;font-size:11.5px;font-weight:600;cursor:pointer;flex-shrink:0;
+  transition:border-color .15s,color .15s,background .15s;
+}
+.dw-view:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.dw-view:disabled{color:var(--muted);border-color:var(--border);cursor:not-allowed;background:var(--surface-2)}
+
+/* View All footer link */
+.dw-viewall{
+  margin-top:auto;display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:9px 12px;border-top:1px solid var(--border);
+  background:var(--surface-2);color:var(--accent);
+  font-size:12px;font-weight:600;text-decoration:none;
+  transition:background .15s;
+}
+.dw-viewall:hover{background:var(--accent-soft)}
+.dw-viewall svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── "View All" list page ── */
+.dl-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.dl-back{font-size:12.5px;font-weight:600;color:var(--accent);text-decoration:none;white-space:nowrap}
+.dl-back:hover{text-decoration:underline}
+.dl-title{
+  display:flex;align-items:center;gap:10px;
+  font-family:var(--font-display);font-size:19px;font-weight:700;letter-spacing:-.02em;
+}
+.dl-total{font-size:12px;color:var(--muted);margin-left:auto}
+
+.dl-table-wrap{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);overflow-x:auto;box-shadow:var(--shadow-xs);
+}
+.dl-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.dl-table th{
+  background:var(--surface-2);color:var(--ink-2);text-align:left;
+  font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;
+  padding:10px 14px;border-bottom:1px solid var(--border);white-space:nowrap;
+}
+.dl-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+.dl-table tbody tr:last-child td{border-bottom:none}
+.dl-table tbody tr:hover td{background:var(--surface-2)}
+.dl-ref{font-family:var(--font-mono);font-weight:600}
+.dl-num{text-align:right}
+.dl-act{text-align:right;white-space:nowrap}
+.dl-muted{color:var(--muted);font-style:italic}
+.dl-empty{
+  font-size:13px;color:var(--muted);text-align:center;padding:28px;
+  background:var(--surface-2);border:1.5px dashed var(--border-strong);border-radius:var(--radius);
+}
+
+/* ── Search page (V2.3) ── */
+.sp-search{max-width:720px;margin:0 auto 26px}
+.sp-search .sol-card{box-shadow:var(--shadow-sm)}
+
+.ro-card{margin-top:6px}
+.ro-head{margin-bottom:12px}
+.ro-title{
+  font-family:var(--font-display);
+  font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.01em;
+}
+.ro-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+.dl-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:16px}
+.dl-page-btn{
+  background:var(--surface);color:var(--ink-2);
+  border:1px solid var(--border-strong);border-radius:9px;
+  padding:7px 15px;font-size:12px;font-weight:600;cursor:pointer;
+  transition:border-color .15s,color .15s;
+}
+.dl-page-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.dl-page-btn:disabled{color:var(--muted);border-color:var(--border);cursor:not-allowed}
+.dl-page-info{font-size:12px;color:var(--ink-2);font-weight:600}

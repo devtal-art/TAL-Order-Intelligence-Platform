@@ -1,6 +1,6 @@
 import Layout from '../components/Layout.jsx';
 import CatalogSection from '../components/CatalogSection.jsx';
-import SavedOrderLookup, { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
+import { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
 import DuplicateOrderView from '../components/DuplicateOrderView.jsx';
 import UploadStep from '../components/UploadStep.jsx';
 import ProcessingView from '../components/ProcessingView.jsx';
@@ -166,10 +166,9 @@ export default function Home() {
       <Layout>
         <div className="screen active" id="s-upload">
           <div className="dash">
-            <div className="dash-grid">
-              <SavedOrderLookup />
-              <CatalogSection />
-            </div>
+            {/* V2.2: Saved Order Search lives on the Dashboard page now —
+                this screen is dedicated to creating new orders. */}
+            <CatalogSection />
             <UploadStep
               file={null}
               files={batchFiles}
@@ -190,10 +189,9 @@ export default function Home() {
       {singleScreen === 'upload' && (
         <div className="screen active" id="s-upload">
           <div className="dash">
-            <div className="dash-grid">
-              <SavedOrderLookup />
-              <CatalogSection />
-            </div>
+            {/* V2.2: Saved Order Search lives on the Dashboard page now —
+                this screen is dedicated to creating new orders. */}
+            <CatalogSection />
             <UploadStep
               file={file}
               files={null}

@@ -8,6 +8,8 @@ import {
   setOrderFulfillment,
   setOrderNotes,
   setOrderProcessedBy,
+  getDashboard,
+  listDashboardOrders,
 } from '../../controllers/orderController.js';
 
 // Mounted at /api/v1/orders (V1.2 — new, additive).
@@ -15,6 +17,10 @@ export const orderRouter = Router();
 
 orderRouter.post('/', saveOrder);
 orderRouter.get('/', listOrders);
+// Dashboard routes (V2.2) MUST be registered before GET /:ref, otherwise
+// Express would treat "dashboard" as a Portal Order Ref.
+orderRouter.get('/dashboard', getDashboard);
+orderRouter.get('/dashboard/orders', listDashboardOrders);
 orderRouter.get('/:ref', getOrder);
 orderRouter.patch('/:ref/comments', setOrderComments);
 orderRouter.patch('/:ref/fulfillment', setOrderFulfillment);

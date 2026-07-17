@@ -16,6 +16,9 @@ export const orderService = {
 
   list: (query) => apiClient.get(`/v1/orders${query ? `?query=${encodeURIComponent(query)}` : ''}`),
 
+  // Latest N saved orders (V2.3) — the Search page's "Recent Processed Orders".
+  recent: (limit = 5) => apiClient.get(`/v1/orders?limit=${encodeURIComponent(limit)}`),
+
   get: (portalOrderRef) => apiClient.get(`/v1/orders/${encodeURIComponent(portalOrderRef)}`),
 
   // comments: { [lineId]: 'Released' | 'OS' | 'N/A' | null }
@@ -33,4 +36,16 @@ export const orderService = {
   // processedBy: one of PROCESSED_BY_USERS, or '' to clear (V1.9)
   setProcessedBy: (portalOrderRef, processedBy) =>
     apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/processed-by`, { processedBy }),
+
+  // Dashboard summary (V2.2, read-only): per delivery status / comment bucket,
+  // the total count plus the latest `limit` orders. Derived live server-side
+  // from the Orders collection — never from a duplicated summary store.
+  dashboard: (limit = 5) => apiClient.get(`/v1/orders/dashboard?limit=${encodeURIComponent(limit)}`),
+
+  // Full filtered bucket list for "View All" (V2.2, paginated).
+  // type: 'status' | 'comment'; value: bucket value (e.g. 'delivered', 'N/A').
+  dashboardOrders: ({ type, value, page = 1, limit = 25 }) =>
+    apiClient.get(
+      `/v1/orders/dashboard/orders?type=${encodeURIComponent(type)}&value=${encodeURIComponent(value)}&page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`
+    ),
 };

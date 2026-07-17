@@ -1,0 +1,63 @@
+/* ── Left navigation sidebar (V2.3) ─────────────────────────────────────────
+   The app shell becomes: appbar on top, then [sidenav | content]. The
+   sidebar is sticky below the 70px bar (68px + 2px hairline) and carries the
+   two primary destinations. Active route = brand-blue soft treatment. */
+
+.shell{display:flex;align-items:flex-start}
+.shell #app{flex:1;min-width:0}
+
+.sidenav{
+  width:216px;flex-shrink:0;
+  position:sticky;top:70px;
+  height:calc(100vh - 70px);
+  padding:22px 14px;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;gap:6px;
+}
+.sn-label{
+  font-size:10.5px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.08em;
+  padding:0 11px;margin-bottom:6px;
+}
+.sn-item{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 11px;border-radius:11px;
+  color:var(--ink-2);text-decoration:none;
+  border:1px solid transparent;
+  transition:background .15s,color .15s,border-color .15s;
+}
+.sn-item:hover{background:var(--surface-2);color:var(--ink)}
+.sn-item.active{
+  background:var(--accent-soft);color:var(--accent);
+  border-color:var(--accent-border);
+}
+.sn-icon{
+  width:34px;height:34px;border-radius:9px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface-2);border:1px solid var(--border);
+  transition:background .15s,border-color .15s;
+}
+.sn-item.active .sn-icon{background:#fff;border-color:var(--accent-border)}
+.sn-icon svg{
+  width:16px;height:16px;fill:none;stroke:currentColor;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+}
+.sn-text{display:flex;flex-direction:column;min-width:0;font-size:13px;font-weight:600;line-height:1.25}
+.sn-text small{font-size:10.5px;font-weight:500;color:var(--muted);margin-top:1px;white-space:nowrap}
+.sn-item.active .sn-text small{color:var(--accent);opacity:.75}
+
+/* Tablet / mobile: the sidebar becomes a horizontal switcher under the bar */
+@media (max-width:900px){
+  .shell{flex-direction:column}
+  .sidenav{
+    position:static;width:100%;height:auto;
+    flex-direction:row;gap:8px;
+    padding:10px 16px;
+    border-right:none;border-bottom:1px solid var(--border);
+  }
+  .sn-label{display:none}
+  .sn-item{padding:7px 12px;flex:1;justify-content:center}
+  .sn-icon{display:none}
+  .sn-text small{display:none}
+}

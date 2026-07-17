@@ -1,0 +1,53 @@
+import { NavLink } from 'react-router-dom';
+
+// Primary left navigation (V2.3). Moved out of the dark app bar — the two
+// destinations live in a light sidebar beside the content, matching the
+// step-card design language. Active route gets the brand-blue soft treatment.
+export default function SideNav() {
+  const item = ({ isActive }) => `sn-item${isActive ? ' active' : ''}`;
+  return (
+    <aside className="sidenav" aria-label="Primary navigation">
+      <div className="sn-label">Menu</div>
+      <NavLink to="/" end className={item}>
+        <span className="sn-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+        </span>
+        <span className="sn-text">
+          Upload &amp; Save
+          <small>Create a new order</small>
+        </span>
+      </NavLink>
+      {/* /dashboard/orders is a Dashboard sub-view — the tab stays lit there */}
+      <NavLink to="/dashboard" className={item}>
+        <span className="sn-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+            <rect x="14" y="14" width="7" height="7" rx="1.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          </svg>
+        </span>
+        <span className="sn-text">
+          Dashboard
+          <small>Track order buckets</small>
+        </span>
+      </NavLink>
+      <NavLink to="/search" className={item}>
+        <span className="sn-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </span>
+        <span className="sn-text">
+          Search
+          <small>Find saved orders</small>
+        </span>
+      </NavLink>
+    </aside>
+  );
+}

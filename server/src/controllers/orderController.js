@@ -43,11 +43,38 @@ export async function saveOrder(req, res, next) {
   }
 }
 
-// GET /api/v1/orders — list orders (summary), optional ?query= ref filter.
+// GET /api/v1/orders — list orders (summary), optional ?query= ref filter and
+// ?limit= result cap (V2.3, additive — omitted returns everything as before).
 export async function listOrders(req, res, next) {
   try {
     ensureDb();
-    const result = await orderService.listOrders({ query: req.query.query });
+    const result = await orderService.listOrders({ query: req.query.query, limit: req.query.limit });
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/orders/dashboard — dashboard summary (V2.2, read-only).
+// ?limit= caps the preview cards per bucket (default 5, max 20). Derived live
+// from the Orders collection — no dashboard collections, nothing duplicated.
+export async function getDashboard(req, res, next) {
+  try {
+    ensureDb();
+    const summary = await orderService.getDashboardSummary({ previewLimit: req.query.limit });
+    res.status(200).json(summary);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/orders/dashboard/orders — full filtered bucket list ("View All").
+// ?type=status|comment &value=<bucket> &page= &limit= (V2.2, read-only).
+export async function listDashboardOrders(req, res, next) {
+  try {
+    ensureDb();
+    const { type, value, page, limit } = req.query;
+    const result = await orderService.listDashboardOrders({ type, value, page, limit });
     res.status(200).json(result);
   } catch (err) {
     next(err);

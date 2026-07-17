@@ -1,6 +1,8 @@
 import logoUrl from '../assets/artlogic-logo.svg';
 
-// Enterprise app bar: The Art Logic mark, product title + subtitle.
+// Enterprise app bar: The Art Logic mark, product title + subtitle. Primary
+// navigation lives in the left sidebar (SideNav, V2.3), not up here — the
+// dark bar stays purely brand + environment.
 export default function TopBar() {
   return (
     <header className="appbar">
@@ -13,7 +15,6 @@ export default function TopBar() {
             <p className="appbar-sub">Internal Operations Tool</p>
           </div>
         </div>
-        <span className="appbar-env">Internal</span>
       </div>
     </header>
   );

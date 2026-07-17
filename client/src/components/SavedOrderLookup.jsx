@@ -20,11 +20,14 @@ export function downloadOrderExcel(order) {
   XLSX.writeFile(wb, fname, { bookType: 'xlsx', type: 'binary', cellStyles: true });
 }
 
-// Home-page lookup for previously processed orders (V1.2). Every uploaded HTML
-// is saved to MongoDB keyed by Portal Order Ref No, so an order can be found
-// again days/weeks later — searched here, viewed read-only, and its Excel
-// regenerated from the stored parsed + resolution data.
-export default function SavedOrderLookup() {
+// Saved-order lookup (V1.2; lives on the Dashboard page since V2.2). Every
+// uploaded HTML is saved to MongoDB keyed by Portal Order Ref No, so an order
+// can be found again days/weeks later — searched here, viewed read-only, and
+// its Excel regenerated from the stored parsed + resolution data.
+// `onOrderChanged` (V2.2, optional): called with the updated order DTO after
+// any edit saved through this panel's detail modal, so the host page (the
+// Dashboard) can refresh derived views. Purely additive — omitted, nothing changes.
+export default function SavedOrderLookup({ onOrderChanged }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null); // null = not searched yet; [] = no matches
   const [loading, setLoading] = useState(false);
@@ -130,7 +133,7 @@ export default function SavedOrderLookup() {
                           <span>· {o.totalProducts} products</span>
                           <span>· saved {fmtDate(o.uploadTimestamp)}</span>
                           <span className="sol-row-pb">
-                            · <b>By:</b> 
+                            · <b>By:</b>
                             {o.processedBy ? (
                               <span className="sol-row-pb-name">{o.processedBy}</span>
                             ) : (
@@ -161,7 +164,10 @@ export default function SavedOrderLookup() {
           order={details[openRef]}
           onClose={() => setOpenRef(null)}
           onDownload={() => download(details[openRef])}
-          onSaved={(updated) => setDetails((d) => ({ ...d, [openRef]: updated }))}
+          onSaved={(updated) => {
+            setDetails((d) => ({ ...d, [openRef]: updated }));
+            if (onOrderChanged) onOrderChanged(updated);
+          }}
         />
       )}
     </section>
@@ -329,7 +335,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       pendingQty: f.pendingQty,
       deliveryStatus: f.status || '',
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- results/items/fulfillment/comments/sym all derive from `order`
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- results/items/fulfillment/comments/sym all derive from `order`
   }), [order]);
 
   // Delivery summary: how many products sit in each Order Status. Derived

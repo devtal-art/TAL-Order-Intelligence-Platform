@@ -398,12 +398,179 @@ export async function setProductFulfillment(portalOrderRef, fulfillment) {
   return toDto(updated);
 }
 
-// List orders (summary only), newest first, optionally filtered by ref substring.
-export async function listOrders({ query } = {}) {
+// ────────────────────────────────────────────────
+//  DASHBOARD (V2.2 — new, additive, read-only)
+//
+//  The dashboard is ALWAYS derived live from the Orders collection — no
+//  summary collections, no duplicated data, no denormalised counters. An
+//  order belongs to a bucket when AT LEAST ONE of its products carries that
+//  delivery status (product_fulfillment) or comment (product_comments).
+//  Both maps are lineId-keyed objects, so the aggregation unpacks them with
+//  $objectToArray into flat value arrays and matches on array membership.
+//  Everything below is read-only: nothing here ever writes an order.
+// ────────────────────────────────────────────────
+
+// Safely turn a Mixed map field into its entry array inside the pipeline.
+// Older orders may lack the field entirely (V1.2 docs) — $type guards every
+// non-object shape (missing, null, legacy junk) down to an empty object.
+function mapEntries(field) {
+  return {
+    $objectToArray: {
+      $cond: [{ $eq: [{ $type: `$${field}` }, 'object'] }, `$${field}`, {}],
+    },
+  };
+}
+
+// Shared first stage: strip each order to the summary fields the dashboard
+// cards need, plus flat arrays of its products' delivery statuses / comments.
+// parsed_data / resolution_data are dropped immediately so the heavy blobs
+// never flow through the pipeline (or over the wire).
+const DASHBOARD_FIELDS_STAGE = {
+  $project: {
+    portal_order_ref: 1,
+    customer_name: 1,
+    processed_by: 1,
+    order_date: 1,
+    upload_timestamp: 1,
+    total_products: 1,
+    resolution_status: 1,
+    delivery_statuses: { $map: { input: mapEntries('product_fulfillment'), as: 'e', in: '$$e.v.status' } },
+    comment_values: { $map: { input: mapEntries('product_comments'), as: 'e', in: '$$e.v' } },
+  },
+};
+
+// Map a dashboard-projected document to the card DTO. Deliberately lean —
+// exactly what an order card renders (ref, customer, processed by, date).
+function toDashboardCardDto(doc) {
+  return {
+    id: doc._id,
+    portalOrderRef: doc.portal_order_ref,
+    customerName: doc.customer_name || '',
+    processedBy: doc.processed_by || '',
+    orderDate: doc.order_date || '',
+    uploadTimestamp:
+      doc.upload_timestamp instanceof Date ? doc.upload_timestamp.toISOString() : doc.upload_timestamp,
+    totalProducts: doc.total_products ?? 0,
+    resolutionStatus: doc.resolution_status || 'needs_review',
+  };
+}
+
+const clampInt = (raw, def, min, max) => {
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n)) return def;
+  return Math.min(max, Math.max(min, n));
+};
+
+// One round trip for the whole dashboard: a single $facet aggregation returns,
+// for every delivery status AND every comment value, the bucket's total count
+// plus its latest `previewLimit` orders (newest upload first). Facet keys use
+// indexes, not raw values ('N/A' contains '/', 'Not Found' a space).
+export async function getDashboardSummary({ previewLimit } = {}) {
+  const limit = clampInt(previewLimit, 5, 1, 20);
+
+  const facets = {};
+  const bucket = (key, matchField, value) => {
+    facets[`${key}_orders`] = [
+      { $match: { [matchField]: value } },
+      { $sort: { upload_timestamp: -1 } },
+      { $limit: limit },
+    ];
+    facets[`${key}_count`] = [{ $match: { [matchField]: value } }, { $count: 'n' }];
+  };
+  DELIVERY_STATUSES.forEach((status, i) => bucket(`s${i}`, 'delivery_statuses', status));
+  PRODUCT_COMMENTS.forEach((comment, i) => bucket(`c${i}`, 'comment_values', comment));
+
+  // Overview stats — total orders, orders uploaded today, and Released orders
+  // broken down by processor — power the three summary cards atop the page.
+  facets.total_count = [{ $count: 'n' }];
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  facets.today_count = [{ $match: { upload_timestamp: { $gte: startOfToday } } }, { $count: 'n' }];
+  facets.released_by_processor = [
+    { $match: { comment_values: 'Released' } },
+    { $group: { _id: '$processed_by', n: { $sum: 1 } } },
+  ];
+
+  const [agg] = await Order.aggregate([DASHBOARD_FIELDS_STAGE, { $facet: facets }]);
+
+  const readBucket = (key, value) => ({
+    value,
+    total: agg[`${key}_count`]?.[0]?.n ?? 0,
+    orders: (agg[`${key}_orders`] || []).map(toDashboardCardDto),
+  });
+
+  const releasedByProcessor = {};
+  for (const user of PROCESSED_BY_USERS) releasedByProcessor[user] = 0;
+  for (const row of agg.released_by_processor || []) {
+    if (row._id in releasedByProcessor) releasedByProcessor[row._id] = row.n;
+  }
+
+  return {
+    previewLimit: limit,
+    totalOrders: agg.total_count?.[0]?.n ?? 0,
+    todayOrders: agg.today_count?.[0]?.n ?? 0,
+    releasedByProcessor,
+    statuses: DELIVERY_STATUSES.map((status, i) => readBucket(`s${i}`, status)),
+    comments: PRODUCT_COMMENTS.map((comment, i) => readBucket(`c${i}`, comment)),
+  };
+}
+
+// Full filtered list for a single dashboard bucket ("View All"), paginated.
+// `type` = 'status' (delivery status) | 'comment' (product comment); `value`
+// is validated against the platform's known values so the match can never be
+// driven by arbitrary input.
+export async function listDashboardOrders({ type, value, page, limit } = {}) {
+  const known = { status: DELIVERY_STATUSES, comment: PRODUCT_COMMENTS };
+  const allowed = known[type];
+  if (!allowed) {
+    throw new AppError('VALIDATION_ERROR', "type must be 'status' or 'comment'.", {
+      status: 400,
+      details: [{ field: 'type', issue: 'invalid value' }],
+    });
+  }
+  if (!allowed.includes(value)) {
+    throw new AppError('VALIDATION_ERROR', `value must be one of: ${allowed.join(', ')}.`, {
+      status: 400,
+      details: [{ field: 'value', issue: 'invalid value' }],
+    });
+  }
+
+  const pageN = clampInt(page, 1, 1, 100000);
+  const limitN = clampInt(limit, 25, 1, 100);
+  const matchField = type === 'status' ? 'delivery_statuses' : 'comment_values';
+
+  const [agg] = await Order.aggregate([
+    DASHBOARD_FIELDS_STAGE,
+    { $match: { [matchField]: value } },
+    { $sort: { upload_timestamp: -1 } },
+    {
+      $facet: {
+        data: [{ $skip: (pageN - 1) * limitN }, { $limit: limitN }],
+        count: [{ $count: 'n' }],
+      },
+    },
+  ]);
+
+  const total = agg?.count?.[0]?.n ?? 0;
+  return {
+    data: (agg?.data || []).map(toDashboardCardDto),
+    meta: { type, value, total, page: pageN, limit: limitN, pages: Math.max(1, Math.ceil(total / limitN)) },
+  };
+}
+
+// List orders (summary only), newest first, optionally filtered by ref
+// substring. `limit` (V2.3, optional, additive) caps the result — used by the
+// Search page's "Recent Processed Orders" preview; omitted, behaviour is
+// exactly as before.
+export async function listOrders({ query, limit } = {}) {
   const filter = {};
   if (query) filter.portal_order_ref = new RegExp(escapeRegex(query), 'i');
 
-  const docs = await Order.find(filter).sort({ upload_timestamp: -1 }).lean();
+  let find = Order.find(filter).sort({ upload_timestamp: -1 });
+  const n = Math.floor(Number(limit));
+  if (Number.isFinite(n) && n > 0) find = find.limit(Math.min(n, 100));
+
+  const docs = await find.lean();
   return { data: docs.map(toSummaryDto), meta: { total: docs.length } };
 }
 
