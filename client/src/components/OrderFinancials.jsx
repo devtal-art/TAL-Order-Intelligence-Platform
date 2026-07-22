@@ -7,7 +7,7 @@ import { currencySymbol } from '../utils/format.js';
 // didn't carry are omitted, and when there is no totals data at all (older /
 // edge orders) the whole card is hidden. Shared by the Review screen and the
 // Saved Order modal so both display identically.
-export default function OrderFinancials({ financials, manualTotal = 0 }) {
+export default function OrderFinancials({ financials, results = [], lineItems = [], comments = {} }) {
   const f = financials || {};
   const sym = currencySymbol(f.currency);
   const money = (n) => `${Number(n) < 0 ? '-' : ''}${sym}${Math.abs(Number(n) || 0).toFixed(2)}`;
@@ -16,12 +16,39 @@ export default function OrderFinancials({ financials, manualTotal = 0 }) {
   const transport = Number(f.transportation_charges) || 0;
   const total = Number(f.total) || 0;
 
-  // Discount: prefer the parsed value (with the email's own label). Orders
-  // saved before the discount-label parser fix carry 0 here even though the
-  // email had one — recover it from the totals identity
-  // (sub_total + transport + discount = total), so PAST orders display it too.
-  // A positive residue (e.g. a tax the parser doesn't itemize) is shown as
-  // "Other Charges" rather than being hidden.
+  // Calculate totalAdjustment and check if we have any adjustments
+  let totalAdjustment = 0;
+  let hasAdjustments = false;
+
+  results.forEach((r) => {
+    const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
+    const item = (Number.isInteger(lineIndex) && lineIndex >= 0 && lineItems[lineIndex]) || null;
+    if (!item) return;
+
+    const qty = Number(item.qty) || 0;
+    const unitPrice = Number(item.unit_price) || 0;
+    const itemTotal = qty * Math.abs(unitPrice);
+    const comment = comments[r.lineId] || '';
+    const isNotFound = comment === 'Not Found';
+    const isManual = r.source === 'manual_addition';
+    const isNegative = unitPrice < 0;
+
+    if (isManual || isNotFound || isNegative) {
+      hasAdjustments = true;
+    }
+
+    if (isNotFound) {
+      totalAdjustment -= itemTotal;
+    } else if (isManual) {
+      if (isNegative) {
+        totalAdjustment -= itemTotal;
+      } else {
+        totalAdjustment += itemTotal;
+      }
+    }
+  });
+
+  // Discount: prefer the parsed value (with the email's own label)
   let discount = Number(f.discount) || 0;
   let discountLabel = f.discount_label || 'Discount';
   if (discount === 0 && subTotal > 0 && total > 0) {
@@ -35,17 +62,14 @@ export default function OrderFinancials({ financials, manualTotal = 0 }) {
   const rows = [];
   if (subTotal > 0) rows.push({ key: 'sub', label: 'Sub Total', value: money(subTotal) });
   if (discount !== 0) rows.push({ key: 'disc', label: discountLabel, value: money(discount) });
-  // The email always lists transport under its totals; keep the £0.00 row when
-  // a totals section exists so the card mirrors the mail.
   if (subTotal > 0 || transport > 0) rows.push({ key: 'trans', label: 'Transportation Charges', value: money(transport) });
   if (total > 0) rows.push({ key: 'total', label: 'Total', value: money(total), strong: true });
 
-  const hasManual = manualTotal > 0;
-  if (!rows.length && !hasManual) return null;
+  if (!rows.length && !hasAdjustments) return null;
 
   const originalCard = rows.length ? (
     <div className="fin-card" aria-label="Original order totals">
-      {hasManual && <div className="fin-title">Original (Email)</div>}
+      {hasAdjustments && <div className="fin-title">Original (Email)</div>}
       {rows.map((r) => (
         <div key={r.key} className={`fin-row${r.strong ? ' fin-total' : ''}`}>
           <span className="fin-label">{r.label}</span>
@@ -56,14 +80,14 @@ export default function OrderFinancials({ financials, manualTotal = 0 }) {
   ) : null;
 
   let updatedCard = null;
-  if (hasManual && rows.length) {
-    const updatedSub = subTotal + manualTotal;
-    const updatedTot = total + manualTotal;
+  if (hasAdjustments && rows.length) {
+    const updatedSub = subTotal + totalAdjustment;
+    const updatedTot = total + totalAdjustment;
     const upRows = [];
-    if (updatedSub > 0) upRows.push({ key: 'sub', label: 'Sub Total', value: money(updatedSub) });
+    if (subTotal !== 0 || updatedSub !== 0) upRows.push({ key: 'sub', label: 'Sub Total', value: money(updatedSub) });
     if (discount !== 0) upRows.push({ key: 'disc', label: discountLabel, value: money(discount) });
-    if (updatedSub > 0 || transport > 0) upRows.push({ key: 'trans', label: 'Transportation Charges', value: money(transport) });
-    if (updatedTot > 0) upRows.push({ key: 'total', label: 'Total', value: money(updatedTot), strong: true });
+    if (subTotal !== 0 || transport > 0 || updatedSub !== 0) upRows.push({ key: 'trans', label: 'Transportation Charges', value: money(transport) });
+    upRows.push({ key: 'total', label: 'Total', value: money(updatedTot), strong: true });
     
     updatedCard = (
       <div className="fin-card is-updated" aria-label="Updated order totals">
@@ -76,17 +100,17 @@ export default function OrderFinancials({ financials, manualTotal = 0 }) {
         ))}
       </div>
     );
-  } else if (hasManual && !rows.length) {
+  } else if (hasAdjustments && !rows.length) {
     updatedCard = (
       <div className="fin-card is-updated" aria-label="Updated order totals">
         <div className="fin-title">Updated (with manual additions)</div>
         <div className="fin-row">
           <span className="fin-label">Manual Additions Subtotal</span>
-          <span className="fin-value">{money(manualTotal)}</span>
+          <span className="fin-value">{money(totalAdjustment)}</span>
         </div>
         <div className="fin-row fin-total">
           <span className="fin-label">Total</span>
-          <span className="fin-value">{money(manualTotal)}</span>
+          <span className="fin-value">{money(totalAdjustment)}</span>
         </div>
       </div>
     );

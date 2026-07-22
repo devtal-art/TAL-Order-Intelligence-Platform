@@ -40,7 +40,7 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
   const [searchOpen, setSearchOpen] = useState(false);
 
   const sym = currencySymbol(currency);
-  const money = (n) => `${sym}${Number(n || 0).toFixed(2)}`;
+  const money = (n) => `${Number(n) < 0 ? '-' : ''}${sym}${Math.abs(Number(n) || 0).toFixed(2)}`;
 
   // Ordered quantity of this line — the Pending Qty upper bound. When known,
   // Pending Qty renders as a 0..qty dropdown so invalid values can't be typed.
@@ -49,6 +49,9 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
   // The website product this row represents: approved match, searched pick, or engine suggestion.
   const candidate = approved ? result.match : chosen || result.suggestedProduct || null;
   const matchScore = approved ? 100 : candidate && candidate.matchScore != null ? candidate.matchScore : null;
+
+  const isUnitPriceNegative = item && Number(item.unit_price) < 0;
+  const isTotalNegative = item && Number(item.total) < 0;
 
   const doApprove = async () => {
     if (busy || !candidate || skipped) return; // prevent duplicate submissions; no approval while Not Found
@@ -75,8 +78,8 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
       </td>
       <td className="rt-email">{item ? item.package : '—'}</td>
       <td className="rt-email rt-num">{item ? item.qty : '—'}</td>
-      <td className="rt-email rt-num">{item ? money(item.unit_price) : '—'}</td>
-      <td className="rt-email rt-num">{item ? money(item.total) : '—'}</td>
+      <td className={`rt-email rt-num${isUnitPriceNegative ? ' price-negative' : ''}`}>{item ? money(item.unit_price) : '—'}</td>
+      <td className={`rt-email rt-num${isTotalNegative ? ' price-negative' : ''}`}>{item ? money(item.total) : '—'}</td>
 
       {/* ── Match (green) ── */}
       <td className="rt-match rt-itemno">

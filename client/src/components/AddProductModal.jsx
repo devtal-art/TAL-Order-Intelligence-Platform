@@ -29,12 +29,10 @@ export default function AddProductModal({ existingItemNos, onAdd, onClose }) {
   const timer = useRef(null);
 
   // Total Price is derived, never typed: Unit Price × Quantity, recomputed
-  // automatically whenever either field changes. Price is optional (V1.7) —
-  // empty counts as 0.
   const computedTotal = (() => {
     const q = Number(qty);
     const u = String(unitPrice).trim() === '' ? 0 : Number(unitPrice);
-    if (!Number.isFinite(q) || q < 0 || !Number.isFinite(u) || u < 0) return null;
+    if (!Number.isFinite(q) || q < 0 || !Number.isFinite(u)) return null;
     return Math.round(u * q * 100) / 100;
   })();
 
@@ -205,7 +203,6 @@ export default function AddProductModal({ existingItemNos, onAdd, onClose }) {
                 <span>Unit Price (optional)</span>
                 <input
                   type="number"
-                  min={0}
                   step="0.01"
                   placeholder="0.00"
                   value={unitPrice}

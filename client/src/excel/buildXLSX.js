@@ -6,10 +6,43 @@
 // ────────────────────────────────────────────────
 import * as XLSX from 'xlsx';
 
-export function buildXLSX(d, resolution){
+export function buildXLSX(d, resolution, comments = {}){
   const wb=XLSX.utils.book_new();
   const inf=d.order_info||{},bil=d.billing_address||{},del=d.delivery_address||{},fin=d.financials||{};
   const items=d.line_items||[];
+  const results=resolution?.results||[];
+
+  // Calculate updated totals using the new logic
+  const subTotal = Number(fin.sub_total) || 0;
+  const transport = Number(fin.transportation_charges) || 0;
+  const total = Number(fin.total) || 0;
+
+  let totalAdjustment = 0;
+  results.forEach((r) => {
+    const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
+    const item = (Number.isInteger(lineIndex) && lineIndex >= 0 && items[lineIndex]) || null;
+    if (!item) return;
+
+    const qty = Number(item.qty) || 0;
+    const unitPrice = Number(item.unit_price) || 0;
+    const itemTotal = qty * Math.abs(unitPrice);
+    const comment = comments[r.lineId] || '';
+    const isNotFound = comment === 'Not Found';
+    const isManual = r.source === 'manual_addition';
+
+    if (isNotFound) {
+      totalAdjustment -= itemTotal;
+    } else if (isManual) {
+      if (unitPrice < 0) {
+        totalAdjustment -= itemTotal;
+      } else {
+        totalAdjustment += itemTotal;
+      }
+    }
+  });
+
+  const updatedSub = subTotal + totalAdjustment;
+  const updatedTot = total + totalAdjustment;
 
   const add=(aoa,name,cols,merges)=>{
     const ws=XLSX.utils.aoa_to_sheet(aoa);
@@ -46,20 +79,20 @@ export function buildXLSX(d, resolution){
     ['#','PRODUCT CODE','PRODUCT DESCRIPTION','PACKAGE','QTY','UNIT PRICE','LINE TOTAL'],
     ...itemRows,
     [''],
-    ['','','','','','Sub Total',fin.sub_total||0],
+    ['','','','','','Sub Total',updatedSub],
     ['','','','','',fin.discount_label||'Discount',fin.discount||0],
-    ['','','','','','Transport Charges',fin.transportation_charges||0],
-    ['','','','','','TOTAL',fin.total||0],
+    ['','','','','','Transport Charges',transport],
+    ['','','','','','TOTAL',updatedTot],
   ],'Order Items',[5,14,54,16,6,15,15],[{s:{r:0,c:0},e:{r:0,c:6}}]);
 
   // Sheet 4 — Financial Summary
   add([
     ['FINANCIAL SUMMARY'],[''],
     ['DESCRIPTION','AMOUNT','NOTES'],
-    ['Sub Total',fin.sub_total||0,'Sum of all line items'],
+    ['Sub Total',updatedSub,'Sum of all line items'],
     [fin.discount_label||'Discount',fin.discount||0,'Applied discount'],
-    ['Transport Charges',fin.transportation_charges||0,'Delivery / shipping costs'],
-    ['TOTAL PAYABLE',fin.total||0,'Final amount due'],
+    ['Transport Charges',transport,'Delivery / shipping costs'],
+    ['TOTAL PAYABLE',updatedTot,'Final amount due'],
     [''],
     ['PAYMENT DETAILS',''],
     ['Payment Type',inf.payment_type||''],

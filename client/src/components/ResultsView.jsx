@@ -5,7 +5,7 @@ import { portalOrderRef } from '../utils/order.js';
 // Results screen (s-results). Same values, filename and download options as the
 // original showResults(); the workbook is passed in from the processing flow.
 // V1.2: shows the order identity (Portal Order Ref) and resolution counts.
-export default function ResultsView({ data, workbook, resolution, filename = '', onReset }) {
+export default function ResultsView({ data, workbook, resolution, comments = {}, filename = '', onReset }) {
   const d = data;
   const fin = d.financials || {};
   const inf = d.order_info || {};
@@ -18,9 +18,41 @@ export default function ResultsView({ data, workbook, resolution, filename = '',
   const approvedCount = resResults.filter((r) => r.status === 'approved').length;
   const needsCount = resResults.filter((r) => r.status === 'needs_review').length;
 
+  // Calculate updated totals using the new logic
+  const subTotal = Number(fin.sub_total) || 0;
+  const transport = Number(fin.transportation_charges) || 0;
+  const total = Number(fin.total) || 0;
+
+  let totalAdjustment = 0;
+  resResults.forEach((r) => {
+    const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
+    const item = (Number.isInteger(lineIndex) && lineIndex >= 0 && items[lineIndex]) || null;
+    if (!item) return;
+
+    const qty = Number(item.qty) || 0;
+    const unitPrice = Number(item.unit_price) || 0;
+    const itemTotal = qty * Math.abs(unitPrice);
+    const comment = comments[r.lineId] || '';
+    const isNotFound = comment === 'Not Found';
+    const isManual = r.source === 'manual_addition';
+
+    if (isNotFound) {
+      totalAdjustment -= itemTotal;
+    } else if (isManual) {
+      if (unitPrice < 0) {
+        totalAdjustment -= itemTotal;
+      } else {
+        totalAdjustment += itemTotal;
+      }
+    }
+  });
+
+  const updatedSub = subTotal + totalAdjustment;
+  const updatedTot = total + totalAdjustment;
+
   const stats = [
     { n: items.length, l: 'Line items' },
-    { n: sym + Math.abs(fin.total || 0).toFixed(2), l: 'Order total' },
+    { n: `${updatedTot < 0 ? '-' : ''}${sym}${Math.abs(updatedTot).toFixed(2)}`, l: 'Order total' },
     { n: inf.order_ref || '—', l: 'Order ref' },
     { n: (d.billing_address?.company_name || '—').split(' ').slice(0, 2).join(' ') || '—', l: 'Customer' },
   ];
@@ -38,7 +70,7 @@ export default function ResultsView({ data, workbook, resolution, filename = '',
           </svg>
         </div>
         <h2>Your Excel file is ready</h2>
-        <p>{`${items.length} line items · ${sym}${Math.abs(fin.total || 0).toFixed(2)} total · 5 Excel sheets`}</p>
+        <p>{`${items.length} line items · ${updatedTot < 0 ? '-' : ''}${sym}${Math.abs(updatedTot).toFixed(2)} total · 5 Excel sheets`}</p>
       </div>
 
       <div className="ord-id-card">
@@ -108,44 +140,43 @@ export default function ResultsView({ data, workbook, resolution, filename = '',
             </tr>
           </thead>
           <tbody>
-            {prev.map((it, i) => (
-              <tr key={i}>
-                <td style={{ color: '#A8A29E', fontSize: '11px' }}>{i + 1}</td>
-                <td title={it.description || ''}>{it.description || ''}</td>
-                <td style={{ color: '#78716C', fontSize: '11px' }}>{it.package || ''}</td>
-                <td className="nr">{it.qty || 0}</td>
-                <td className="nr">
-                  {sym}
-                  {Number(it.unit_price || 0).toFixed(2)}
-                </td>
-                <td className="nr" style={{ fontWeight: 600 }}>
-                  {sym}
-                  {Number(it.total || 0).toFixed(2)}
-                </td>
-              </tr>
-            ))}
+            {prev.map((it, i) => {
+              const isUnitPriceNegative = Number(it.unit_price) < 0;
+              const isTotalNegative = Number(it.total) < 0;
+              return (
+                <tr key={i}>
+                  <td style={{ color: '#A8A29E', fontSize: '11px' }}>{i + 1}</td>
+                  <td title={it.description || ''}>{it.description || ''}</td>
+                  <td style={{ color: '#78716C', fontSize: '11px' }}>{it.package || ''}</td>
+                  <td className="nr">{it.qty || 0}</td>
+                  <td className={`nr${isUnitPriceNegative ? ' price-negative' : ''}`}>
+                    {isUnitPriceNegative ? '-' : ''}{sym}{Math.abs(Number(it.unit_price || 0)).toFixed(2)}
+                  </td>
+                  <td className={`nr${isTotalNegative ? ' price-negative' : ''}`} style={{ fontWeight: 600 }}>
+                    {isTotalNegative ? '-' : ''}{sym}{Math.abs(Number(it.total || 0)).toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         <div className="tot-strip">
           <div className="ti">
             Sub total{' '}
             <strong>
-              {sym}
-              {Math.abs(fin.sub_total || 0).toFixed(2)}
+              {updatedSub < 0 ? '-' : ''}{sym}{Math.abs(updatedSub).toFixed(2)}
             </strong>
           </div>
           <div className="ti">
             Discount{' '}
             <strong>
-              {sym}
-              {Math.abs(fin.discount || 0).toFixed(2)}
+              {Number(fin.discount) < 0 ? '-' : ''}{sym}{Math.abs(fin.discount || 0).toFixed(2)}
             </strong>
           </div>
           <div className="ti">
             Total{' '}
             <strong style={{ color: '#067647' }}>
-              {sym}
-              {Math.abs(fin.total || 0).toFixed(2)}
+              {updatedTot < 0 ? '-' : ''}{sym}{Math.abs(updatedTot).toFixed(2)}
             </strong>
           </div>
         </div>

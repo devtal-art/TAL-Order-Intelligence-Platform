@@ -255,6 +255,7 @@ export default function Home() {
           data={result.data}
           workbook={result.workbook}
           resolution={resolution}
+          comments={comments}
           filename={file?.name || ''}
           onReset={handleResetAll}
         />

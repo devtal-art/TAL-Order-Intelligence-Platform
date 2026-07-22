@@ -35,7 +35,7 @@ export function validateManualProduct({ itemNo, emailProductName, qty, unitPrice
   }
   if (String(unitPrice ?? '').trim() !== '') {
     const p = Number(unitPrice);
-    if (!Number.isFinite(p) || p < 0) return 'Unit price must be a number of 0 or more.';
+    if (!Number.isFinite(p)) return 'Unit price must be a valid number.';
   }
   return '';
 }

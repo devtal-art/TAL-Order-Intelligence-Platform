@@ -14,7 +14,8 @@ import OrderFinancials from './OrderFinancials.jsx';
 export function downloadOrderExcel(order) {
   const parsed = order.parsedData || {};
   const resolution = order.resolutionData || { results: [] };
-  const wb = buildXLSX(parsed, resolution);
+  const comments = order.productComments || {};
+  const wb = buildXLSX(parsed, resolution, comments);
   const inf = parsed.order_info || {};
   const fname = `Order_${inf.order_ref || order.portalOrderRef}_${(inf.order_date || '').replace(/\//g, '-') || 'data'}.xlsx`;
   XLSX.writeFile(wb, fname, { bookType: 'xlsx', type: 'binary', cellStyles: true });
@@ -437,7 +438,8 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       product: item ? item.description : r.emailProductName,
       qty: item ? item.qty : '—',
       orderedQty: item ? Number(item.qty) : NaN,
-      unitPrice: item ? `${sym}${Number(item.unit_price || 0).toFixed(2)}` : '—',
+      unitPrice: item ? `${Number(item.unit_price) < 0 ? '-' : ''}${sym}${Math.abs(Number(item.unit_price || 0)).toFixed(2)}` : '—',
+      isUnitPriceNegative: item && Number(item.unit_price) < 0,
       itemNo: matched ? matched.itemNo : '—',
       website: matched ? matched.websiteProductName : '—',
       approved,
@@ -632,7 +634,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                 <tr key={row.lineId} className="rt-row">
                   <td className="rt-name">{row.product}</td>
                   <td className="rt-num">{row.qty}</td>
-                  <td className="rt-num">{row.unitPrice}</td>
+                  <td className={`rt-num${row.isUnitPriceNegative ? ' price-negative' : ''}`}>{row.unitPrice}</td>
                   <td className="rt-itemno">
                     {row.itemNo && row.itemNo !== '—' ? (
                       <span className="item-chip">{row.itemNo}</span>
@@ -772,16 +774,9 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
 
       <OrderFinancials 
         financials={parsed.financials} 
-        manualTotal={results.reduce((sum, r) => {
-          if (r.source === 'manual_addition') {
-            const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
-            const item = items[lineIndex];
-            if (item && Number.isFinite(Number(item.total))) {
-              return sum + Number(item.total);
-            }
-          }
-          return sum;
-        }, 0)}
+        results={results}
+        lineItems={items}
+        comments={comments}
       />
 
       {addOpen && (

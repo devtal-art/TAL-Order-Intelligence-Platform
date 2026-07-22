@@ -352,8 +352,15 @@
   .btn-generate{justify-content:center}
   .og-head{padding:12px 14px}
 }
-@media (max-width:520px){
+@media (max-width:520px) {
   .rev-summary{grid-template-columns:1fr}
   .rev-fields{grid-template-columns:1fr}
   .og-head-right{flex-direction:row;align-items:center}
 }
+
+.price-negative {
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+  font-weight: 600;
+}
+

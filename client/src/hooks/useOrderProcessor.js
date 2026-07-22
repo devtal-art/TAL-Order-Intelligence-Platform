@@ -383,10 +383,10 @@ export function useOrderProcessor() {
   // buildXLSX) and show the results screen. Triggered from the Review screen.
   const generateExcel = useCallback(() => {
     if (!parsed) return;
-    const workbook = buildXLSX(parsed, resolution);
+    const workbook = buildXLSX(parsed, resolution, comments);
     setResult({ data: parsed, workbook });
     setScreen('results');
-  }, [parsed, resolution]);
+  }, [parsed, resolution, comments]);
 
   const reset = useCallback(() => {
     setFile(null);
