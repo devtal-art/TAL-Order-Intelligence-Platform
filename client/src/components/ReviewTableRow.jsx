@@ -31,6 +31,9 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
   // the comment back re-enables everything, and nothing is ever mapped.
   // Already-approved rows have no matching controls, so nothing to disable.
   const skipped = !approved && isMatchingSkipped(comment);
+  // When 'Released' is selected the order line is confirmed fulfilled —
+  // Pending Qty and Order Status are irrelevant and should be greyed out.
+  const released = comment === 'Released';
   const [chosen, setChosen] = useState(null); // product picked from search (overrides suggestion)
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -108,6 +111,8 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
                 value={fulfillment?.pendingQty ?? ''}
                 onChange={(e) => onFulfillment(result.lineId, { pendingQty: e.target.value === '' ? '' : Number(e.target.value) })}
                 aria-label="Pending quantity"
+                disabled={released}
+                title={released ? 'Not applicable when comment is Released' : undefined}
               >
                 <option value="">—</option>
                 {Array.from({ length: orderedQty + 1 }, (_, n) => (
@@ -125,6 +130,8 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
                 placeholder="—"
                 onChange={(e) => onFulfillment(result.lineId, { pendingQty: clampPendingQty(e.target.value, item?.qty) })}
                 aria-label="Pending quantity"
+                disabled={released}
+                title={released ? 'Not applicable when comment is Released' : undefined}
               />
             )}
           </td>
@@ -134,6 +141,8 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
               value={fulfillment?.status ?? ''}
               onChange={(e) => onFulfillment(result.lineId, { status: e.target.value || null })}
               aria-label="Order status"
+              disabled={released}
+              title={released ? 'Not applicable when comment is Released' : undefined}
             >
               <option value="">—</option>
               {DELIVERY_STATUSES.map((s) => (

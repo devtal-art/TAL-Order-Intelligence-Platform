@@ -39,7 +39,7 @@ export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil'];
 //                 INTENTIONALLY skipped for THIS order only (V2.1). Never
 //                 creates a mapping and never affects future orders — it is
 //                 stored exactly like the other comments (product_comments).
-export const PRODUCT_COMMENTS = ['Released', 'OS', 'N/A', 'Not Found'];
+export const PRODUCT_COMMENTS = ['Released', 'OS', 'Not Found'];
 
 // The comment value that intentionally skips matching for the order (V2.1).
 export const NOT_FOUND_COMMENT = 'Not Found';
@@ -60,6 +60,7 @@ export function commentMeta(comment) {
     case 'OS':
       return { label: 'OS', tone: 'os' };
     case 'N/A':
+      // Legacy value — still renderable if stored, but no longer offered in the dropdown.
       return { label: 'N/A', tone: 'na' };
     case 'Not Found':
       // Neutral (grey) — an order-level decision, not an inventory status.

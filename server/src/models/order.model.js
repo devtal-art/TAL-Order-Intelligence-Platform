@@ -22,7 +22,7 @@ const orderSchema = new mongoose.Schema(
     portal_order_ref: { type: String, required: true, unique: true, trim: true },
 
     filename: { type: String, default: '' },
-    customer_name: { type: String, default: '' },
+    customer_name: { type: String, default: '', index: true },
 
     // Team member who processed the order (V1.9). Order-level, plain string —
     // deliberately NOT authentication/user management. '' = Not Assigned

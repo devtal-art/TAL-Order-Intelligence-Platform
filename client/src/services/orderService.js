@@ -15,6 +15,8 @@ export const orderService = {
     apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}`, { resolutionData }),
 
   list: (query) => apiClient.get(`/v1/orders${query ? `?query=${encodeURIComponent(query)}` : ''}`),
+  listByCompany: (company) => apiClient.get(`/v1/orders?company=${encodeURIComponent(company)}`),
+  autocompleteCompanies: (query) => apiClient.get(`/v1/orders/companies/autocomplete?query=${encodeURIComponent(query)}`),
 
   // Latest N saved orders (V2.3) — the Search page's "Recent Processed Orders".
   recent: (limit = 5) => apiClient.get(`/v1/orders?limit=${encodeURIComponent(limit)}`),

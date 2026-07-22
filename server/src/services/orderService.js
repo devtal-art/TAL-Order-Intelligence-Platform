@@ -188,7 +188,7 @@ export async function updateResolution(portalOrderRef, resolutionData) {
 // exactly like the other comments and deliberately has NO effect anywhere
 // else: it never creates an Approved Mapping, never touches the Product
 // Catalog, and never influences the matching engine or future orders.
-export const PRODUCT_COMMENTS = ['Released', 'OS', 'N/A', 'Not Found'];
+export const PRODUCT_COMMENTS = ['Released', 'OS', 'Not Found'];
 
 // Merge per-product comments into an order without touching anything else.
 // `comments` = { [lineId]: 'Released' | 'OS' | 'N/A' | 'Not Found' | null } —
@@ -559,19 +559,65 @@ export async function listDashboardOrders({ type, value, page, limit } = {}) {
 }
 
 // List orders (summary only), newest first, optionally filtered by ref
-// substring. `limit` (V2.3, optional, additive) caps the result — used by the
-// Search page's "Recent Processed Orders" preview; omitted, behaviour is
-// exactly as before.
-export async function listOrders({ query, limit } = {}) {
+// substring or exact company name. `limit` (V2.3, optional, additive) caps the
+// result — used by the Search page's "Recent Processed Orders" preview.
+export async function listOrders({ query, company, limit } = {}) {
   const filter = {};
   if (query) filter.portal_order_ref = new RegExp(escapeRegex(query), 'i');
-
+  if (company) filter.customer_name = new RegExp(escapeRegex(company), 'i');
   let find = Order.find(filter).sort({ upload_timestamp: -1 });
   const n = Math.floor(Number(limit));
   if (Number.isFinite(n) && n > 0) find = find.limit(Math.min(n, 100));
 
   const docs = await find.lean();
   return { data: docs.map(toSummaryDto), meta: { total: docs.length } };
+}
+
+// Autocomplete company names for the search dropdown. Groups matching orders
+// by customer_name and sorts by match quality (exact > prefix > substring > alphabetical).
+export async function autocompleteCompanies(query) {
+  if (!query || typeof query !== 'string' || !query.trim()) {
+    return [];
+  }
+  const q = query.trim();
+  const regex = new RegExp(escapeRegex(q), 'i');
+  
+  const pipeline = [
+    { $match: { customer_name: regex } },
+    {
+      $group: {
+        _id: '$customer_name',
+        orderCount: { $sum: 1 },
+        latestOrderRef: { $first: '$portal_order_ref' },
+        latestOrderDate: { $max: '$upload_timestamp' }
+      }
+    }
+  ];
+  
+  const results = await Order.aggregate(pipeline);
+  
+  const qLower = q.toLowerCase();
+  
+  results.sort((a, b) => {
+    const nameA = a._id.toLowerCase();
+    const nameB = b._id.toLowerCase();
+    
+    const isExactA = nameA === qLower;
+    const isExactB = nameB === qLower;
+    if (isExactA !== isExactB) return isExactA ? -1 : 1;
+    
+    const isPrefixA = nameA.startsWith(qLower);
+    const isPrefixB = nameB.startsWith(qLower);
+    if (isPrefixA !== isPrefixB) return isPrefixA ? -1 : 1;
+    
+    return nameA.localeCompare(nameB);
+  });
+  
+  return results.slice(0, 10).map(r => ({
+    companyName: r._id,
+    orderCount: r.orderCount,
+    latestOrderRef: r.latestOrderRef
+  }));
 }
 
 // Rewrite the website product names inside a resolution snapshot to the live

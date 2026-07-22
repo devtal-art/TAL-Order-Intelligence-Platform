@@ -43,12 +43,23 @@ export async function saveOrder(req, res, next) {
   }
 }
 
-// GET /api/v1/orders — list orders (summary), optional ?query= ref filter and
-// ?limit= result cap (V2.3, additive — omitted returns everything as before).
+// GET /api/v1/orders — list orders (summary), optional ?query= ref filter,
+// ?company= exact company filter, and ?limit= result cap.
 export async function listOrders(req, res, next) {
   try {
     ensureDb();
-    const result = await orderService.listOrders({ query: req.query.query, limit: req.query.limit });
+    const result = await orderService.listOrders({ query: req.query.query, company: req.query.company, limit: req.query.limit });
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/orders/companies/autocomplete — search companies by name.
+export async function autocompleteCompanies(req, res, next) {
+  try {
+    ensureDb();
+    const result = await orderService.autocompleteCompanies(req.query.query);
     res.status(200).json(result);
   } catch (err) {
     next(err);

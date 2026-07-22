@@ -3,7 +3,64 @@
 .sol-card{margin-bottom:0}
 .sol-badge svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
 
-.sol-search{display:flex;gap:8px;margin-top:16px}
+.sol-search{display:flex;gap:8px;margin-top:16px;position:relative}
+
+.sol-search-type-select{
+  padding:10px 14px;border:1px solid var(--border-strong);
+  border-radius:10px;font-size:13.5px;font-family:var(--font-ui);outline:none;
+  background:var(--surface-2);color:var(--ink);
+  cursor:pointer;
+  transition:border-color .15s,box-shadow .15s;
+}
+.sol-search-type-select:focus{border-color:var(--accent);box-shadow:var(--ring)}
+
+.sol-autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  margin-top: 6px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.1);
+  z-index: 100;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.sol-autocomplete-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.sol-autocomplete-item:last-child {
+  border-bottom: none;
+}
+.sol-autocomplete-item:hover {
+  background: var(--surface-2);
+}
+.sol-autocomplete-name {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.sol-autocomplete-meta {
+  font-size: 11px;
+  color: var(--ink-2);
+  display: flex;
+  gap: 8px;
+}
+.sol-autocomplete-loading {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
 .sol-input{
   flex:1;min-width:0;padding:10px 14px;border:1px solid var(--border-strong);
   border-radius:10px;font-size:13.5px;font-family:var(--font-ui);outline:none;

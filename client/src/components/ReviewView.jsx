@@ -180,7 +180,18 @@ export default function ReviewView({
         <div className="og-empty">No order matches “{search}”.</div>
       )}
 
-      <OrderFinancials financials={parsedData?.financials} />
+      <OrderFinancials 
+        financials={parsedData?.financials} 
+        manualTotal={results.reduce((sum, r) => {
+          if (r.source === 'manual_addition') {
+            const item = lineItems[Number(r.lineId) - 1];
+            if (item && Number.isFinite(Number(item.total))) {
+              return sum + Number(item.total);
+            }
+          }
+          return sum;
+        }, 0)}
+      />
 
       {(blockingReview > 0 || needsProcessedBy) && (
         <div className="rev-gate-note">

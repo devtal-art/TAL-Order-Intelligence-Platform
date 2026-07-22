@@ -10,6 +10,7 @@ import {
   setOrderProcessedBy,
   getDashboard,
   listDashboardOrders,
+  autocompleteCompanies,
 } from '../../controllers/orderController.js';
 
 // Mounted at /api/v1/orders (V1.2 — new, additive).
@@ -21,6 +22,7 @@ orderRouter.get('/', listOrders);
 // Express would treat "dashboard" as a Portal Order Ref.
 orderRouter.get('/dashboard', getDashboard);
 orderRouter.get('/dashboard/orders', listDashboardOrders);
+orderRouter.get('/companies/autocomplete', autocompleteCompanies);
 orderRouter.get('/:ref', getOrder);
 orderRouter.patch('/:ref/comments', setOrderComments);
 orderRouter.patch('/:ref/fulfillment', setOrderFulfillment);

@@ -28,7 +28,14 @@ export function downloadOrderExcel(order) {
 // any edit saved through this panel's detail modal, so the host page (the
 // Dashboard) can refresh derived views. Purely additive — omitted, nothing changes.
 export default function SavedOrderLookup({ onOrderChanged }) {
+  const [searchType, setSearchType] = useState('ref'); // 'ref' | 'company'
   const [query, setQuery] = useState('');
+  
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [autocompleteLoading, setAutocompleteLoading] = useState(false);
+  
   const [results, setResults] = useState(null); // null = not searched yet; [] = no matches
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -36,20 +43,81 @@ export default function SavedOrderLookup({ onOrderChanged }) {
   const [openRef, setOpenRef] = useState(null);
   const [busyRef, setBusyRef] = useState('');
 
+  // Debounced autocomplete search
+  useEffect(() => {
+    if (searchType !== 'company') return;
+    const q = query.trim();
+    if (!q) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      return;
+    }
+    
+    let cancelled = false;
+    setAutocompleteLoading(true);
+    const timer = setTimeout(() => {
+      orderService.autocompleteCompanies(q)
+        .then(res => {
+          if (!cancelled) {
+            // The autocomplete endpoint returns a plain array, not { data: [...] }
+            setSuggestions(Array.isArray(res) ? res : (res.data || []));
+            setShowDropdown(true);
+            setAutocompleteLoading(false);
+          }
+        })
+        .catch(e => {
+          if (!cancelled) {
+            console.error('Autocomplete error:', e);
+            setAutocompleteLoading(false);
+          }
+        });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, searchType]);
+
   const runSearch = async (e) => {
     if (e) e.preventDefault();
     const q = query.trim();
+    if (!q) return;
     setLoading(true);
     setError('');
     setOpenRef(null);
+    setShowDropdown(false);
     try {
-      const resp = await orderService.list(q);
+      const resp = searchType === 'company' ? await orderService.listByCompany(q) : await orderService.list(q);
       setResults(resp.data || []);
     } catch (err) {
       setError(err.message || 'Could not search saved orders.');
       setResults(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSuggestionClick = async (suggestion) => {
+    setShowDropdown(false);
+    setQuery(suggestion.companyName);
+    
+    if (suggestion.orderCount === 1) {
+      openDetail(suggestion.latestOrderRef);
+    } else {
+      // List matching orders for the company
+      setLoading(true);
+      setError('');
+      setOpenRef(null);
+      try {
+        const resp = await orderService.listByCompany(suggestion.companyName);
+        setResults(resp.data || []);
+      } catch (err) {
+        setError(err.message || 'Could not search saved orders.');
+        setResults(null);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -86,18 +154,62 @@ export default function SavedOrderLookup({ onOrderChanged }) {
         </span>
         <div className="step-headings">
           <div className="step-title">Find a Saved Order</div>
-          <div className="step-sub">Look up any previously processed order by its Portal Order Ref No.</div>
+          <div className="step-sub">Look up any previously processed order by its Portal Order Ref No or Company Name.</div>
         </div>
       </div>
 
       <form className="sol-search" onSubmit={runSearch}>
-        <input
-          type="text"
-          className="sol-input"
-          placeholder="Enter Portal Order Ref No (e.g. 10025487)…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <select 
+          className="sol-search-type-select" 
+          value={searchType} 
+          onChange={e => {
+            setSearchType(e.target.value);
+            setQuery('');
+            setResults(null);
+            setShowDropdown(false);
+          }}
+          aria-label="Search Type"
+        >
+          <option value="ref">Order Number</option>
+          <option value="company">Company Name</option>
+        </select>
+        <div style={{ flex: 1, position: 'relative' }}>
+          <input
+            type="text"
+            className="sol-input"
+            style={{ width: '100%', boxSizing: 'border-box' }}
+            placeholder={searchType === 'ref' ? 'Enter Portal Order Ref No (e.g. 10025487)…' : 'Search Customer / Company Name…'}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => {
+              if (searchType === 'company' && query.trim() && suggestions.length > 0) {
+                setShowDropdown(true);
+              }
+            }}
+            onBlur={() => {
+              // Delay hiding so clicking a suggestion works before onBlur fires
+              setTimeout(() => setShowDropdown(false), 200);
+            }}
+          />
+          {showDropdown && (
+            <div className="sol-autocomplete-dropdown">
+              {autocompleteLoading ? (
+                <div className="sol-autocomplete-loading">Searching…</div>
+              ) : suggestions.length === 0 ? (
+                <div className="sol-autocomplete-loading">No companies found</div>
+              ) : (
+                suggestions.map(s => (
+                  <div key={s.companyName} className="sol-autocomplete-item" onClick={() => handleSuggestionClick(s)}>
+                    <span className="sol-autocomplete-name">{s.companyName}</span>
+                    <span className="sol-autocomplete-meta">
+                      <span>{s.orderCount} order{s.orderCount > 1 ? 's' : ''}</span>
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
         <button className="sol-btn" type="submit" disabled={loading}>
           {loading ? 'Searching…' : 'Search'}
         </button>
@@ -514,142 +626,163 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.lineId} className="rt-row">
-                <td className="rt-name">{row.product}</td>
-                <td className="rt-num">{row.qty}</td>
-                <td className="rt-num">{row.unitPrice}</td>
-                <td className="rt-itemno">
-                  {row.itemNo && row.itemNo !== '—' ? (
-                    <span className="item-chip">{row.itemNo}</span>
-                  ) : (
-                    <span className="rt-empty">—</span>
-                  )}
-                </td>
-                <td className="rt-name">{row.website}</td>
-                <td>
-                  <span className={`rt-badge ${row.approved ? 'approved' : 'needs'}`}>
-                    {row.approved ? 'Approved' : 'Needs Review'}
-                  </span>
-                </td>
-                <td className="rt-num">
-                  {editing ? (
-                    Number.isInteger(row.orderedQty) ? (
-                      <select
-                        className="fl-select"
-                        value={draft[row.lineId]?.pendingQty ?? ''}
-                        onChange={(e) =>
-                          editLine(row.lineId, { pendingQty: e.target.value === '' ? '' : Number(e.target.value) })
-                        }
-                        aria-label="Pending quantity"
-                      >
-                        <option value="">—</option>
-                        {Array.from({ length: row.orderedQty + 1 }, (_, n) => (
-                          <option key={n} value={n}>{n}</option>
-                        ))}
-                      </select>
+            {rows.map((row) => {
+              const released = draft[row.lineId]?.comment === 'Released';
+              return (
+                <tr key={row.lineId} className="rt-row">
+                  <td className="rt-name">{row.product}</td>
+                  <td className="rt-num">{row.qty}</td>
+                  <td className="rt-num">{row.unitPrice}</td>
+                  <td className="rt-itemno">
+                    {row.itemNo && row.itemNo !== '—' ? (
+                      <span className="item-chip">{row.itemNo}</span>
                     ) : (
-                      // Ordered quantity unknown (line item missing) — free numeric input.
-                      <input
-                        type="number"
-                        className="fl-input"
-                        value={draft[row.lineId]?.pendingQty ?? ''}
-                        min={0}
-                        step={1}
-                        placeholder="—"
-                        onChange={(e) =>
-                          editLine(row.lineId, { pendingQty: clampPendingQty(e.target.value, row.orderedQty) })
-                        }
-                        aria-label="Pending quantity"
-                      />
-                    )
-                  ) : row.pendingQty != null ? (
-                    row.pendingQty
-                  ) : (
-                    <span className="rt-empty">—</span>
-                  )}
-                </td>
-                <td>
-                  {editing ? (
-                    <select
-                      className={`ds-select${draft[row.lineId]?.status ? ` is-${draft[row.lineId].status}` : ''}`}
-                      value={draft[row.lineId]?.status || ''}
-                      onChange={(e) => editLine(row.lineId, { status: e.target.value })}
-                      aria-label="Order status"
-                    >
-                      <option value="">—</option>
-                      {DELIVERY_STATUSES.map((s) => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
-                    </select>
-                  ) : deliveryMeta(row.deliveryStatus) ? (
-                    <span className={`ds-badge ds-${deliveryMeta(row.deliveryStatus).tone}`}>
-                      {deliveryMeta(row.deliveryStatus).label}
-                    </span>
-                  ) : (
-                    <span className="rt-empty">—</span>
-                  )}
-                </td>
-                <td>
-                  {editing ? (
-                    <select
-                      className="cm-select"
-                      value={draft[row.lineId]?.comment || ''}
-                      onChange={(e) => editLine(row.lineId, { comment: e.target.value })}
-                      aria-label="Product comment"
-                    >
-                      <option value="">—</option>
-                      {PRODUCT_COMMENTS.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  ) : commentMeta(row.comment) ? (
-                    <span className={`cm-badge cm-${commentMeta(row.comment).tone}`}>
-                      {commentMeta(row.comment).label}
-                    </span>
-                  ) : (
-                    <span className="rt-empty">—</span>
-                  )}
-                </td>
-                <td className="rt-note">
-                  {editing ? (
-                    <textarea
-                      className="note-input"
-                      rows={1}
-                      placeholder="Add note…"
-                      value={draft[row.lineId]?.note ?? ''}
-                      onChange={(e) => editLine(row.lineId, { note: e.target.value })}
-                      aria-label="Additional comment"
-                    />
-                  ) : row.note ? (
-                    <span className="note-text" title={row.note}>{row.note}</span>
-                  ) : (
-                    <span className="rt-empty">—</span>
-                  )}
-                </td>
-                {hasManual && (
-                  <td className="rt-del-cell">
-                    {row.manual && !editing && (
-                      <button
-                        className="rt-del"
-                        type="button"
-                        title="Remove manually added product"
-                        aria-label="Remove manually added product"
-                        onClick={() => removeProduct(row.lineId)}
-                        disabled={deletingId === row.lineId}
-                      >
-                        {deletingId === row.lineId ? '…' : '🗑'}
-                      </button>
+                      <span className="rt-empty">—</span>
                     )}
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td className="rt-name">{row.website}</td>
+                  <td>
+                    <span className={`rt-badge ${row.approved ? 'approved' : 'needs'}`}>
+                      {row.approved ? 'Approved' : 'Needs Review'}
+                    </span>
+                  </td>
+                  <td className="rt-num">
+                    {editing ? (
+                      Number.isInteger(row.orderedQty) ? (
+                        <select
+                          className="fl-select"
+                          value={draft[row.lineId]?.pendingQty ?? ''}
+                          onChange={(e) =>
+                            editLine(row.lineId, { pendingQty: e.target.value === '' ? '' : Number(e.target.value) })
+                          }
+                          aria-label="Pending quantity"
+                          disabled={released}
+                          title={released ? 'Not applicable when comment is Released' : undefined}
+                        >
+                          <option value="">—</option>
+                          {Array.from({ length: row.orderedQty + 1 }, (_, n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        // Ordered quantity unknown (line item missing) — free numeric input.
+                        <input
+                          type="number"
+                          className="fl-input"
+                          value={draft[row.lineId]?.pendingQty ?? ''}
+                          min={0}
+                          step={1}
+                          placeholder="—"
+                          onChange={(e) =>
+                            editLine(row.lineId, { pendingQty: clampPendingQty(e.target.value, row.orderedQty) })
+                          }
+                          aria-label="Pending quantity"
+                          disabled={released}
+                          title={released ? 'Not applicable when comment is Released' : undefined}
+                        />
+                      )
+                    ) : row.pendingQty != null ? (
+                      row.pendingQty
+                    ) : (
+                      <span className="rt-empty">—</span>
+                    )}
+                  </td>
+                  <td>
+                    {editing ? (
+                      <select
+                        className={`ds-select${draft[row.lineId]?.status ? ` is-${draft[row.lineId].status}` : ''}`}
+                        value={draft[row.lineId]?.status || ''}
+                        onChange={(e) => editLine(row.lineId, { status: e.target.value })}
+                        aria-label="Order status"
+                        disabled={released}
+                        title={released ? 'Not applicable when comment is Released' : undefined}
+                      >
+                        <option value="">—</option>
+                        {DELIVERY_STATUSES.map((s) => (
+                          <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                      </select>
+                    ) : deliveryMeta(row.deliveryStatus) ? (
+                      <span className={`ds-badge ds-${deliveryMeta(row.deliveryStatus).tone}`}>
+                        {deliveryMeta(row.deliveryStatus).label}
+                      </span>
+                    ) : (
+                      <span className="rt-empty">—</span>
+                    )}
+                  </td>
+                  <td>
+                    {editing ? (
+                      <select
+                        className="cm-select"
+                        value={draft[row.lineId]?.comment || ''}
+                        onChange={(e) => editLine(row.lineId, { comment: e.target.value })}
+                        aria-label="Product comment"
+                      >
+                        <option value="">—</option>
+                        {PRODUCT_COMMENTS.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    ) : commentMeta(row.comment) ? (
+                      <span className={`cm-badge cm-${commentMeta(row.comment).tone}`}>
+                        {commentMeta(row.comment).label}
+                      </span>
+                    ) : (
+                      <span className="rt-empty">—</span>
+                    )}
+                  </td>
+                  <td className="rt-note">
+                    {editing ? (
+                      <textarea
+                        className="note-input"
+                        rows={1}
+                        placeholder="Add note…"
+                        value={draft[row.lineId]?.note ?? ''}
+                        onChange={(e) => editLine(row.lineId, { note: e.target.value })}
+                        aria-label="Additional comment"
+                      />
+                    ) : row.note ? (
+                      <span className="note-text" title={row.note}>{row.note}</span>
+                    ) : (
+                      <span className="rt-empty">—</span>
+                    )}
+                  </td>
+                  {hasManual && (
+                    <td className="rt-del-cell">
+                      {row.manual && !editing && (
+                        <button
+                          className="rt-del"
+                          type="button"
+                          title="Remove manually added product"
+                          aria-label="Remove manually added product"
+                          onClick={() => removeProduct(row.lineId)}
+                          disabled={deletingId === row.lineId}
+                        >
+                          {deletingId === row.lineId ? '…' : '🗑'}
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      <OrderFinancials financials={parsed.financials} />
+      <OrderFinancials 
+        financials={parsed.financials} 
+        manualTotal={results.reduce((sum, r) => {
+          if (r.source === 'manual_addition') {
+            const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
+            const item = items[lineIndex];
+            if (item && Number.isFinite(Number(item.total))) {
+              return sum + Number(item.total);
+            }
+          }
+          return sum;
+        }, 0)}
+      />
 
       {addOpen && (
         <AddProductModal
