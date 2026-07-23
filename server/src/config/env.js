@@ -16,4 +16,15 @@ export const env = {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
+
+  // JWT secret — MUST be set in production via the JWT_SECRET env var.
+  // A missing secret in production is flagged at startup; in development a
+  // fallback keeps things working but tokens issued with it are insecure.
+  jwtSecret: process.env.JWT_SECRET || (() => {
+    if ((process.env.NODE_ENV || 'development') === 'production') {
+      // eslint-disable-next-line no-console
+      console.error('[FATAL] JWT_SECRET env var is not set. Set it before deploying to production.');
+    }
+    return 'dev-insecure-fallback-secret-do-not-use-in-production';
+  })(),
 };

@@ -22,7 +22,6 @@ export function useOrderProcessor() {
   const [comments, setComments] = useState({}); // { [lineId]: 'Released' | 'OS' | 'N/A' } (V1.3)
   const [fulfillment, setFulfillment] = useState({}); // { [lineId]: { pendingQty, status } } (V1.4)
   const [notes, setNotes] = useState({}); // { [lineId]: string } — free-text Additional Comments (V1.7)
-  const [processedBy, setProcessedBy] = useState(''); // who processed the order (V1.9, mandatory before save)
   const [pending, setPending] = useState(null); // duplicate upload awaiting a decision: { data, resolved, prev, ref }
   const [saved, setSaved] = useState(false); // true once the order has been explicitly saved to the DB (V2.0)
   const orderRefRef = useRef(null); // Portal Order Ref of the PERSISTED order (set only after the first save)
@@ -42,13 +41,14 @@ export function useOrderProcessor() {
   // exclusively when the user clicks the "Save Order" button on the Review
   // screen. An order is NEVER written to the DB before that deliberate action.
   //
+  // processedBy is NO LONGER sent from the client (V3.0 — JWT Auth). The
+  // server automatically assigns req.user.name from the verified JWT token.
   // After the initial save, any per-product edits made while the order was
   // still unsaved (comments / fulfillment / notes) are flushed as best-effort
-  // PATCH calls. From that point on, orderRefRef is set and subsequent edits
-  // go straight to the live mirrors as before.
+  // PATCH calls.
   const saveOrder = useCallback(async () => {
     const ref = plannedRefRef.current;
-    if (!ref || !parsed || !resolution || !processedBy) return;
+    if (!ref || !parsed || !resolution) return;
     orderRefRef.current = ref;
     try {
       await orderService.save({
@@ -59,7 +59,7 @@ export function useOrderProcessor() {
         totalProducts: (parsed.line_items || []).length,
         parsedData: parsed,
         resolutionData: resolution,
-        processedBy,
+        // processedBy is intentionally omitted — the server sets it from req.user.name.
       });
       setSaved(true);
       // Flush per-product edits made before the save (best-effort — a DB
@@ -85,7 +85,7 @@ export function useOrderProcessor() {
     } catch (e) {
       console.warn('Order save failed:', e.message);
     }
-  }, [file, parsed, resolution, processedBy, comments, fulfillment, notes]);
+  }, [file, parsed, resolution, comments, fulfillment, notes]);
 
   // Show the Review screen for a parsed + resolved order (V2.0). Carries over
   // manual lines from the previously saved order (`prev`, re-upload path).
@@ -122,9 +122,8 @@ export function useOrderProcessor() {
       setResolution(mergedResolved);
       plannedRefRef.current = ref;
 
-      // Pre-populate Processed By from the previously saved order (re-upload
-      // path) so the user only needs to click Save — not re-select the name.
-      setProcessedBy(prev?.processedBy || '');
+      // processedBy is no longer pre-populated (V3.0 — JWT Auth).
+      // The authenticated user is automatically assigned at save time.
 
       setScreen('review');
     },
@@ -138,7 +137,6 @@ export function useOrderProcessor() {
     setComments({});
     setFulfillment({});
     setNotes({});
-    setProcessedBy(''); // mandatory per order — always an explicit choice (V1.9)
     setSaved(false); // reset saved flag for the new upload (V2.0)
     setPending(null);
     orderRefRef.current = null;
@@ -221,13 +219,12 @@ export function useOrderProcessor() {
     setPending((p) => (p ? { ...p, prev: updated } : p));
   }, []);
 
-  // Set the team member who processed this order (V2.0 — mandatory before
-  // saving). This is a PURE STATE SETTER — it does not touch the DB. The
-  // first DB write happens only when the user explicitly clicks "Save Order"
-  // (see saveOrder). Once an order is saved, Processed By is immutable on
-  // both the server and the UI, so this is only ever called pre-save.
+  // Set (or clear, with '') the team member who processed this order.
+  // V3.0 (JWT Auth): This callback is retained for compatibility but is no
+  // longer called from any UI — processedBy is now automatically set server-side.
   const chooseProcessedBy = useCallback((value) => {
-    setProcessedBy(value);
+    // No-op — processedBy is managed server-side via req.user.name.
+    void value;
   }, []);
 
   // Manual approval for a single product. Creates the mapping, tolerates a
@@ -397,7 +394,6 @@ export function useOrderProcessor() {
     setComments({});
     setFulfillment({});
     setNotes({});
-    setProcessedBy('');
     setSaved(false); // V2.0
     setPending(null);
     orderRefRef.current = null;
@@ -406,5 +402,5 @@ export function useOrderProcessor() {
     setScreen('upload');
   }, []);
 
-  return { screen, file, steps, parsed, resolution, result, error, comments, fulfillment, notes, processedBy, saved, pending, pickFile, run, approveProduct, addProduct, removeProduct, setProductComment, setProductFulfillment, setProductNote, chooseProcessedBy, saveOrder, continueDuplicate, updateDuplicateOrder, generateExcel, reset };
+  return { screen, file, steps, parsed, resolution, result, error, comments, fulfillment, notes, saved, pending, pickFile, run, approveProduct, addProduct, removeProduct, setProductComment, setProductFulfillment, setProductNote, chooseProcessedBy, saveOrder, continueDuplicate, updateDuplicateOrder, generateExcel, reset };
 }

@@ -5,6 +5,10 @@ import { AppError } from '../utils/AppError.js';
 const isBlank = (v) => v === undefined || v === null || String(v).trim() === '';
 
 // POST /api/v1/orders — create or update (upsert) one order by Portal Order Ref.
+// The `processedBy` field is set automatically from the authenticated user
+// (req.user.name, injected by the authenticate middleware). It is NEVER
+// accepted from the request body — this ensures the processor is always the
+// person who actually uploaded and saved the order.
 export async function saveOrder(req, res, next) {
   try {
     ensureDb();
@@ -16,7 +20,6 @@ export async function saveOrder(req, res, next) {
       totalProducts,
       parsedData,
       resolutionData,
-      processedBy,
     } = req.body || {};
 
     if (isBlank(portalOrderRef)) {
@@ -34,7 +37,9 @@ export async function saveOrder(req, res, next) {
       totalProducts: Number.isFinite(Number(totalProducts)) ? Number(totalProducts) : 0,
       parsedData: parsedData ?? {},
       resolutionData: resolutionData ?? {},
-      processedBy: processedBy || '',
+      // Automatically assigned from the JWT-authenticated user.
+      // req.user is guaranteed non-null here (authenticate middleware ran first).
+      processedBy: req.user.name,
     });
 
     res.status(200).json(order);
@@ -42,6 +47,7 @@ export async function saveOrder(req, res, next) {
     next(err);
   }
 }
+
 
 // GET /api/v1/orders — list orders (summary), optional ?query= ref filter,
 // ?company= exact company filter, and ?limit= result cap.

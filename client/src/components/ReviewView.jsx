@@ -3,9 +3,10 @@ import OrderReviewGroup from './OrderReviewGroup.jsx';
 import OrderSearchBar from './OrderSearchBar.jsx';
 import AddProductModal from './AddProductModal.jsx';
 import OrderFinancials from './OrderFinancials.jsx';
-import { portalOrderRef, hasRealRef, PROCESSED_BY_USERS, isMatchingSkipped } from '../utils/order.js';
+import { portalOrderRef, hasRealRef, isMatchingSkipped } from '../utils/order.js';
 import { approvedItemNos } from '../utils/manualProduct.js';
 import { currencySymbol } from '../utils/format.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Review screen (single-file). Order-centric (V1.2): the products are wrapped in
 // one Order group keyed by its Portal Order Ref No, with an instant ref search.
@@ -19,19 +20,20 @@ export default function ReviewView({
   comments = {},
   fulfillment = {},
   notes = {},
-  processedBy = '',
   onApprove,
   onAddProduct,
   onRemoveProduct,
   onComment,
   onFulfillment,
   onNote,
-  onProcessedBy,
   onSave,        // V2.0 — called when user clicks Save Order
   saved = false, // V2.0 — true once the order has been written to the DB
   onGenerate,
   onReset,
 }) {
+  // The authenticated user is automatically the processor (V3.0 — JWT Auth).
+  // No manual selection is required or permitted.
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
 
@@ -56,13 +58,10 @@ export default function ReviewView({
   const blockingReview = results.filter(
     (r) => r.status === 'needs_review' && !isMatchingSkipped(comments[r.lineId])
   ).length;
-  // Processed By is mandatory (V1.9): the order isn’t saved and Excel can’t
-  // be generated until a team member is selected.
-  const needsProcessedBy = Boolean(onProcessedBy) && !processedBy;
   // Save is enabled once all products are resolved (or intentionally skipped
-  // via 'Not Found') and a name is selected. Generate is enabled only after
-  // the order has been explicitly saved (V2.0).
-  const canSave = !saved && blockingReview === 0 && !needsProcessedBy;
+  // via 'Not Found'). Processed By is now automatic (JWT user) — no gate needed.
+  // Generate is enabled only after the order has been explicitly saved (V2.0).
+  const canSave = !saved && blockingReview === 0;
   const canGenerate = saved && blockingReview === 0;
 
   // A single upload is exactly one order. Resolve results carry lineId =
@@ -115,54 +114,29 @@ export default function ReviewView({
 
       <OrderSearchBar value={search} onChange={setSearch} matchCount={visible ? 1 : 0} totalCount={1} />
 
-      {(onAddProduct || onProcessedBy) && (
-        <div className="apm-bar">
-          {onProcessedBy ? (
-            saved ? (
-              // Once saved, Processed By is immutable — show locked badge.
-              <div className="pb-field">
-                <span className="pb-label">Processed By</span>
-                <span className="pb-locked" title="Processed By cannot be changed once the order is saved">
-                  {processedBy}
-                  <svg className="pb-lock-icon" viewBox="0 0 24 24" aria-label="Locked">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                </span>
-              </div>
-            ) : (
-              <div className={`pb-field${needsProcessedBy ? ' pb-missing' : ''}`}>
-                <label htmlFor="rv-processed-by">
-                  Processed By <span className="pb-req" aria-hidden="true">*</span>
-                </label>
-                <select
-                  id="rv-processed-by"
-                  className="pb-select"
-                  value={processedBy}
-                  onChange={(e) => onProcessedBy(e.target.value)}
-                >
-                  <option value="">Select User…</option>
-                  {PROCESSED_BY_USERS.map((u) => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-                {needsProcessedBy && <span className="pb-hint">Required before saving.</span>}
-              </div>
-            )
-          ) : (
-            <span />
-          )}
-          {onAddProduct && (
-            <button className="btn-add-product" type="button" onClick={() => setAddOpen(true)}>
-              <svg viewBox="0 0 24 24">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Add Product
-            </button>
-          )}
+      {/* Processed By (V3.0): automatically set from the authenticated user.
+           The badge is always shown — locked before and after save. */}
+      <div className="apm-bar">
+        <div className="pb-field">
+          <span className="pb-label">Processed By</span>
+          <span className="pb-locked" title="Automatically assigned to the logged-in user">
+            {user?.name || '—'}
+            <svg className="pb-lock-icon" viewBox="0 0 24 24" aria-label="Auto-assigned">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </span>
         </div>
-      )}
+        {onAddProduct && (
+          <button className="btn-add-product" type="button" onClick={() => setAddOpen(true)}>
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add Product
+          </button>
+        )}
+      </div>
 
       {visible ? (
         <OrderReviewGroup
@@ -187,11 +161,9 @@ export default function ReviewView({
         comments={comments}
       />
 
-      {(blockingReview > 0 || needsProcessedBy) && (
+      {blockingReview > 0 && (
         <div className="rev-gate-note">
-          {blockingReview > 0
-            ? `${blockingReview} product${blockingReview > 1 ? 's' : ''} still need${blockingReview === 1 ? 's' : ''} review before the order can be saved.`
-            : 'Select who processed this order (Processed By) before saving.'}
+          {`${blockingReview} product${blockingReview > 1 ? 's' : ''} still need${blockingReview === 1 ? 's' : ''} review before the order can be saved.`}
         </div>
       )}
 

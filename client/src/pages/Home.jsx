@@ -37,7 +37,6 @@ export default function Home() {
     comments,
     fulfillment,
     notes,
-    processedBy,
     saved,
     pending,
     pickFile,
@@ -48,7 +47,6 @@ export default function Home() {
     setProductComment,
     setProductFulfillment,
     setProductNote,
-    chooseProcessedBy,
     saveOrder,
     continueDuplicate,
     updateDuplicateOrder,
@@ -235,14 +233,12 @@ export default function Home() {
           comments={comments}
           fulfillment={fulfillment}
           notes={notes}
-          processedBy={processedBy}
           onApprove={approveProduct}
           onAddProduct={addProduct}
           onRemoveProduct={removeProduct}
           onComment={setProductComment}
           onFulfillment={setProductFulfillment}
           onNote={setProductNote}
-          onProcessedBy={chooseProcessedBy}
           onSave={saveOrder}
           saved={saved}
           onGenerate={generateExcel}

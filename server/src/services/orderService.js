@@ -103,17 +103,13 @@ export async function upsertOrder({
     upload_timestamp: new Date(),
   };
 
-  // Processed By (V1.9): set only when explicitly provided — saves that omit
-  // it (manual add/remove product, resolution mirrors) must never clear an
-  // existing assignment.
+  // Processed By (V3.0 — JWT Auth): the value now comes exclusively from
+  // req.user.name (set by the authenticate middleware), so it is always a
+  // valid authenticated user. We no longer check against a static whitelist
+  // here; the whitelist lives at the authentication layer (the User collection).
+  // We still guard against accidental empty strings for robustness.
   const pb = String(processedBy ?? '').trim();
   if (pb) {
-    if (!PROCESSED_BY_USERS.includes(pb)) {
-      throw new AppError('VALIDATION_ERROR', `Processed By must be one of: ${PROCESSED_BY_USERS.join(', ')}.`, {
-        status: 400,
-        details: [{ field: 'processedBy', issue: 'invalid value' }],
-      });
-    }
     set.processed_by = pb;
   }
 
@@ -128,6 +124,7 @@ export async function upsertOrder({
 
   return toDto(doc);
 }
+
 
 // Assign the order's Processed By (V1.9). ONE-SHOT by business rule (V1.9.1):
 // the value can be set only while the order is unassigned (legacy orders show
