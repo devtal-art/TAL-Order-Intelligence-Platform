@@ -52,6 +52,8 @@ export function toDto(doc) {
       doc.upload_timestamp instanceof Date ? doc.upload_timestamp.toISOString() : doc.upload_timestamp,
     totalProducts: doc.total_products,
     resolutionStatus: doc.resolution_status,
+    // 'HTML' for orders saved before V3.1 (Manual Order Creation) — undefined reads as HTML.
+    orderSource: doc.order_source || 'HTML',
     parsedData: doc.parsed_data,
     resolutionData: doc.resolution_data,
     productComments: doc.product_comments || {},
@@ -75,6 +77,7 @@ export function toSummaryDto(doc) {
       doc.upload_timestamp instanceof Date ? doc.upload_timestamp.toISOString() : doc.upload_timestamp,
     totalProducts: doc.total_products,
     resolutionStatus: doc.resolution_status,
+    orderSource: doc.order_source || 'HTML',
   };
 }
 
@@ -89,6 +92,7 @@ export async function upsertOrder({
   parsedData = {},
   resolutionData = {},
   processedBy = '',
+  orderSource,
 }) {
   const resolution_status = deriveStatus(resolutionData);
 
@@ -111,6 +115,15 @@ export async function upsertOrder({
   const pb = String(processedBy ?? '').trim();
   if (pb) {
     set.processed_by = pb;
+  }
+
+  // Order source (V3.1 — Manual Order Creation, optional). Omitted entirely by
+  // the HTML upload flow, so those orders simply keep/get the schema default
+  // ('HTML') via setDefaultsOnInsert — byte-identical behavior to before this
+  // field existed.
+  const src = String(orderSource ?? '').trim();
+  if (src) {
+    set.order_source = src;
   }
 
   const doc = await Order.findOneAndUpdate(

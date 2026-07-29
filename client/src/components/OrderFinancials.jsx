@@ -48,20 +48,43 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
     }
   });
 
-  // Discount: prefer the parsed value (with the email's own label)
-  let discount = Number(f.discount) || 0;
-  let discountLabel = f.discount_label || 'Discount';
-  if (discount === 0 && subTotal > 0 && total > 0) {
-    const diff = Math.round((total - subTotal - transport) * 100) / 100;
-    if (Math.abs(diff) >= 0.01) {
-      discount = diff;
-      discountLabel = diff < 0 ? 'Discount' : 'Other Charges';
+  // Discounts: an email can carry more than one discount line (e.g. a
+  // frozen-range volume discount AND a separate sales-rep discount). Prefer
+  // the parser's full `discounts` list so every line's own label survives;
+  // fall back to the single discount value (or a computed diff) for orders
+  // saved before this list existed.
+  let discountRows = Array.isArray(f.discounts) && f.discounts.length
+    ? f.discounts
+        .filter((d) => Number(d.amount) !== 0)
+        .map((d, i) => ({ key: `disc-${i}`, label: d.label || 'Discount', value: money(d.amount) }))
+    : null;
+
+  if (!discountRows) {
+    const storedDiscount = Number(f.discount) || 0;
+    const storedLabel = f.discount_label || 'Discount';
+    const out = [];
+    if (storedDiscount !== 0) out.push({ key: 'disc', label: storedLabel, value: money(storedDiscount) });
+
+    // Orders saved before the parser tracked every discount line only kept the
+    // LAST one it saw — the stored `total` was still parsed correctly, though,
+    // so any gap between subTotal - storedDiscount - transport and total means
+    // an earlier discount line's amount (its exact label is gone) is missing.
+    // Surface that gap as its own row so the breakdown adds up to `total`
+    // again, instead of silently under-reporting the discount.
+    if (subTotal > 0 && total > 0) {
+      const diff = Math.round((total - subTotal - transport) * 100) / 100;
+      const remainder = Math.round((diff - storedDiscount) * 100) / 100;
+      if (Math.abs(remainder) >= 0.01) {
+        const label = storedDiscount !== 0 ? 'Other Discount' : (remainder < 0 ? 'Discount' : 'Other Charges');
+        out.push({ key: 'disc-extra', label, value: money(remainder) });
+      }
     }
+    discountRows = out;
   }
 
   const rows = [];
   if (subTotal > 0) rows.push({ key: 'sub', label: 'Sub Total', value: money(subTotal) });
-  if (discount !== 0) rows.push({ key: 'disc', label: discountLabel, value: money(discount) });
+  rows.push(...discountRows);
   if (subTotal > 0 || transport > 0) rows.push({ key: 'trans', label: 'Transportation Charges', value: money(transport) });
   if (total > 0) rows.push({ key: 'total', label: 'Total', value: money(total), strong: true });
 
@@ -85,7 +108,7 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
     const updatedTot = total + totalAdjustment;
     const upRows = [];
     if (subTotal !== 0 || updatedSub !== 0) upRows.push({ key: 'sub', label: 'Sub Total', value: money(updatedSub) });
-    if (discount !== 0) upRows.push({ key: 'disc', label: discountLabel, value: money(discount) });
+    upRows.push(...discountRows.map((r) => ({ ...r, key: `up-${r.key}` })));
     if (subTotal !== 0 || transport > 0 || updatedSub !== 0) upRows.push({ key: 'trans', label: 'Transportation Charges', value: money(transport) });
     upRows.push({ key: 'total', label: 'Total', value: money(updatedTot), strong: true });
     

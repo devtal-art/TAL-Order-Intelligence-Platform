@@ -20,6 +20,7 @@ export async function saveOrder(req, res, next) {
       totalProducts,
       parsedData,
       resolutionData,
+      orderSource,
     } = req.body || {};
 
     if (isBlank(portalOrderRef)) {
@@ -40,6 +41,9 @@ export async function saveOrder(req, res, next) {
       // Automatically assigned from the JWT-authenticated user.
       // req.user is guaranteed non-null here (authenticate middleware ran first).
       processedBy: req.user.name,
+      // Optional (V3.1 — Manual Order Creation). Omitted by the HTML upload
+      // flow, so those orders keep the schema default ('HTML').
+      orderSource: orderSource === 'MANUAL' ? 'MANUAL' : undefined,
     });
 
     res.status(200).json(order);

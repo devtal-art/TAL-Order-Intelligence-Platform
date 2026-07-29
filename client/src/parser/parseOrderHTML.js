@@ -14,7 +14,7 @@ export function parseOrderHTML(htmlText){
     billing_address:{company_name:'',contact_name:'',address:'',city:'',county:'',country:'',post_code:'',phone:''},
     delivery_address:{company_name:'',contact_name:'',address:'',city:'',county:'',country:'',post_code:'',phone:''},
     line_items:[],
-    financials:{sub_total:0,transportation_charges:0,discount:0,discount_label:'Discount',total:0,currency:'GBP'}
+    financials:{sub_total:0,transportation_charges:0,discount:0,discount_label:'Discount',discounts:[],total:0,currency:'GBP'}
   };
 
   // Detect currency from page
@@ -110,8 +110,16 @@ export function parseOrderHTML(htmlText){
       const label=ne.length>1?ne.slice(0,-1).join(' '):(ne[0]||'');
       const amount=ne.length?parseNum(ne[ne.length-1]):0;
       if(ne.length>=1&&ne.length<=4&&(/^discount/i.test(label.trim())||!/product|desc/i.test(low))){
+        // V1.10 (additive): an email can carry more than one discount row (e.g.
+        // a volume/frozen-range discount AND a separate sales-rep discount).
+        // The singular discount/discount_label fields keep their original
+        // last-write-wins behaviour so existing consumers are unaffected;
+        // `discounts` additionally collects every row so the full detail can
+        // be displayed/exported.
         R.financials.discount_label=label;
-        R.financials.discount=amount;return;
+        R.financials.discount=amount;
+        R.financials.discounts.push({label,amount});
+        return;
       }
     }
     if(/^total[:\s]*$/i.test(low.trim())||(cells.length<=3&&/total/i.test(cells[0])&&!/sub|transport|discount/i.test(low))){
@@ -161,9 +169,12 @@ export function parseOrderHTML(htmlText){
     }
   });
 
-  // Fallback: if total not found, compute from sub_total + charges + discount
+  // Fallback: if total not found, compute from sub_total + charges + discount(s)
   if(!R.financials.total&&R.financials.sub_total){
-    R.financials.total=R.financials.sub_total+R.financials.transportation_charges+R.financials.discount;
+    const discountSum=R.financials.discounts.length
+      ?R.financials.discounts.reduce((s,d)=>s+d.amount,0)
+      :R.financials.discount;
+    R.financials.total=R.financials.sub_total+R.financials.transportation_charges+discountSum;
   }
 
   return R;

@@ -1,8 +1,25 @@
 /* Review screen: progress summary, grouped review table, generate/gate controls. */
 /* The review screen breaks out of the #app container so the full grouped
    table fits on one screen without horizontal scrolling. It stays centred
-   on the viewport regardless of the parent's narrower width. */
+   on the viewport regardless of the parent's narrower width.
+   NOTE on the centering math (margin-left:50% + translateX(-50%), relative to
+   #app): #app's own max-width cancels out of the arithmetic, so this always
+   centers the box within the FULL space beside the 216px sidenav (see
+   sidenav.css) — but only as long as this box's width stays LESS than that
+   available space (viewport - 216px on desktop, see the >900px override
+   below). A width too close to (or over) that limit pushes the box left into
+   the sidenav column — this is what broke once already. Keep any future
+   widening expressed via the same calc(100vw - 216px - …) pattern, never a
+   flat vw/px guess. */
 #s-review{width:min(1160px,96vw);margin-left:50%;transform:translateX(-50%)}
+/* Desktop-only (matches sidenav.css's >900px sidebar breakpoint): the sidebar
+   reliably takes 216px, so the safe upper bound for this box is
+   (100vw - 216px) minus a comfortable gutter on both sides. Below 900px the
+   sidebar stacks on top instead (0px of horizontal space taken), so the base
+   rule above (vw-relative, no sidenav deduction) is what applies there. */
+@media (min-width:901px){
+  #s-review{width:min(1500px,calc(100vw - 216px - 64px))}
+}
 /* The shared .screen.active entrance animation ends at transform:none, which
    would cancel the translateX(-50%) breakout above — give this screen its own
    keyframes that keep the horizontal offset. */
@@ -36,6 +53,15 @@
 .rt-scroll::-webkit-scrollbar-track{background:var(--surface-2)}
 .rt-scroll::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:99px;border:2px solid var(--surface-2)}
 .rt-scroll::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+
+/* Single-upload Review screen only: unlike the Saved Order modal, this is a
+   full, unconstrained page, so the header content above the table (heading,
+   stats, Additional Comment, search bar, Processed By bar, and the order's
+   own ref/file/customer line) never needs to be pulled out into a separate
+   sticky block — it already stays put simply by being above this box. Giving
+   the table its own bounded height + scroll achieves the same "only the
+   product table scrolls" behavior without any restructuring. */
+#s-review .rt-scroll{max-height:60vh;overflow-y:auto}
 .rt-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:780px}
 .rt-table th,.rt-table td{text-align:left;padding:10px 12px;border-bottom:1px solid #F1F0ED;vertical-align:middle}
 .rt-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -44,10 +70,25 @@
 .rt-groups th{
   font-family:var(--font-ui);font-size:10.5px;font-weight:700;text-transform:uppercase;
   letter-spacing:.07em;padding:9px 14px;border-bottom:1px solid var(--border);
+  /* Fixed height so #s-review can give .rt-cols below an exact sticky `top`
+     offset to stack under it, instead of guessing from font metrics. */
+  height:34px;box-sizing:border-box;
 }
+/* Single-upload Review screen only (the table with BOTH header rows): stick
+   both rows together, .rt-groups above .rt-cols, matching the height set on
+   .rt-groups th above. Scoped to #s-review — the Saved Order modal's table
+   has only ONE header row (.rt-cols, already sticky at top:0 generically
+   below) and must not be pushed down by this. */
+#s-review .rt-groups th{position:sticky;top:0;z-index:3}
+#s-review .rt-cols th{top:34px;z-index:2}
 .rt-grp-email{background:var(--email-hd);color:var(--email-hd-ink);border-right:2px solid var(--surface)}
 .rt-grp-match{background:var(--match-hd);color:var(--match-hd-ink);border-right:2px solid var(--surface)}
 .rt-grp-act{background:var(--surface-2);color:var(--ink-2)}
+/* Delivery / Comment / Additional Comment group headers never had an opaque
+   background (only email/match/act did) — harmless while this row scrolled
+   away normally, but it let scrolled-under content show through now that the
+   row is sticky (#s-review .rt-groups th above). */
+.rt-grp-fulfil,.rt-grp-comment,.rt-grp-note{background:var(--surface-2);color:var(--ink-2)}
 .rt-grp-email::before,.rt-grp-match::before{
   content:'';display:inline-block;width:7px;height:7px;border-radius:50%;
   margin-right:8px;vertical-align:1px;

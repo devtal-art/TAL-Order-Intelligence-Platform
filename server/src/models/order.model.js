@@ -24,6 +24,11 @@ const orderSchema = new mongoose.Schema(
     filename: { type: String, default: '' },
     customer_name: { type: String, default: '', index: true },
 
+    // Where this order originated (V3.1 — Manual Order Creation, additive).
+    // Orders saved before this field existed simply have it undefined, which
+    // reads as 'HTML' everywhere via toDto/toSummaryDto — no backfill needed.
+    order_source: { type: String, enum: ['HTML', 'MANUAL'], default: 'HTML' },
+
     // Team member who processed the order (V1.9). Order-level, plain string —
     // deliberately NOT authentication/user management. '' = Not Assigned
     // (all orders saved before V1.9).

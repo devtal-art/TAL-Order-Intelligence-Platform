@@ -610,6 +610,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
 
       {saveError && <div className="sol-error">{saveError}</div>}
 
+      <div className="sol-scroll-area">
       <div className="rt-scroll">
         <table className="rt-table sol-table">
           <thead>
@@ -772,12 +773,13 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
         </table>
       </div>
 
-      <OrderFinancials 
-        financials={parsed.financials} 
+      <OrderFinancials
+        financials={parsed.financials}
         results={results}
         lineItems={items}
         comments={comments}
       />
+      </div>
 
       {addOpen && (
         <AddProductModal

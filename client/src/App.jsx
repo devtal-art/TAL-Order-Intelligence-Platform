@@ -6,6 +6,7 @@ import Home from './pages/Home.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import DashboardList from './pages/DashboardList.jsx';
 import Search from './pages/Search.jsx';
+import CreateManualOrder from './pages/CreateManualOrder.jsx';
 
 // Route map:
 //   /login            — public, no auth required
@@ -13,6 +14,7 @@ import Search from './pages/Search.jsx';
 //   /dashboard        — operational widgets (protected)
 //   /dashboard/orders — bucket list "View All" (protected)
 //   /search           — saved-order search (protected)
+//   /orders/manual    — Create Manual Order (protected, V3.1 — new, additive)
 export default function App() {
   return (
     <AuthProvider>
@@ -50,6 +52,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Search />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders/manual"
+          element={
+            <ProtectedRoute>
+              <CreateManualOrder />
             </ProtectedRoute>
           }
         />

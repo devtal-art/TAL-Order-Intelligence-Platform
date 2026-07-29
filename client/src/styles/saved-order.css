@@ -141,10 +141,32 @@
 
 /* ── Order detail modal ──
    The detail table is wide; showing it inline stretched the page sideways.
-   In the modal the table scrolls inside .rt-scroll instead. */
-.sol-modal{max-width:min(1080px,calc(100vw - 32px))}
-.sol-modal-body{overflow-y:auto;min-height:0}
-.sol-modal .sol-detail{border-top:1px solid var(--border)}
+   In the modal the table scrolls inside .rt-scroll instead. Widened from the
+   original 1080px cap so the full column set fits with less horizontal
+   scrolling on typical desktop widths. */
+.sol-modal{max-width:min(1400px,calc(100vw - 32px))}
+.sol-modal-body{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.sol-modal .sol-detail{border-top:1px solid var(--border);display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+
+/* Only the area below the order meta / Additional Comment / status summary
+   scrolls inside the modal — that header block stays fixed, and the product
+   table + financial summary scroll together underneath it so the table keeps
+   as much room as possible instead of being squeezed by a separately-pinned
+   financial summary. */
+.sol-modal .sol-detail-top,
+.sol-modal .oc-note,
+.sol-modal .sol-status-summary,
+.sol-modal .sol-error{flex-shrink:0}
+.sol-modal .sol-scroll-area{flex:1;min-height:200px;overflow:auto}
+
+/* .rt-scroll's own overflow-x:auto would otherwise make IT the nearest
+   scrolling ancestor, which breaks the table header's `position:sticky` (it
+   would stick relative to .rt-scroll — which never actually scrolls — instead
+   of .sol-scroll-area, which does). Making it overflow:visible here removes
+   it as a scroll container so .sol-scroll-area handles both axes directly,
+   letting the sticky header track the real scroll position. Its border/
+   background styling is untouched — only the scroll mechanics change. */
+.sol-modal .rt-scroll{overflow:visible}
 
 @media (max-width:480px){
   .sol-search{flex-direction:column}

@@ -44,6 +44,30 @@ export function buildXLSX(d, resolution, comments = {}){
   const updatedSub = subTotal + totalAdjustment;
   const updatedTot = total + totalAdjustment;
 
+  // Discounts: an email can carry more than one discount line (e.g. a
+  // frozen-range volume discount AND a separate sales-rep discount). Use the
+  // parser's full `discounts` list so every line's own label is exported.
+  // For orders saved before that list existed, only the LAST discount line
+  // was ever kept — but `total` was still parsed correctly, so any gap
+  // between subTotal - storedDiscount - transport and total is an earlier
+  // discount's amount (its exact label is gone). Surface that gap as its own
+  // row so the export adds up to `total` again.
+  let discountRows;
+  if (Array.isArray(fin.discounts) && fin.discounts.length) {
+    discountRows = fin.discounts.filter((dsc) => Number(dsc.amount) !== 0);
+  } else {
+    const storedDiscount = Number(fin.discount) || 0;
+    discountRows = storedDiscount ? [{ label: fin.discount_label || 'Discount', amount: storedDiscount }] : [];
+    if (subTotal > 0 && total > 0) {
+      const diff = Math.round((total - subTotal - transport) * 100) / 100;
+      const remainder = Math.round((diff - storedDiscount) * 100) / 100;
+      if (Math.abs(remainder) >= 0.01) {
+        const label = storedDiscount !== 0 ? 'Other Discount' : (remainder < 0 ? 'Discount' : 'Other Charges');
+        discountRows.push({ label, amount: remainder });
+      }
+    }
+  }
+
   const add=(aoa,name,cols,merges)=>{
     const ws=XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols']=cols.map(w=>({wch:w}));
@@ -80,7 +104,7 @@ export function buildXLSX(d, resolution, comments = {}){
     ...itemRows,
     [''],
     ['','','','','','Sub Total',updatedSub],
-    ['','','','','',fin.discount_label||'Discount',fin.discount||0],
+    ...discountRows.map((dsc)=>['','','','','',dsc.label||'Discount',dsc.amount||0]),
     ['','','','','','Transport Charges',transport],
     ['','','','','','TOTAL',updatedTot],
   ],'Order Items',[5,14,54,16,6,15,15],[{s:{r:0,c:0},e:{r:0,c:6}}]);
@@ -90,7 +114,7 @@ export function buildXLSX(d, resolution, comments = {}){
     ['FINANCIAL SUMMARY'],[''],
     ['DESCRIPTION','AMOUNT','NOTES'],
     ['Sub Total',updatedSub,'Sum of all line items'],
-    [fin.discount_label||'Discount',fin.discount||0,'Applied discount'],
+    ...discountRows.map((dsc)=>[dsc.label||'Discount',dsc.amount||0,'Applied discount']),
     ['Transport Charges',transport,'Delivery / shipping costs'],
     ['TOTAL PAYABLE',updatedTot,'Final amount due'],
     [''],

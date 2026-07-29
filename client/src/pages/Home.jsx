@@ -13,6 +13,7 @@ import BatchResultsView from '../components/BatchResultsView.jsx';
 import { useOrderProcessor } from '../hooks/useOrderProcessor.js';
 import { useBatchProcessor } from '../hooks/useBatchProcessor.js';
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Home — V1.1
@@ -71,6 +72,10 @@ export default function Home() {
 
   // Local state: the batch files array (cleared when reset)
   const [batchFiles, setBatchFiles] = useState(null); // File[] | null
+
+  // V3.1 (Manual Order Creation, additive): second entry point alongside HTML
+  // upload — navigates to its own page/route, no shared state with either hook.
+  const navigate = useNavigate();
 
   // Duplicate-upload flow (V1.9): whether the existing order's detail modal
   // is open on top of the duplicate screen.
@@ -198,6 +203,23 @@ export default function Home() {
               onExtract={run}
               onBatch={handleRunBatch}
             />
+
+            {/* V3.1 (Manual Order Creation, additive): second, independent entry
+                point — does not read or touch any HTML-upload state above. */}
+            <div className="mo-entry-card">
+              <div className="mo-entry-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </div>
+              <div className="mo-entry-text">
+                <div className="mo-entry-title">No HTML email for this order?</div>
+                <div className="mo-entry-sub">Create a manual order — it&apos;s saved and tracked exactly like an uploaded one.</div>
+              </div>
+              <button type="button" className="mo-entry-btn" onClick={() => navigate('/orders/manual')}>
+                Create Manual Order
+              </button>
+            </div>
           </div>
         </div>
       )}

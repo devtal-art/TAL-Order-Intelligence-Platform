@@ -8,7 +8,8 @@ import { apiClient } from './apiClient.js';
 //   PATCH /api/v1/orders/:ref             — update resolution snapshot + status
 //   PATCH /api/v1/orders/:ref/comments    — set per-product comments
 export const orderService = {
-  // order: { portalOrderRef, filename, customerName, orderDate, totalProducts, parsedData, resolutionData }
+  // order: { portalOrderRef, filename, customerName, orderDate, totalProducts, parsedData, resolutionData, orderSource? }
+  // orderSource is optional ('HTML' | 'MANUAL', V3.1) — omitted by the upload flow, defaults server-side to 'HTML'.
   save: (order) => apiClient.post('/v1/orders', order),
 
   updateResolution: (portalOrderRef, resolutionData) =>
