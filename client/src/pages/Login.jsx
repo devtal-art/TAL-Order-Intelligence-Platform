@@ -5,7 +5,7 @@ import logoUrl from '../assets/artlogic-logo.svg';
 
 // The four internal users. Matches the seed script — a dropdown avoids
 // username typos and removes the need for a free-text name field.
-const USERS = ['Jasmeet', 'Sahil', 'Shubham', 'Alpa'];
+const USERS = ['Jasmeet', 'Sahil', 'Shubham', 'Alpa', 'Sehbaz'];
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 

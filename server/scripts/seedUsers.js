@@ -49,6 +49,7 @@ const USERS_TO_SEED = [
   { name: 'Sahil',   password: process.env.SEED_PASSWORD_SAHIL,   role: 'staff' },
   { name: 'Shubham', password: process.env.SEED_PASSWORD_SHUBHAM, role: 'staff' },
   { name: 'Alpa',    password: process.env.SEED_PASSWORD_ALPA,    role: 'staff' },
+  { name: 'Sehbaz',  password: process.env.SEED_PASSWORD_SEHBAZ,  role: 'staff' },
 ];
 
 const BCRYPT_ROUNDS = 12; // OWASP minimum recommendation for 2024
