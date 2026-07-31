@@ -616,8 +616,8 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           <thead>
             <tr className="rt-cols">
               <th>Product (from email)</th>
-              <th className="rt-num">QTY</th>
-              <th className="rt-num">Unit Price</th>
+              <th className="rt-num rt-highlight">QTY</th>
+              <th className="rt-num rt-highlight">Unit Price</th>
               <th>Item No</th>
               <th>Website Product</th>
               <th>Status</th>
@@ -634,8 +634,8 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
               return (
                 <tr key={row.lineId} className="rt-row">
                   <td className="rt-name">{row.product}</td>
-                  <td className="rt-num">{row.qty}</td>
-                  <td className={`rt-num${row.isUnitPriceNegative ? ' price-negative' : ''}`}>{row.unitPrice}</td>
+                  <td className="rt-num rt-highlight">{row.qty}</td>
+                  <td className={`rt-num rt-highlight${row.isUnitPriceNegative ? ' price-negative' : ''}`}>{row.unitPrice}</td>
                   <td className="rt-itemno">
                     {row.itemNo && row.itemNo !== '—' ? (
                       <span className="item-chip">{row.itemNo}</span>
@@ -778,6 +778,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
         results={results}
         lineItems={items}
         comments={comments}
+        orderSource={order.orderSource}
       />
       </div>
 

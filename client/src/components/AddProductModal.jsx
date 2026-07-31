@@ -135,10 +135,10 @@ export default function AddProductModal({ existingItemNos, onAdd, onClose }) {
               className="modal-search"
               type="text"
               autoFocus
-              placeholder="Search by product name…"
+              placeholder="Search by product name or item number…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search catalog by product name"
+              aria-label="Search catalog by product name or item number"
             />
             <div className="modal-results">
               {loading && <div className="modal-note">Searching…</div>}

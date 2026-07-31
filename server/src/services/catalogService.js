@@ -70,6 +70,11 @@ export async function getStatus() {
 export async function searchProducts(query, limit) {
   const qNorm = normalizeName(query);
   const qTokens = qNorm.split(' ').filter(Boolean);
+  // Item numbers aren't product-name text, so they skip normalizeName and are
+  // matched as a plain case-insensitive substring instead (additive — every
+  // existing name-search caller is unaffected unless their query happens to
+  // also match an item number, which only adds a result, never removes one).
+  const qRaw = String(query ?? '').trim().toLowerCase();
 
   const products = await Product.find({}, { item_no: 1, name: 1, option: 1, _id: 0 }).lean();
 
@@ -79,13 +84,14 @@ export async function searchProducts(query, limit) {
     // ("Box10") is both visible and findable.
     const display = productDisplayName(p.name, p.option);
     const nNorm = normalizeName(display);
-    const contains = nNorm.includes(qNorm);
+    const itemNoMatch = qRaw.length > 0 && String(p.item_no || '').toLowerCase().includes(qRaw);
+    const contains = nNorm.includes(qNorm) || itemNoMatch;
     let hits = 0;
     for (const t of qTokens) {
       if (nNorm.includes(t)) hits += 1;
     }
     if (!contains && hits === 0) continue;
-    const matchPercent = qTokens.length ? Math.round((hits / qTokens.length) * 100) : contains ? 100 : 0;
+    const matchPercent = itemNoMatch ? 100 : (qTokens.length ? Math.round((hits / qTokens.length) * 100) : contains ? 100 : 0);
     scored.push({ websiteProductName: display, itemNo: p.item_no, matchPercent, _c: contains ? 1 : 0, _len: nNorm.length });
   }
 

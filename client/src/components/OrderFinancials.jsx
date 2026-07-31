@@ -7,10 +7,20 @@ import { currencySymbol } from '../utils/format.js';
 // didn't carry are omitted, and when there is no totals data at all (older /
 // edge orders) the whole card is hidden. Shared by the Review screen and the
 // Saved Order modal so both display identically.
-export default function OrderFinancials({ financials, results = [], lineItems = [], comments = {} }) {
+export default function OrderFinancials({ financials, results = [], lineItems = [], comments = {}, orderSource }) {
   const f = financials || {};
   const sym = currencySymbol(f.currency);
   const money = (n) => `${Number(n) < 0 ? '-' : ''}${sym}${Math.abs(Number(n) || 0).toFixed(2)}`;
+
+  // Manual orders (V3.1) have no "original email" to compare against — every
+  // product row is built via the same manual_addition source HTML orders use
+  // for the "+ Add Product" feature, which would otherwise make the
+  // Updated/Original comparison below fire for the WHOLE order. Skipping the
+  // adjustment scan entirely for manual orders is what keeps hasAdjustments
+  // false, so only a single card renders (see the title/updatedCard logic
+  // further down). HTML orders (orderSource undefined/'HTML') are completely
+  // unaffected — this guard is the only thing that changed for them.
+  const isManualOrder = orderSource === 'MANUAL';
 
   const subTotal = Number(f.sub_total) || 0;
   const transport = Number(f.transportation_charges) || 0;
@@ -20,33 +30,35 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
   let totalAdjustment = 0;
   let hasAdjustments = false;
 
-  results.forEach((r) => {
-    const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
-    const item = (Number.isInteger(lineIndex) && lineIndex >= 0 && lineItems[lineIndex]) || null;
-    if (!item) return;
+  if (!isManualOrder) {
+    results.forEach((r) => {
+      const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
+      const item = (Number.isInteger(lineIndex) && lineIndex >= 0 && lineItems[lineIndex]) || null;
+      if (!item) return;
 
-    const qty = Number(item.qty) || 0;
-    const unitPrice = Number(item.unit_price) || 0;
-    const itemTotal = qty * Math.abs(unitPrice);
-    const comment = comments[r.lineId] || '';
-    const isNotFound = comment === 'Not Found';
-    const isManual = r.source === 'manual_addition';
-    const isNegative = unitPrice < 0;
+      const qty = Number(item.qty) || 0;
+      const unitPrice = Number(item.unit_price) || 0;
+      const itemTotal = qty * Math.abs(unitPrice);
+      const comment = comments[r.lineId] || '';
+      const isNotFound = comment === 'Not Found';
+      const isManual = r.source === 'manual_addition';
+      const isNegative = unitPrice < 0;
 
-    if (isManual || isNotFound || isNegative) {
-      hasAdjustments = true;
-    }
-
-    if (isNotFound) {
-      totalAdjustment -= itemTotal;
-    } else if (isManual) {
-      if (isNegative) {
-        totalAdjustment -= itemTotal;
-      } else {
-        totalAdjustment += itemTotal;
+      if (isManual || isNotFound || isNegative) {
+        hasAdjustments = true;
       }
-    }
-  });
+
+      if (isNotFound) {
+        totalAdjustment -= itemTotal;
+      } else if (isManual) {
+        if (isNegative) {
+          totalAdjustment -= itemTotal;
+        } else {
+          totalAdjustment += itemTotal;
+        }
+      }
+    });
+  }
 
   // Discounts: an email can carry more than one discount line (e.g. a
   // frozen-range volume discount AND a separate sales-rep discount). Prefer
@@ -90,9 +102,14 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
 
   if (!rows.length && !hasAdjustments) return null;
 
+  // Title: manual orders always get their own label (there's only ever one
+  // card for them); HTML orders keep the exact previous behavior — a title
+  // only appears once there's a second (Updated) card to distinguish it from.
+  const originalTitle = isManualOrder ? 'Manual Order Price' : (hasAdjustments ? 'Original (Email)' : null);
+
   const originalCard = rows.length ? (
-    <div className="fin-card" aria-label="Original order totals">
-      {hasAdjustments && <div className="fin-title">Original (Email)</div>}
+    <div className="fin-card" aria-label={isManualOrder ? 'Manual order totals' : 'Original order totals'}>
+      {originalTitle && <div className="fin-title">{originalTitle}</div>}
       {rows.map((r) => (
         <div key={r.key} className={`fin-row${r.strong ? ' fin-total' : ''}`}>
           <span className="fin-label">{r.label}</span>

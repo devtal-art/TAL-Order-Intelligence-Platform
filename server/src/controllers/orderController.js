@@ -171,7 +171,7 @@ export async function setOrderNotes(req, res, next) {
 }
 
 // PATCH /api/v1/orders/:ref/processed-by — assign/clear the order's processor.
-// Body: { processedBy: 'Jasmeet' | 'Shubham' | 'Alpa' | 'Sahil' | '' | null } (V1.9)
+// Body: { processedBy: <one of orderService.PROCESSED_BY_USERS> | '' | null } (V1.9)
 export async function setOrderProcessedBy(req, res, next) {
   try {
     ensureDb();

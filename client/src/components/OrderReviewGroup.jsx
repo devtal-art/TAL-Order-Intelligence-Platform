@@ -82,8 +82,8 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
                 <tr className="rt-cols">
                   <th className="rt-email">Product Name</th>
                   <th className="rt-email">Package</th>
-                  <th className="rt-email rt-num">QTY</th>
-                  <th className="rt-email rt-num">Unit Price</th>
+                  <th className="rt-email rt-num rt-highlight">QTY</th>
+                  <th className="rt-email rt-num rt-highlight">Unit Price</th>
                   <th className="rt-email rt-num">Total Price</th>
                   <th className="rt-match">Item No</th>
                   <th className="rt-match">Product Name</th>

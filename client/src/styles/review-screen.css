@@ -107,6 +107,18 @@
 /* Body cells, tinted per group so the source of each column stays obvious */
 .rt-row td.rt-email{background:var(--email-cell)}
 .rt-row td.rt-match{background:var(--match-cell)}
+
+/* QTY / Unit Price columns — emphasized so they read as key numbers at a
+   glance, on both the Review screen's grouped table and the Saved Order
+   detail table (both share these .rt- classes). The two higher-specificity
+   overrides beat the .rt-email background tint above (same specificity,
+   later in the file wins) so the highlight shows in the Review screen too. */
+.rt-highlight{font-weight:700;background:var(--danger-soft)}
+.rt-cols th.rt-highlight{background:var(--danger-soft);font-weight:800}
+/* tr.rt-row (not just .rt-row) so this outranks the later .rt-row:hover td
+   rule below — otherwise hovering a row would wipe the highlight back out. */
+tr.rt-row td.rt-highlight{background:var(--danger-soft)}
+
 .rt-row{transition:background .12s}
 .rt-row:hover td{background:var(--surface-2)}
 .rt-row.is-approved td.rt-match{background:var(--success-soft)}

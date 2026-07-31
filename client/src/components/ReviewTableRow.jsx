@@ -77,8 +77,8 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
         {item ? item.description : result.emailProductName}
       </td>
       <td className="rt-email">{item ? item.package : '—'}</td>
-      <td className="rt-email rt-num">{item ? item.qty : '—'}</td>
-      <td className={`rt-email rt-num${isUnitPriceNegative ? ' price-negative' : ''}`}>{item ? money(item.unit_price) : '—'}</td>
+      <td className="rt-email rt-num rt-highlight">{item ? item.qty : '—'}</td>
+      <td className={`rt-email rt-num rt-highlight${isUnitPriceNegative ? ' price-negative' : ''}`}>{item ? money(item.unit_price) : '—'}</td>
       <td className={`rt-email rt-num${isTotalNegative ? ' price-negative' : ''}`}>{item ? money(item.total) : '—'}</td>
 
       {/* ── Match (green) ── */}
