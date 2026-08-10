@@ -40,7 +40,7 @@ function deliveryPostcode(doc) {
 // Processor" widget silently drops a real processor's count back to 0 (only
 // names in THIS list get a key in getDashboardSummary's releasedByProcessor
 // map below).
-export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz'];
+export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Shashwat'];
 
 // Map the stored (snake_case) document to the API DTO (camelCase).
 export function toDto(doc) {

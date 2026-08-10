@@ -29,7 +29,7 @@ export function deriveOrderStatus(results) {
 
 // Team members who can be assigned as an order's processor (V1.9). Order-level
 // identification only — deliberately NOT authentication or user management.
-export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz'];
+export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Shashwat'];
 
 // The per-product fulfilment comments the platform knows (V1.3).
 //   'Released'  — in stock, order line released
