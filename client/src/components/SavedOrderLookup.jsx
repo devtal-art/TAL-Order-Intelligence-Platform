@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { orderService } from '../services/orderService.js';
 import { buildXLSX } from '../excel/buildXLSX.js';
 import { statusMeta, commentMeta, deliveryMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, PROCESSED_BY_USERS, clampPendingQty } from '../utils/order.js';
@@ -340,6 +341,8 @@ export function SavedOrderDetailModal({ order, onClose, onDownload, onSaved }) {
 // Pending Qty / Order Status / Comment cells to inputs; saving PATCHes just
 // those fields and leaves everything else in the order untouched.
 function SavedOrderDetail({ order, onDownload, onSaved }) {
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
   const parsed = order.parsedData || {};
   const items = parsed.line_items || [];
   const results = order.resolutionData?.results || [];
@@ -466,8 +469,9 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
   }, [rows, editing, draft]);
   const hasStatuses = Object.values(statusCounts).some((n) => n > 0);
   // The remove column only exists when the order has manually added lines, so
-  // orders without them render exactly as before (V1.7).
-  const hasManual = rows.some((r) => r.manual);
+  // orders without them render exactly as before (V1.7). Never shown to a
+  // view-only account — removal is a mutation like Add Product / Edit.
+  const hasManual = !isViewer && rows.some((r) => r.manual);
 
   const startEdit = () => {
     const d = {};
@@ -549,7 +553,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           </span>
         </div>
         <div className="sol-detail-actions">
-          {editing ? (
+          {!isViewer && (editing ? (
             <>
               <button className="sol-edit-btn" type="button" onClick={() => setEditing(false)} disabled={saving}>
                 Cancel
@@ -574,7 +578,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                 Edit
               </button>
             </>
-          )}
+          ))}
           <button className="sol-dl-btn" type="button" onClick={onDownload}>
             <svg viewBox="0 0 24 24">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />

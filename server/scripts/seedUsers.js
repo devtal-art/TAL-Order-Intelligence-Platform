@@ -45,12 +45,16 @@ const User = mongoose.model('User', userSchema);
 // passwords here are the initial values as specified in the platform
 // requirements.
 const USERS_TO_SEED = [
-  { name: 'Jasmeet',  password: process.env.SEED_PASSWORD_JASMEET,  role: 'staff' },
-  { name: 'Sahil',    password: process.env.SEED_PASSWORD_SAHIL,    role: 'staff' },
-  { name: 'Shubham',  password: process.env.SEED_PASSWORD_SHUBHAM,  role: 'staff' },
-  { name: 'Alpa',     password: process.env.SEED_PASSWORD_ALPA,     role: 'staff' },
-  { name: 'Sehbaz',   password: process.env.SEED_PASSWORD_SEHBAZ,   role: 'staff' },
-  { name: 'Shashwat', password: process.env.SEED_PASSWORD_SHASHWAT, role: 'staff' },
+  { name: 'Jasmeet',   password: process.env.SEED_PASSWORD_JASMEET,   role: 'staff' },
+  { name: 'Sahil',     password: process.env.SEED_PASSWORD_SAHIL,     role: 'staff' },
+  { name: 'Shubham',   password: process.env.SEED_PASSWORD_SHUBHAM,   role: 'staff' },
+  { name: 'Alpa',      password: process.env.SEED_PASSWORD_ALPA,      role: 'staff' },
+  { name: 'Sehbaz',    password: process.env.SEED_PASSWORD_SEHBAZ,    role: 'staff' },
+  { name: 'Shashwat',  password: process.env.SEED_PASSWORD_SHASHWAT,  role: 'staff' },
+  // Read-only demo account (V?.?) — server-side write-blocking is enforced by
+  // blockViewerWrites middleware based on this role; the client also hides
+  // every edit control for it. See server/src/middleware/blockViewerWrites.js.
+  { name: 'Gagandeep', password: process.env.SEED_PASSWORD_GAGANDEEP, role: 'viewer' },
 ];
 
 const BCRYPT_ROUNDS = 12; // OWASP minimum recommendation for 2024

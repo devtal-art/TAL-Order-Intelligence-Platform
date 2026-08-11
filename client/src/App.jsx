@@ -26,7 +26,7 @@ export default function App() {
         <Route
           path="/"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute viewerBlocked>
               <Home />
             </ProtectedRoute>
           }
@@ -58,7 +58,7 @@ export default function App() {
         <Route
           path="/orders/manual"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute viewerBlocked>
               <CreateManualOrder />
             </ProtectedRoute>
           }

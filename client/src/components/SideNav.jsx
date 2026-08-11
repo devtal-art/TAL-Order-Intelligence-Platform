@@ -1,26 +1,33 @@
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Primary left navigation (V2.3). Moved out of the dark app bar — the two
 // destinations live in a light sidebar beside the content, matching the
 // step-card design language. Active route gets the brand-blue soft treatment.
 export default function SideNav() {
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
   const item = ({ isActive }) => `sn-item${isActive ? ' active' : ''}`;
   return (
     <aside className="sidenav" aria-label="Primary navigation">
       <div className="sn-label">Menu</div>
-      <NavLink to="/" end className={item}>
-        <span className="sn-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-        </span>
-        <span className="sn-text">
-          Upload &amp; Save
-          <small>Create a new order</small>
-        </span>
-      </NavLink>
+      {/* View-only demo accounts have nothing to create — this destination is
+          redirected away in ProtectedRoute too, so the link is just hidden here. */}
+      {!isViewer && (
+        <NavLink to="/" end className={item}>
+          <span className="sn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </span>
+          <span className="sn-text">
+            Upload &amp; Save
+            <small>Create a new order</small>
+          </span>
+        </NavLink>
+      )}
       {/* /dashboard/orders is a Dashboard sub-view — the tab stays lit there */}
       <NavLink to="/dashboard" className={item}>
         <span className="sn-icon" aria-hidden="true">

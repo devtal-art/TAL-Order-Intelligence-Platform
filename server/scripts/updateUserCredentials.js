@@ -46,11 +46,7 @@ const BCRYPT_ROUNDS = 12; // Same cost factor used by seedUsers.js
 
 // ── Existing users to update (password only) ────────────────────────────────
 const USERS_TO_UPDATE = [
-  { name: 'Sahil',    password: process.env.SEED_PASSWORD_SAHIL },
-  { name: 'Jasmeet',  password: process.env.SEED_PASSWORD_JASMEET },
-  { name: 'Shubham',  password: process.env.SEED_PASSWORD_SHUBHAM },
-  { name: 'Alpa',     password: process.env.SEED_PASSWORD_ALPA },
-  { name: 'Shashwat', password: process.env.SEED_PASSWORD_SHASHWAT },
+  { name: 'Gagandeep', password: process.env.SEED_PASSWORD_GAGANDEEP },
 ];
 
 // ── New user to create (same process/role/hashing as existing users) ───────
