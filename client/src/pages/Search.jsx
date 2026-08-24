@@ -1,13 +1,7 @@
-<<<<<<< HEAD
-import { useCallback, useEffect, useState } from 'react';
-import Layout from '../components/Layout.jsx';
-import SavedOrderLookup, { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
-=======
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import SavedOrderLookup, { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
 import SortTh from '../components/SortableHeader.jsx';
->>>>>>> 87432db (New Dashboard)
 import { orderService } from '../services/orderService.js';
 import { statusMeta } from '../utils/order.js';
 
@@ -48,8 +42,6 @@ function RecentOrders({ refreshToken, onChanged }) {
   const [viewOrder, setViewOrder] = useState(null);
   const [viewBusyRef, setViewBusyRef] = useState('');
 
-<<<<<<< HEAD
-=======
   // Only 5 rows are ever loaded here, so sorting is done entirely client-side
   // — no server round trip needed. 'orderDate' sorts by the actual date shown
   // in that column (DD/MM/YYYY), rearranged to YYYYMMDD so it sorts
@@ -87,8 +79,6 @@ function RecentOrders({ refreshToken, onChanged }) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- SORT_KEYS is a stable literal
   }, [rows, sortBy, sortDir]);
-
->>>>>>> 87432db (New Dashboard)
   useEffect(() => {
     let cancelled = false;
     setError('');
@@ -138,30 +128,17 @@ function RecentOrders({ refreshToken, onChanged }) {
           <table className="dl-table">
             <thead>
               <tr>
-<<<<<<< HEAD
-                <th>Order #</th>
-                <th>Customer</th>
-                <th>Processed By</th>
-                <th>Order Date</th>
-                <th>Status</th>
-                <th className="dl-num">Products</th>
-=======
                 <SortTh column="ref" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order #</SortTh>
                 <SortTh column="customer" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Customer</SortTh>
                 <SortTh column="processedBy" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Processed By</SortTh>
                 <SortTh column="orderDate" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order Date</SortTh>
                 <th>Status</th>
                 <SortTh column="products" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} numeric>Products</SortTh>
->>>>>>> 87432db (New Dashboard)
                 <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
-<<<<<<< HEAD
-              {rows.map((o) => {
-=======
               {sortedRows.map((o) => {
->>>>>>> 87432db (New Dashboard)
                 const meta = statusMeta(o.resolutionStatus);
                 return (
                   <tr key={o.id}>

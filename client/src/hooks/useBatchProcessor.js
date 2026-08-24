@@ -192,13 +192,9 @@ export function useBatchProcessor() {
           .save({
             portalOrderRef: portalOrderRef(order.parsedData, order.filename),
             filename: order.filename,
-<<<<<<< HEAD
-            customerName: order.parsedData.billing_address?.company_name || '',
-=======
             // Customer is the DELIVERY address's company name (V4.3), matching
             // the postcode (already delivery-sourced) and single-upload flow.
             customerName: order.parsedData.delivery_address?.company_name || '',
->>>>>>> 87432db (New Dashboard)
             orderDate: inf.order_date || '',
             totalProducts: order.products.length,
             parsedData: order.parsedData,

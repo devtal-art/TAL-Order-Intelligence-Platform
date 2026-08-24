@@ -1,20 +1,6 @@
 /* Home dashboard: progressive sections instead of a numbered step flow. */
 .dash{display:flex;flex-direction:column;gap:20px}
-<<<<<<< HEAD
-.dash-grid{
-  display:grid;
-  grid-template-columns:1.1fr .9fr;
-  gap:20px;
-  align-items:start;
-}
-
 /* Tablet: stack the top row */
 @media (max-width:900px){
-  .dash-grid{grid-template-columns:1fr;gap:16px}
-=======
-
-/* Tablet: stack the top row */
-@media (max-width:900px){
->>>>>>> 87432db (New Dashboard)
   .dash{gap:16px}
 }

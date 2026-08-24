@@ -27,10 +27,7 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 import bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
-<<<<<<< HEAD
-=======
 import { assertExpectedMongoTarget } from '../src/config/mongoGuard.js';
->>>>>>> 87432db (New Dashboard)
 
 // ── Inline User schema (mirrors seedUsers.js / models/user.model.js) ───────
 const userSchema = new mongoose.Schema(
@@ -57,14 +54,9 @@ const USERS_TO_UPDATE = [
 const NEW_USER = { name: 'Sehbaz', password: process.env.SEED_PASSWORD_SEHBAZ, role: 'staff' };
 
 async function main() {
-<<<<<<< HEAD
-  const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/order_intelligence';
-  const mongoDbName = process.env.MONGODB_DB || 'order_intelligence';
-=======
   const mongoUri = process.env.MONGODB_URI;
   const mongoDbName = process.env.MONGODB_DB || 'order_intelligence';
   assertExpectedMongoTarget(mongoUri, mongoDbName);
->>>>>>> 87432db (New Dashboard)
 
   console.log(`\n🔗 Connecting to MongoDB (db: ${mongoDbName})…`);
 

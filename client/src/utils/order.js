@@ -29,19 +29,6 @@ export function deriveOrderStatus(results) {
 
 // Team members who can be assigned as an order's processor (V1.9). Order-level
 // identification only — deliberately NOT authentication or user management.
-<<<<<<< HEAD
-export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Shashwat'];
-
-// The per-product fulfilment comments the platform knows (V1.3).
-//   'Released'  — in stock, order line released
-//   'OS'        — out of stock
-//   'N/A'       — not available on the website
-//   'Not Found' — product doesn't exist in our records and matching is
-//                 INTENTIONALLY skipped for THIS order only (V2.1). Never
-//                 creates a mapping and never affects future orders — it is
-//                 stored exactly like the other comments (product_comments).
-export const PRODUCT_COMMENTS = ['Released', 'OS', 'Not Found'];
-=======
 export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Shashwat', 'Gagandeep'];
 
 // The per-product Reason values selectable going forward (V3.2).
@@ -55,7 +42,6 @@ export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehba
 // Legacy orders that already have a stored 'Released' comment still display
 // it correctly via commentMeta() below; it just can't be re-selected.
 export const PRODUCT_COMMENTS = ['OS', 'Not Found'];
->>>>>>> 87432db (New Dashboard)
 
 // The comment value that intentionally skips matching for the order (V2.1).
 export const NOT_FOUND_COMMENT = 'Not Found';
@@ -86,16 +72,6 @@ export function commentMeta(comment) {
   }
 }
 
-<<<<<<< HEAD
-// Per-product delivery statuses (V1.4): stored value + display label.
-export const DELIVERY_STATUSES = [
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'half_delivered', label: 'Half Delivered' },
-  { value: 'not_delivered', label: 'Not Delivered' },
-];
-
-// Human label + style token for a delivery status (badge rendering).
-=======
 // Per-product Item Status (V1.4, relabeled V3.2): stored value + display
 // label. Stored values (delivered/half_delivered/not_delivered) are
 // UNCHANGED for backward compatibility — only the display labels changed,
@@ -108,18 +84,10 @@ export const DELIVERY_STATUSES = [
 ];
 
 // Human label + style token for an Item Status (badge rendering).
->>>>>>> 87432db (New Dashboard)
 //   delivered → green, half_delivered → yellow, not_delivered → red.
 export function deliveryMeta(status) {
   switch (status) {
     case 'delivered':
-<<<<<<< HEAD
-      return { label: 'Delivered', tone: 'delivered' };
-    case 'half_delivered':
-      return { label: 'Half Delivered', tone: 'half' };
-    case 'not_delivered':
-      return { label: 'Not Delivered', tone: 'not' };
-=======
       return { label: 'Released', tone: 'delivered' };
     case 'half_delivered':
       return { label: 'Half Released', tone: 'half' };
@@ -175,7 +143,6 @@ export function discountBucketMeta(value) {
       return { label: 'Both or Combined Discounts', tone: 'cancelled' };
     case 'other':
       return { label: 'Other Discount', tone: 'problem' };
->>>>>>> 87432db (New Dashboard)
     default:
       return null;
   }

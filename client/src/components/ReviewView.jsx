@@ -3,11 +3,7 @@ import OrderReviewGroup from './OrderReviewGroup.jsx';
 import OrderSearchBar from './OrderSearchBar.jsx';
 import AddProductModal from './AddProductModal.jsx';
 import OrderFinancials from './OrderFinancials.jsx';
-<<<<<<< HEAD
-import { portalOrderRef, hasRealRef, isMatchingSkipped } from '../utils/order.js';
-=======
 import { portalOrderRef, hasRealRef, isMatchingSkipped, ORDER_STATUSES } from '../utils/order.js';
->>>>>>> 87432db (New Dashboard)
 import { approvedItemNos } from '../utils/manualProduct.js';
 import { currencySymbol } from '../utils/format.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -32,8 +28,6 @@ export default function ReviewView({
   onNote,
   onSave,        // V2.0 — called when user clicks Save Order
   saved = false, // V2.0 — true once the order has been written to the DB
-<<<<<<< HEAD
-=======
   orderStatus = '',        // V3.2 — required before Save
   onOrderStatus,           // V3.2
   orderComment = '',       // V3.2 — optional
@@ -41,7 +35,6 @@ export default function ReviewView({
   deliveryDate = '',       // V4.2 — optional, always editable (even after Save)
   onDeliveryDate,          // V4.2
   saveError = '',          // V3.2 — surfaced when Save fails
->>>>>>> 87432db (New Dashboard)
   onGenerate,
   onReset,
 }) {
@@ -73,16 +66,10 @@ export default function ReviewView({
     (r) => r.status === 'needs_review' && !isMatchingSkipped(comments[r.lineId])
   ).length;
   // Save is enabled once all products are resolved (or intentionally skipped
-<<<<<<< HEAD
-  // via 'Not Found'). Processed By is now automatic (JWT user) — no gate needed.
-  // Generate is enabled only after the order has been explicitly saved (V2.0).
-  const canSave = !saved && blockingReview === 0;
-=======
   // via 'Not Found') AND an Order Status has been selected (V3.2, required).
   // Processed By is now automatic (JWT user) — no gate needed.
   // Generate is enabled only after the order has been explicitly saved (V2.0).
   const canSave = !saved && blockingReview === 0 && !!orderStatus;
->>>>>>> 87432db (New Dashboard)
   const canGenerate = saved && blockingReview === 0;
 
   // A single upload is exactly one order. Resolve results carry lineId =
@@ -92,11 +79,7 @@ export default function ReviewView({
       portalOrderRef: portalOrderRef(parsedData, filename),
       hasRef: hasRealRef(parsedData),
       filename,
-<<<<<<< HEAD
-      customer: parsedData?.billing_address?.company_name || '',
-=======
-      customer: parsedData?.delivery_address?.company_name || '',
->>>>>>> 87432db (New Dashboard)
+      customer: parsedData?.delivery_address?.company_name || parsedData?.billing_address?.company_name || '',
       postcode: parsedData?.delivery_address?.post_code || '',
       currency,
       orderTotal,
@@ -179,20 +162,13 @@ export default function ReviewView({
         <div className="og-empty">No order matches “{search}”.</div>
       )}
 
-<<<<<<< HEAD
-      <OrderFinancials 
-        financials={parsedData?.financials} 
-=======
       <OrderFinancials
         financials={parsedData?.financials}
->>>>>>> 87432db (New Dashboard)
         results={results}
         lineItems={lineItems}
         comments={comments}
       />
 
-<<<<<<< HEAD
-=======
       {!saved && (
         <div className="os-edit-block" aria-label="Overall order status and comment">
           <div className="os-edit-field">
@@ -239,8 +215,6 @@ export default function ReviewView({
       )}
 
       {saveError && <div className="rev-gate-note">{saveError}</div>}
-
->>>>>>> 87432db (New Dashboard)
       {blockingReview > 0 && (
         <div className="rev-gate-note">
           {`${blockingReview} product${blockingReview > 1 ? 's' : ''} still need${blockingReview === 1 ? 's' : ''} review before the order can be saved.`}
@@ -274,16 +248,12 @@ export default function ReviewView({
               </button>
             </>
           ) : (
-<<<<<<< HEAD
-            <button className="btn-save" onClick={onSave} disabled={!canSave}>
-=======
             <button
               className="btn-save"
               onClick={onSave}
               disabled={!canSave}
               title={!orderStatus && blockingReview === 0 ? 'Select an Order Status before saving' : undefined}
             >
->>>>>>> 87432db (New Dashboard)
               <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                 <polyline points="17 21 17 13 7 13 7 21" />

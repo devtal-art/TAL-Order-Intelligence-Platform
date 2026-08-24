@@ -4,11 +4,7 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { orderService } from '../services/orderService.js';
 import { buildXLSX } from '../excel/buildXLSX.js';
-<<<<<<< HEAD
-import { statusMeta, commentMeta, deliveryMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, PROCESSED_BY_USERS, clampPendingQty } from '../utils/order.js';
-=======
 import { statusMeta, commentMeta, deliveryMeta, orderStatusMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, ORDER_STATUSES, PROCESSED_BY_USERS, clampPendingQty } from '../utils/order.js';
->>>>>>> 87432db (New Dashboard)
 import { approvedItemNos, appendManualProduct, removeManualProduct, remapAfterRemoval } from '../utils/manualProduct.js';
 import { currencySymbol } from '../utils/format.js';
 import AddProductModal from './AddProductModal.jsx';
@@ -20,11 +16,7 @@ export function downloadOrderExcel(order) {
   const parsed = order.parsedData || {};
   const resolution = order.resolutionData || { results: [] };
   const comments = order.productComments || {};
-<<<<<<< HEAD
-  const wb = buildXLSX(parsed, resolution, comments);
-=======
   const wb = buildXLSX(parsed, resolution, comments, order.orderStatus, order.orderComment, order.deliveryDate);
->>>>>>> 87432db (New Dashboard)
   const inf = parsed.order_info || {};
   const fname = `Order_${inf.order_ref || order.portalOrderRef}_${(inf.order_date || '').replace(/\//g, '-') || 'data'}.xlsx`;
   XLSX.writeFile(wb, fname, { bookType: 'xlsx', type: 'binary', cellStyles: true });
@@ -40,12 +32,12 @@ export function downloadOrderExcel(order) {
 export default function SavedOrderLookup({ onOrderChanged }) {
   const [searchType, setSearchType] = useState('ref'); // 'ref' | 'company'
   const [query, setQuery] = useState('');
-  
+
   // Autocomplete state
   const [suggestions, setSuggestions] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [autocompleteLoading, setAutocompleteLoading] = useState(false);
-  
+
   const [results, setResults] = useState(null); // null = not searched yet; [] = no matches
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -62,7 +54,7 @@ export default function SavedOrderLookup({ onOrderChanged }) {
       setShowDropdown(false);
       return;
     }
-    
+
     let cancelled = false;
     setAutocompleteLoading(true);
     const timer = setTimeout(() => {
@@ -111,7 +103,7 @@ export default function SavedOrderLookup({ onOrderChanged }) {
   const handleSuggestionClick = async (suggestion) => {
     setShowDropdown(false);
     setQuery(suggestion.companyName);
-    
+
     if (suggestion.orderCount === 1) {
       openDetail(suggestion.latestOrderRef);
     } else {
@@ -169,9 +161,9 @@ export default function SavedOrderLookup({ onOrderChanged }) {
       </div>
 
       <form className="sol-search" onSubmit={runSearch}>
-        <select 
-          className="sol-search-type-select" 
-          value={searchType} 
+        <select
+          className="sol-search-type-select"
+          value={searchType}
           onChange={e => {
             setSearchType(e.target.value);
             setQuery('');
@@ -225,15 +217,12 @@ export default function SavedOrderLookup({ onOrderChanged }) {
         </button>
       </form>
 
-<<<<<<< HEAD
-=======
       {/* Company Name searches the DELIVERY address's company name (V4.6) —
           matches how Customer is displayed everywhere else in the app. */}
       {searchType === 'company' && (
         <div className="sol-search-hint">Company Name searches the name on the delivery address.</div>
       )}
 
->>>>>>> 87432db (New Dashboard)
       {error && <div className="sol-error">{error}</div>}
 
       {results !== null && !loading && (
@@ -264,7 +253,7 @@ export default function SavedOrderLookup({ onOrderChanged }) {
                           <span>· {o.totalProducts} products</span>
                           <span>· saved {fmtDate(o.uploadTimestamp)}</span>
                           <span className="sol-row-pb">
-                            · <b>By:</b>
+                            · <b>By:</b>
                             {o.processedBy ? (
                               <span className="sol-row-pb-name">{o.processedBy}</span>
                             ) : (
@@ -355,11 +344,7 @@ export function SavedOrderDetailModal({ order, onClose, onDownload, onSaved }) {
 
 // Order detail: order metadata + the products with their stored resolution.
 // Read-only except delivery tracking + comments — "Edit" switches ONLY the
-<<<<<<< HEAD
-// Pending Qty / Order Status / Comment cells to inputs; saving PATCHes just
-=======
 // Pending Qty / Item Status / Reason cells to inputs; saving PATCHes just
->>>>>>> 87432db (New Dashboard)
 // those fields and leaves everything else in the order untouched.
 function SavedOrderDetail({ order, onDownload, onSaved }) {
   const { user } = useAuth();
@@ -380,8 +365,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({}); // { [lineId]: { pendingQty, status } }
-<<<<<<< HEAD
-=======
   // Overall Order Status / Order Comment draft (V3.2) — order-level, kept
   // separate from the per-line `draft` map above. Starts blank (not seeded
   // unless the order already has a real ORDER_STATUSES value) so the user
@@ -391,7 +374,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
   // Delivery Date (V4.2) — separate field, always editable (no requirement,
   // unlike Order Status), so it's saved via its own PATCH call in saveEdit.
   const [deliveryDateDraft, setDeliveryDateDraft] = useState('');
->>>>>>> 87432db (New Dashboard)
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
@@ -474,13 +456,9 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       product: item ? item.description : r.emailProductName,
       qty: item ? item.qty : '—',
       orderedQty: item ? Number(item.qty) : NaN,
-<<<<<<< HEAD
-      unitPrice: item ? `${Number(item.unit_price) < 0 ? '-' : ''}${sym}${Math.abs(Number(item.unit_price || 0)).toFixed(2)}` : '—',
-=======
       // Unit Price column omits the currency symbol (V4.4) — Order Total
       // (orderTotal above) keeps it, this column just doesn't.
       unitPrice: item ? `${Number(item.unit_price) < 0 ? '-' : ''}${Math.abs(Number(item.unit_price || 0)).toFixed(2)}` : '—',
->>>>>>> 87432db (New Dashboard)
       isUnitPriceNegative: item && Number(item.unit_price) < 0,
       itemNo: matched ? matched.itemNo : '—',
       website: matched ? matched.websiteProductName : '—',
@@ -494,11 +472,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- results/items/fulfillment/comments/sym all derive from `order`
   }), [order]);
 
-<<<<<<< HEAD
-  // Delivery summary: how many products sit in each Order Status. Derived
-=======
   // Delivery summary: how many products sit in each Item Status. Derived
->>>>>>> 87432db (New Dashboard)
   // live — from the draft while editing (so changing a dropdown updates the
   // badges instantly), from the stored values otherwise. Products without a
   // status are not counted; statuses with a count of zero are not rendered.
@@ -527,12 +501,9 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       };
     }
     setDraft(d);
-<<<<<<< HEAD
-=======
     setOrderStatusDraft(ORDER_STATUSES.includes(order.orderStatus) ? order.orderStatus : '');
     setOrderCommentDraft(order.orderComment || '');
     setDeliveryDateDraft(order.deliveryDate || '');
->>>>>>> 87432db (New Dashboard)
     setSaveError('');
     setEditing(true);
   };
@@ -541,13 +512,10 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
     setDraft((d) => ({ ...d, [lineId]: { ...d[lineId], ...patch } }));
 
   const saveEdit = async () => {
-<<<<<<< HEAD
-=======
     if (!ORDER_STATUSES.includes(orderStatusDraft)) {
       setSaveError('Order Status must be selected before saving.');
       return;
     }
->>>>>>> 87432db (New Dashboard)
     setSaving(true);
     setSaveError('');
     try {
@@ -565,16 +533,12 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       }
       await orderService.setFulfillment(order.portalOrderRef, fulfillmentPayload);
       await orderService.setComments(order.portalOrderRef, commentsPayload);
-<<<<<<< HEAD
-      const updated = await orderService.setNotes(order.portalOrderRef, notesPayload);
-=======
       await orderService.setNotes(order.portalOrderRef, notesPayload);
       let updated = await orderService.setOrderStatus(order.portalOrderRef, {
         orderStatus: orderStatusDraft,
         orderComment: orderCommentDraft,
       });
       updated = await orderService.setDeliveryDate(order.portalOrderRef, deliveryDateDraft);
->>>>>>> 87432db (New Dashboard)
       onSaved(updated);
       setEditing(false);
     } catch (e) {
@@ -591,10 +555,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           <span><b>Customer:</b> {order.customerName || '—'}</span>
           <span><b>Postcode:</b> {order.deliveryPostcode || parsed.delivery_address?.post_code || '—'}</span>
           <span><b>Order date:</b> {order.orderDate || '—'}</span>
-<<<<<<< HEAD
-          <span><b>File:</b> {order.filename || '—'}</span>
-          {orderTotal && <span><b>Order Total:</b> {orderTotal}</span>}
-=======
           <span><b>Delivery Date:</b> {order.deliveryDate || '—'}</span>
           <span><b>File:</b> {order.filename || '—'}</span>
           {orderTotal && <span><b>Order Total:</b> {orderTotal}</span>}
@@ -607,7 +567,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
               return meta ? <span className={`os-badge os-${meta.tone}`}>{meta.label}</span> : <span className="rt-empty">—</span>;
             })()}
           </span>
->>>>>>> 87432db (New Dashboard)
           <span className="sol-pb">
             <b>Processed By:</b>
             {order.processedBy ? (
@@ -632,10 +591,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
             )}
           </span>
         </div>
-<<<<<<< HEAD
-        <div className="sol-detail-actions">
-          {!isViewer && (editing ? (
-=======
       </div>
 
       {/* Billing / Delivery address summary (V4.5) — read from the order's
@@ -657,14 +612,10 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
 
       <div className="sol-detail-actions">
         {!isViewer && (editing ? (
->>>>>>> 87432db (New Dashboard)
             <>
               <button className="sol-edit-btn" type="button" onClick={() => setEditing(false)} disabled={saving}>
                 Cancel
               </button>
-<<<<<<< HEAD
-              <button className="sol-save-btn" type="button" onClick={saveEdit} disabled={saving}>
-=======
               <button
                 className="sol-save-btn"
                 type="button"
@@ -672,7 +623,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                 disabled={saving || !ORDER_STATUSES.includes(orderStatusDraft)}
                 title={!ORDER_STATUSES.includes(orderStatusDraft) ? 'Select an Order Status before saving' : undefined}
               >
->>>>>>> 87432db (New Dashboard)
                 {saving ? 'Saving…' : 'Save'}
               </button>
             </>
@@ -702,9 +652,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
             Download Excel
           </button>
         </div>
-<<<<<<< HEAD
-      </div>
-=======
 
       {editing && (
         <div className="os-edit-block" aria-label="Overall order status and comment">
@@ -750,7 +697,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           </div>
         </div>
       )}
->>>>>>> 87432db (New Dashboard)
 
       {additionalComment && (
         <div className="oc-note" role="note" aria-label="Order additional comment">
@@ -788,15 +734,9 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
               <th>Website Product</th>
               <th>Status</th>
               <th className="rt-num">Pending Qty</th>
-<<<<<<< HEAD
-              <th>Order Status</th>
-              <th>Comment</th>
-              <th>Additional Comment</th>
-=======
               <th>Item Status</th>
               <th>Reason</th>
               <th>Comments</th>
->>>>>>> 87432db (New Dashboard)
               {hasManual && <th aria-label="Remove product" />}
             </tr>
           </thead>
@@ -832,11 +772,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                           }
                           aria-label="Pending quantity"
                           disabled={released}
-<<<<<<< HEAD
-                          title={released ? 'Not applicable when comment is Released' : undefined}
-=======
                           title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
->>>>>>> 87432db (New Dashboard)
                         >
                           <option value="">—</option>
                           {Array.from({ length: row.orderedQty + 1 }, (_, n) => (
@@ -857,11 +793,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                           }
                           aria-label="Pending quantity"
                           disabled={released}
-<<<<<<< HEAD
-                          title={released ? 'Not applicable when comment is Released' : undefined}
-=======
                           title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
->>>>>>> 87432db (New Dashboard)
                         />
                       )
                     ) : row.pendingQty != null ? (
@@ -876,15 +808,9 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                         className={`ds-select${draft[row.lineId]?.status ? ` is-${draft[row.lineId].status}` : ''}`}
                         value={draft[row.lineId]?.status || ''}
                         onChange={(e) => editLine(row.lineId, { status: e.target.value })}
-<<<<<<< HEAD
-                        aria-label="Order status"
-                        disabled={released}
-                        title={released ? 'Not applicable when comment is Released' : undefined}
-=======
                         aria-label="Item status"
                         disabled={released}
                         title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
->>>>>>> 87432db (New Dashboard)
                       >
                         <option value="">—</option>
                         {DELIVERY_STATUSES.map((s) => (
@@ -905,11 +831,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                         className="cm-select"
                         value={draft[row.lineId]?.comment || ''}
                         onChange={(e) => editLine(row.lineId, { comment: e.target.value })}
-<<<<<<< HEAD
-                        aria-label="Product comment"
-=======
                         aria-label="Reason"
->>>>>>> 87432db (New Dashboard)
                       >
                         <option value="">—</option>
                         {PRODUCT_COMMENTS.map((c) => (
@@ -932,11 +854,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                         placeholder="Add note…"
                         value={draft[row.lineId]?.note ?? ''}
                         onChange={(e) => editLine(row.lineId, { note: e.target.value })}
-<<<<<<< HEAD
-                        aria-label="Additional comment"
-=======
                         aria-label="Comments"
->>>>>>> 87432db (New Dashboard)
                       />
                     ) : row.note ? (
                       <span className="note-text" title={row.note}>{row.note}</span>

@@ -1,12 +1,6 @@
-<<<<<<< HEAD
-/* ── Delivery tracking (V1.4): Pending Qty + Order Status ───────────────────
-   fl-input   — Pending Qty numeric input (review screen + saved-order edit)
-   ds-select  — Order Status selector, tinted by the chosen status
-=======
 /* ── Delivery tracking (V1.4): Pending Qty + Item Status ─────────────────────
    fl-input   — Pending Qty numeric input (review screen + saved-order edit)
    ds-select  — Item Status selector, tinted by the chosen status
->>>>>>> 87432db (New Dashboard)
    ds-badge   — read-only status badge (saved-order detail table)
    Colours follow the platform convention: delivered → green,
    half_delivered → yellow, not_delivered → red. */
@@ -29,11 +23,7 @@
 }
 .fl-input:focus{outline:2px solid var(--accent);outline-offset:1px}
 
-<<<<<<< HEAD
-/* Order Status selector (same base look as cm-select, plus a status tint) */
-=======
 /* Item Status selector (same base look as cm-select, plus a status tint) */
->>>>>>> 87432db (New Dashboard)
 .ds-select{
   padding:6px 8px;border:1px solid var(--border);border-radius:8px;
   background:var(--surface);color:inherit;
@@ -62,17 +52,12 @@
 .sol-status-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .sol-status-summary .ds-badge{font-size:12px;padding:4px 12px}
 
-<<<<<<< HEAD
-/* Saved-order detail: Edit Delivery / Save / Cancel next to Download Excel */
-.sol-detail-actions{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
-=======
 /* Saved-order detail: Edit Delivery / Save / Cancel next to Download Excel.
    Own bottom margin (V4.5) — this used to sit inside .sol-detail-top and
    inherit ITS margin-bottom; now that the address boxes sit between them as
    a separate sibling, this needs its own spacing so it doesn't butt up
    against whatever comes next (Additional Comment / status badges / table). */
 .sol-detail-actions{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
->>>>>>> 87432db (New Dashboard)
 .sol-edit-btn{
   display:inline-flex;align-items:center;gap:6px;
   background:var(--surface);color:inherit;border:1px solid var(--border);border-radius:9px;

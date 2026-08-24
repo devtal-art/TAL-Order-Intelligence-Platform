@@ -4,10 +4,7 @@ import ManualOrderAddressSection from '../components/ManualOrderAddressSection.j
 import ManualOrderProductRow from '../components/ManualOrderProductRow.jsx';
 import MasterTotalsEditor from '../components/MasterTotalsEditor.jsx';
 import { useManualOrderForm } from '../hooks/useManualOrderForm.js';
-<<<<<<< HEAD
-=======
 import { ORDER_STATUSES } from '../utils/order.js';
->>>>>>> 87432db (New Dashboard)
 
 // Create Manual Order (V3.1 — new page, additive). A second entry point into
 // order creation for orders that never arrive as an HTML email. Every field
@@ -156,8 +153,6 @@ export default function CreateManualOrder() {
             grandTotal={form.grandTotal}
           />
 
-<<<<<<< HEAD
-=======
           <div className="os-edit-block" aria-label="Overall order status and comment">
             <div className="os-edit-field">
               <label className="os-edit-label" htmlFor="mo-order-status">Order Status<em>*</em></label>
@@ -188,8 +183,6 @@ export default function CreateManualOrder() {
               />
             </div>
           </div>
-
->>>>>>> 87432db (New Dashboard)
           {form.validationError && <div className="mo-error">{form.validationError}</div>}
           {form.saveError && <div className="mo-error">{form.saveError}</div>}
 
@@ -215,9 +208,6 @@ export default function CreateManualOrder() {
             <button type="button" className="sol-edit-btn" onClick={() => navigate('/')}>
               Cancel
             </button>
-<<<<<<< HEAD
-            <button type="button" className="btn-go" onClick={() => form.save()} disabled={form.saving}>
-=======
             <button
               type="button"
               className="btn-go"
@@ -225,7 +215,6 @@ export default function CreateManualOrder() {
               disabled={form.saving}
               title={!ORDER_STATUSES.includes(form.orderStatus) ? 'Select an Order Status before saving' : undefined}
             >
->>>>>>> 87432db (New Dashboard)
               {form.saving ? 'Saving…' : 'Save Order'}
             </button>
           </div>

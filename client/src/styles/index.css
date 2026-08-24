@@ -1,13 +1,12 @@
 /* Aggregates the existing stylesheets, unchanged, in the original order.
    base.css keeps the Google Fonts @import as its first rule. */
 @import './base.css';
-<<<<<<< HEAD
-=======
+
 /* Tailwind utilities only (Preflight disabled in tailwind.config.js) — added
    for the MUI+Tailwind dashboard redesign; contributes no resets, so it's
    safe to load globally without affecting any other screen. */
 @import './tailwind.css';
->>>>>>> 87432db (New Dashboard)
+
 @import './topbar.css';
 @import './sidenav.css';
 @import './login.css';

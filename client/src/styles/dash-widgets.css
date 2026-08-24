@@ -1,10 +1,6 @@
 /* ── Dashboard page + widgets (V2.2) ────────────────────────────────────────
    dbp-*  — Dashboard page shell (search left, widgets right)
-<<<<<<< HEAD
-   dw-*   — widget cards (Order Status / Comments buckets)
-=======
    dw-*   — widget cards (Item Status / Reason buckets)
->>>>>>> 87432db (New Dashboard)
    dl-*   — "View All" filtered list page
    Tones reuse the platform semantics: delivered/released → green,
    half/OS → amber, not delivered/N-A → red, Not Found → neutral grey. */
@@ -13,12 +9,9 @@
 .dbp-top{margin-bottom:18px}
 .dbp-top h2{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.02em}
 .dbp-top p{color:var(--ink-2);font-size:13px;margin-top:4px}
-<<<<<<< HEAD
-=======
 /* Title block + Export Dashboard button side by side (V4.8) */
 .dbp-top-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .dbp-top-row .sol-dl-btn{flex-shrink:0}
->>>>>>> 87432db (New Dashboard)
 
 /* Overview stat cards atop the dashboard — Total Orders / Today's Orders /
    Released orders broken down by processor. CSS Grid stretches every card
@@ -83,40 +76,8 @@
   background:var(--warn-soft);border:1px solid var(--warn-border);
   border-radius:6px;padding:1px 7px;
 }
-<<<<<<< HEAD
-/* Widget groups — Order Status and Comments side by side (V2.3), stacked on
-   narrow screens. Cards flow within each column. */
-.dw-wrap{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
-@media (max-width:900px){ .dw-wrap{grid-template-columns:1fr} }
-.dw-wrap.is-refreshing{opacity:.65;transition:opacity .15s}
-/* Each widget group is its own panel — a bounded surface with a divided
-   header, so Order Status and Comments read as two separate sections. */
-.dw-section{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);
-  padding:16px 16px 18px;min-width:0;
-}
-.dw-section-head{
-  padding-bottom:12px;margin-bottom:14px;
-  border-bottom:1px solid var(--border);
-}
-.dw-section-title{
-  font-family:var(--font-display);
-  font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.01em;
-}
-.dw-section-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
-.dw-cards{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
-  gap:14px;align-items:start; /* empty buckets stay compact, never stretched */
-}
-/* Inside the two-column layout each section is ~half the content width —
-   let the bucket cards breathe as full-width stacked cards. */
-@media (min-width:901px){ .dw-cards{grid-template-columns:1fr} }
-.dw-loading{font-size:13px;color:var(--muted);padding:24px;text-align:center}
-=======
 .dw-loading{font-size:13px;color:var(--muted);padding:24px;text-align:center}
 .is-refreshing{opacity:.65;transition:opacity .15s}
->>>>>>> 87432db (New Dashboard)
 
 /* Bucket card */
 .dw-card{
@@ -165,8 +126,6 @@
 .dw-notfound .dw-card-head{background:var(--surface-2)}
 .dw-notfound .dw-dot{background:var(--muted)}
 
-<<<<<<< HEAD
-=======
 /* Order Status buckets (V3.2, extended V3.3): Order Released reuses
    .dw-released above (green). Order Hold → amber, Order Cancelled → red,
    Order Released but Problem → accent blue. .dw-comments (neutral grey) is
@@ -189,8 +148,6 @@
 
 .dw-comments .dw-card-head{background:var(--surface-2)}
 .dw-comments .dw-dot{background:var(--muted)}
-
->>>>>>> 87432db (New Dashboard)
 /* Order preview rows — two compact lines: (ref + customer + date), processor */
 .dw-list{list-style:none;margin:0;padding:0}
 .dw-row{
@@ -211,15 +168,12 @@
 .dw-by{font-size:10.5px;color:var(--muted);margin-top:2px}
 .dw-by b{font-weight:600;color:var(--ink-2)}
 .dw-by-empty{font-style:italic}
-<<<<<<< HEAD
-=======
 /* Order Comment preview text (V3.4, Order Comments section only) — clipped
    to one line so a long comment never distorts the row height. */
 .dw-comment-text{
   font-size:11px;color:var(--ink-2);margin-top:3px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
->>>>>>> 87432db (New Dashboard)
 .dw-empty{
   display:flex;flex-direction:column;align-items:center;gap:7px;
   padding:24px 14px;font-size:12px;color:var(--muted);text-align:center;
@@ -246,8 +200,6 @@
 .dw-viewall:hover{background:var(--accent-soft)}
 .dw-viewall svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 
-<<<<<<< HEAD
-=======
 /* ── V4.1 Dashboard Layout ──────────────────────────────────────────────
    Row 1: Order Status stat cards (icon + count + %).
    Row 2: Total Orders (+Email/Kumkum) | Total/Unique Items | Delivery Date.
@@ -476,7 +428,6 @@
 .dw-team-table tbody td{font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--ink)}
 .dw-team-table tbody td:first-child{font-family:inherit;font-size:12.5px;font-weight:600;color:var(--ink-2)}
 
->>>>>>> 87432db (New Dashboard)
 /* ── "View All" list page ── */
 .dl-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
 .dl-back{font-size:12.5px;font-weight:600;color:var(--accent);text-decoration:none;white-space:nowrap}
@@ -497,8 +448,6 @@
   font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;
   padding:10px 14px;border-bottom:1px solid var(--border);white-space:nowrap;
 }
-<<<<<<< HEAD
-=======
 .dl-table th.dl-sort-th{padding:0}
 .dl-sort-btn{
   all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:5px;
@@ -511,7 +460,6 @@
 .dl-sort-arrow{font-size:9px;opacity:.4}
 .dl-sort-active .dl-sort-btn{color:var(--accent)}
 .dl-sort-active .dl-sort-arrow{opacity:1}
->>>>>>> 87432db (New Dashboard)
 .dl-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
 .dl-table tbody tr:last-child td{border-bottom:none}
 .dl-table tbody tr:hover td{background:var(--surface-2)}
@@ -519,10 +467,7 @@
 .dl-num{text-align:right}
 .dl-act{text-align:right;white-space:nowrap}
 .dl-muted{color:var(--muted);font-style:italic}
-<<<<<<< HEAD
-=======
 .dl-comment{max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
->>>>>>> 87432db (New Dashboard)
 .dl-empty{
   font-size:13px;color:var(--muted);text-align:center;padding:28px;
   background:var(--surface-2);border:1.5px dashed var(--border-strong);border-radius:var(--radius);

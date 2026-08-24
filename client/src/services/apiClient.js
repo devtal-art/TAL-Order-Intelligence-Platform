@@ -57,8 +57,6 @@ async function request(path, options = {}) {
   return handleResponse(res);
 }
 
-<<<<<<< HEAD
-=======
 // Extracts the filename from a Content-Disposition header, if present —
 // falls back to `defaultName` (e.g. for a 500 that never set the header).
 function filenameFromDisposition(res, defaultName) {
@@ -67,7 +65,6 @@ function filenameFromDisposition(res, defaultName) {
   return match ? match[1] : defaultName;
 }
 
->>>>>>> 87432db (New Dashboard)
 export const apiClient = {
   get: (path) => request(path),
   post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
@@ -80,8 +77,6 @@ export const apiClient = {
       headers: { ...apiKeyHeaders, ...getAuthHeaders() },
       body: formData,
     }).then(handleResponse),
-<<<<<<< HEAD
-=======
   // Binary file download (e.g. the dashboard export .xlsx) — unlike every
   // other method here this doesn't parse JSON; it saves the response body
   // as a file via a throwaway object URL + <a download> click. Auth/401
@@ -106,6 +101,5 @@ export const apiClient = {
     a.remove();
     URL.revokeObjectURL(url);
   },
->>>>>>> 87432db (New Dashboard)
 };
 

@@ -38,8 +38,6 @@ export default function Home() {
     comments,
     fulfillment,
     notes,
-<<<<<<< HEAD
-=======
     orderStatus,
     setOrderStatus,
     orderComment,
@@ -47,7 +45,6 @@ export default function Home() {
     deliveryDate,
     setDeliveryDate,
     saveError,
->>>>>>> 87432db (New Dashboard)
     saved,
     pending,
     pickFile,
@@ -273,8 +270,6 @@ export default function Home() {
           onNote={setProductNote}
           onSave={saveOrder}
           saved={saved}
-<<<<<<< HEAD
-=======
           orderStatus={orderStatus}
           onOrderStatus={setOrderStatus}
           orderComment={orderComment}
@@ -282,7 +277,6 @@ export default function Home() {
           deliveryDate={deliveryDate}
           onDeliveryDate={setDeliveryDate}
           saveError={saveError}
->>>>>>> 87432db (New Dashboard)
           onGenerate={generateExcel}
           onReset={handleResetAll}
         />
