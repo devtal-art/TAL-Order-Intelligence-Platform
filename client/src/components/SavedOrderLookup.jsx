@@ -4,7 +4,11 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { orderService } from '../services/orderService.js';
 import { buildXLSX } from '../excel/buildXLSX.js';
+<<<<<<< HEAD
 import { statusMeta, commentMeta, deliveryMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, PROCESSED_BY_USERS, clampPendingQty } from '../utils/order.js';
+=======
+import { statusMeta, commentMeta, deliveryMeta, orderStatusMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, ORDER_STATUSES, PROCESSED_BY_USERS, clampPendingQty } from '../utils/order.js';
+>>>>>>> 87432db (New Dashboard)
 import { approvedItemNos, appendManualProduct, removeManualProduct, remapAfterRemoval } from '../utils/manualProduct.js';
 import { currencySymbol } from '../utils/format.js';
 import AddProductModal from './AddProductModal.jsx';
@@ -16,7 +20,11 @@ export function downloadOrderExcel(order) {
   const parsed = order.parsedData || {};
   const resolution = order.resolutionData || { results: [] };
   const comments = order.productComments || {};
+<<<<<<< HEAD
   const wb = buildXLSX(parsed, resolution, comments);
+=======
+  const wb = buildXLSX(parsed, resolution, comments, order.orderStatus, order.orderComment, order.deliveryDate);
+>>>>>>> 87432db (New Dashboard)
   const inf = parsed.order_info || {};
   const fname = `Order_${inf.order_ref || order.portalOrderRef}_${(inf.order_date || '').replace(/\//g, '-') || 'data'}.xlsx`;
   XLSX.writeFile(wb, fname, { bookType: 'xlsx', type: 'binary', cellStyles: true });
@@ -217,6 +225,15 @@ export default function SavedOrderLookup({ onOrderChanged }) {
         </button>
       </form>
 
+<<<<<<< HEAD
+=======
+      {/* Company Name searches the DELIVERY address's company name (V4.6) —
+          matches how Customer is displayed everywhere else in the app. */}
+      {searchType === 'company' && (
+        <div className="sol-search-hint">Company Name searches the name on the delivery address.</div>
+      )}
+
+>>>>>>> 87432db (New Dashboard)
       {error && <div className="sol-error">{error}</div>}
 
       {results !== null && !loading && (
@@ -338,7 +355,11 @@ export function SavedOrderDetailModal({ order, onClose, onDownload, onSaved }) {
 
 // Order detail: order metadata + the products with their stored resolution.
 // Read-only except delivery tracking + comments — "Edit" switches ONLY the
+<<<<<<< HEAD
 // Pending Qty / Order Status / Comment cells to inputs; saving PATCHes just
+=======
+// Pending Qty / Item Status / Reason cells to inputs; saving PATCHes just
+>>>>>>> 87432db (New Dashboard)
 // those fields and leaves everything else in the order untouched.
 function SavedOrderDetail({ order, onDownload, onSaved }) {
   const { user } = useAuth();
@@ -359,6 +380,18 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({}); // { [lineId]: { pendingQty, status } }
+<<<<<<< HEAD
+=======
+  // Overall Order Status / Order Comment draft (V3.2) — order-level, kept
+  // separate from the per-line `draft` map above. Starts blank (not seeded
+  // unless the order already has a real ORDER_STATUSES value) so the user
+  // must make an explicit choice, per the "Order Status is required" rule.
+  const [orderStatusDraft, setOrderStatusDraft] = useState('');
+  const [orderCommentDraft, setOrderCommentDraft] = useState('');
+  // Delivery Date (V4.2) — separate field, always editable (no requirement,
+  // unlike Order Status), so it's saved via its own PATCH call in saveEdit.
+  const [deliveryDateDraft, setDeliveryDateDraft] = useState('');
+>>>>>>> 87432db (New Dashboard)
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
@@ -441,7 +474,13 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       product: item ? item.description : r.emailProductName,
       qty: item ? item.qty : '—',
       orderedQty: item ? Number(item.qty) : NaN,
+<<<<<<< HEAD
       unitPrice: item ? `${Number(item.unit_price) < 0 ? '-' : ''}${sym}${Math.abs(Number(item.unit_price || 0)).toFixed(2)}` : '—',
+=======
+      // Unit Price column omits the currency symbol (V4.4) — Order Total
+      // (orderTotal above) keeps it, this column just doesn't.
+      unitPrice: item ? `${Number(item.unit_price) < 0 ? '-' : ''}${Math.abs(Number(item.unit_price || 0)).toFixed(2)}` : '—',
+>>>>>>> 87432db (New Dashboard)
       isUnitPriceNegative: item && Number(item.unit_price) < 0,
       itemNo: matched ? matched.itemNo : '—',
       website: matched ? matched.websiteProductName : '—',
@@ -455,7 +494,11 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- results/items/fulfillment/comments/sym all derive from `order`
   }), [order]);
 
+<<<<<<< HEAD
   // Delivery summary: how many products sit in each Order Status. Derived
+=======
+  // Delivery summary: how many products sit in each Item Status. Derived
+>>>>>>> 87432db (New Dashboard)
   // live — from the draft while editing (so changing a dropdown updates the
   // badges instantly), from the stored values otherwise. Products without a
   // status are not counted; statuses with a count of zero are not rendered.
@@ -484,6 +527,12 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       };
     }
     setDraft(d);
+<<<<<<< HEAD
+=======
+    setOrderStatusDraft(ORDER_STATUSES.includes(order.orderStatus) ? order.orderStatus : '');
+    setOrderCommentDraft(order.orderComment || '');
+    setDeliveryDateDraft(order.deliveryDate || '');
+>>>>>>> 87432db (New Dashboard)
     setSaveError('');
     setEditing(true);
   };
@@ -492,6 +541,13 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
     setDraft((d) => ({ ...d, [lineId]: { ...d[lineId], ...patch } }));
 
   const saveEdit = async () => {
+<<<<<<< HEAD
+=======
+    if (!ORDER_STATUSES.includes(orderStatusDraft)) {
+      setSaveError('Order Status must be selected before saving.');
+      return;
+    }
+>>>>>>> 87432db (New Dashboard)
     setSaving(true);
     setSaveError('');
     try {
@@ -509,7 +565,16 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       }
       await orderService.setFulfillment(order.portalOrderRef, fulfillmentPayload);
       await orderService.setComments(order.portalOrderRef, commentsPayload);
+<<<<<<< HEAD
       const updated = await orderService.setNotes(order.portalOrderRef, notesPayload);
+=======
+      await orderService.setNotes(order.portalOrderRef, notesPayload);
+      let updated = await orderService.setOrderStatus(order.portalOrderRef, {
+        orderStatus: orderStatusDraft,
+        orderComment: orderCommentDraft,
+      });
+      updated = await orderService.setDeliveryDate(order.portalOrderRef, deliveryDateDraft);
+>>>>>>> 87432db (New Dashboard)
       onSaved(updated);
       setEditing(false);
     } catch (e) {
@@ -526,8 +591,23 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           <span><b>Customer:</b> {order.customerName || '—'}</span>
           <span><b>Postcode:</b> {order.deliveryPostcode || parsed.delivery_address?.post_code || '—'}</span>
           <span><b>Order date:</b> {order.orderDate || '—'}</span>
+<<<<<<< HEAD
           <span><b>File:</b> {order.filename || '—'}</span>
           {orderTotal && <span><b>Order Total:</b> {orderTotal}</span>}
+=======
+          <span><b>Delivery Date:</b> {order.deliveryDate || '—'}</span>
+          <span><b>File:</b> {order.filename || '—'}</span>
+          {orderTotal && <span><b>Order Total:</b> {orderTotal}</span>}
+          <span>
+            <b>Order Status:</b>{' '}
+            {(() => {
+              const meta = orderStatusMeta(order.orderStatus);
+              // No 'Unknown' fallback (V3.3) — an order whose status hasn't
+              // landed yet shows a plain dash, not a fake status badge.
+              return meta ? <span className={`os-badge os-${meta.tone}`}>{meta.label}</span> : <span className="rt-empty">—</span>;
+            })()}
+          </span>
+>>>>>>> 87432db (New Dashboard)
           <span className="sol-pb">
             <b>Processed By:</b>
             {order.processedBy ? (
@@ -552,13 +632,47 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
             )}
           </span>
         </div>
+<<<<<<< HEAD
         <div className="sol-detail-actions">
           {!isViewer && (editing ? (
+=======
+      </div>
+
+      {/* Billing / Delivery address summary (V4.5) — read from the order's
+          stored parsed_data snapshot, so every past and future order has
+          both automatically; nothing to backfill. Placed above the action
+          buttons. */}
+      <div className="addr-boxes">
+        <div className="addr-box addr-box--delivery" aria-label="Delivery address">
+          <div className="addr-box-title">Delivery Address</div>
+          <div className="addr-box-row"><b>Customer:</b> {parsed.delivery_address?.company_name || '—'}</div>
+          <div className="addr-box-row"><b>Postcode:</b> {parsed.delivery_address?.post_code || '—'}</div>
+        </div>
+        <div className="addr-box addr-box--billing" aria-label="Billing address">
+          <div className="addr-box-title">Billing Address</div>
+          <div className="addr-box-row"><b>Customer:</b> {parsed.billing_address?.company_name || '—'}</div>
+          <div className="addr-box-row"><b>Postcode:</b> {parsed.billing_address?.post_code || '—'}</div>
+        </div>
+      </div>
+
+      <div className="sol-detail-actions">
+        {!isViewer && (editing ? (
+>>>>>>> 87432db (New Dashboard)
             <>
               <button className="sol-edit-btn" type="button" onClick={() => setEditing(false)} disabled={saving}>
                 Cancel
               </button>
+<<<<<<< HEAD
               <button className="sol-save-btn" type="button" onClick={saveEdit} disabled={saving}>
+=======
+              <button
+                className="sol-save-btn"
+                type="button"
+                onClick={saveEdit}
+                disabled={saving || !ORDER_STATUSES.includes(orderStatusDraft)}
+                title={!ORDER_STATUSES.includes(orderStatusDraft) ? 'Select an Order Status before saving' : undefined}
+              >
+>>>>>>> 87432db (New Dashboard)
                 {saving ? 'Saving…' : 'Save'}
               </button>
             </>
@@ -588,7 +702,55 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
             Download Excel
           </button>
         </div>
+<<<<<<< HEAD
       </div>
+=======
+
+      {editing && (
+        <div className="os-edit-block" aria-label="Overall order status and comment">
+          <div className="os-edit-field">
+            <label className="os-edit-label" htmlFor="order-status-select">Order Status</label>
+            <select
+              id="order-status-select"
+              className="os-select"
+              value={orderStatusDraft}
+              onChange={(e) => setOrderStatusDraft(e.target.value)}
+              aria-label="Order Status"
+              required
+            >
+              <option value="" disabled>Select…</option>
+              {ORDER_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div className="os-edit-field">
+            <label className="os-edit-label" htmlFor="order-delivery-date-input">Delivery Date</label>
+            <input
+              id="order-delivery-date-input"
+              type="text"
+              className="os-select"
+              placeholder="DD/MM/YYYY"
+              value={deliveryDateDraft}
+              onChange={(e) => setDeliveryDateDraft(e.target.value)}
+              aria-label="Delivery Date"
+            />
+          </div>
+          <div className="os-edit-field os-edit-field--wide">
+            <label className="os-edit-label" htmlFor="order-comment-input">Order Comment</label>
+            <textarea
+              id="order-comment-input"
+              className="os-comment-input"
+              rows={2}
+              placeholder="Optional order-level comment…"
+              value={orderCommentDraft}
+              onChange={(e) => setOrderCommentDraft(e.target.value)}
+              aria-label="Order Comment"
+            />
+          </div>
+        </div>
+      )}
+>>>>>>> 87432db (New Dashboard)
 
       {additionalComment && (
         <div className="oc-note" role="note" aria-label="Order additional comment">
@@ -626,9 +788,15 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
               <th>Website Product</th>
               <th>Status</th>
               <th className="rt-num">Pending Qty</th>
+<<<<<<< HEAD
               <th>Order Status</th>
               <th>Comment</th>
               <th>Additional Comment</th>
+=======
+              <th>Item Status</th>
+              <th>Reason</th>
+              <th>Comments</th>
+>>>>>>> 87432db (New Dashboard)
               {hasManual && <th aria-label="Remove product" />}
             </tr>
           </thead>
@@ -664,7 +832,11 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                           }
                           aria-label="Pending quantity"
                           disabled={released}
+<<<<<<< HEAD
                           title={released ? 'Not applicable when comment is Released' : undefined}
+=======
+                          title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
+>>>>>>> 87432db (New Dashboard)
                         >
                           <option value="">—</option>
                           {Array.from({ length: row.orderedQty + 1 }, (_, n) => (
@@ -685,7 +857,11 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                           }
                           aria-label="Pending quantity"
                           disabled={released}
+<<<<<<< HEAD
                           title={released ? 'Not applicable when comment is Released' : undefined}
+=======
+                          title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
+>>>>>>> 87432db (New Dashboard)
                         />
                       )
                     ) : row.pendingQty != null ? (
@@ -700,9 +876,15 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                         className={`ds-select${draft[row.lineId]?.status ? ` is-${draft[row.lineId].status}` : ''}`}
                         value={draft[row.lineId]?.status || ''}
                         onChange={(e) => editLine(row.lineId, { status: e.target.value })}
+<<<<<<< HEAD
                         aria-label="Order status"
                         disabled={released}
                         title={released ? 'Not applicable when comment is Released' : undefined}
+=======
+                        aria-label="Item status"
+                        disabled={released}
+                        title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
+>>>>>>> 87432db (New Dashboard)
                       >
                         <option value="">—</option>
                         {DELIVERY_STATUSES.map((s) => (
@@ -723,7 +905,11 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                         className="cm-select"
                         value={draft[row.lineId]?.comment || ''}
                         onChange={(e) => editLine(row.lineId, { comment: e.target.value })}
+<<<<<<< HEAD
                         aria-label="Product comment"
+=======
+                        aria-label="Reason"
+>>>>>>> 87432db (New Dashboard)
                       >
                         <option value="">—</option>
                         {PRODUCT_COMMENTS.map((c) => (
@@ -746,7 +932,11 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                         placeholder="Add note…"
                         value={draft[row.lineId]?.note ?? ''}
                         onChange={(e) => editLine(row.lineId, { note: e.target.value })}
+<<<<<<< HEAD
                         aria-label="Additional comment"
+=======
+                        aria-label="Comments"
+>>>>>>> 87432db (New Dashboard)
                       />
                     ) : row.note ? (
                       <span className="note-text" title={row.note}>{row.note}</span>

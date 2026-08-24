@@ -29,6 +29,18 @@ const orderSchema = new mongoose.Schema(
     // reads as 'HTML' everywhere via toDto/toSummaryDto — no backfill needed.
     order_source: { type: String, enum: ['HTML', 'MANUAL'], default: 'HTML' },
 
+    // Order Channel (V3.5) — the business-facing source label the Dashboard
+    // will bifurcate on (frontend work tracked separately). Deliberately a
+    // SEPARATE field from order_source above, not a relabeling of it:
+    // order_source is an internal flag several components already switch on
+    // (e.g. OrderFinancials.jsx's isManualOrder gate expects exactly 'HTML'/
+    // 'MANUAL') and changing its values would silently break that logic.
+    // No default — every order gets this set explicitly, either at creation
+    // (upsertOrder, derived from the same orderSource input that sets
+    // order_source, so it's never guessed or user-selected) or via the
+    // one-time migrateOrderChannel.js backfill for pre-existing orders.
+    order_channel: { type: String, enum: ['Orders - Email', 'Order - Kumkum'] },
+
     // Team member who processed the order (V1.9). Order-level, plain string —
     // deliberately NOT authentication/user management. '' = Not Assigned
     // (all orders saved before V1.9).
@@ -71,6 +83,29 @@ const orderSchema = new mongoose.Schema(
     // user-written notes ("Damaged packaging.", "Urgent delivery."). Optional;
     // orders saved before V1.7 simply have no entry for any line.
     product_notes: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+    // Overall order status (V3.2 — distinct from any per-product status
+    // above; 'Unknown' removed V3.3 — every order now carries a real value;
+    // 'Order Comments' removed V3.4 — verified zero orders used it before
+    // dropping it from the enum). No default: the initial order save
+    // (upsertOrder) never sets this field — a separate, mandatory
+    // setOrderStatus call sets it immediately after, matching how the
+    // API/UI enforce it as required.
+    order_status: {
+      type: String,
+      enum: ['Order Released', 'Order Hold', 'Order Cancelled', 'Order Released but Problem'],
+    },
+    // Free-text comment for the whole order (V3.2) — independent from every
+    // per-product comment/reason/note above.
+    order_comment: { type: String, default: '', trim: true },
+
+    // Delivery date (V4.2 — additive, user-entered and editable at any time).
+    // Deliberately a TOP-LEVEL sibling field, not stored inside parsed_data
+    // (unlike the HTML parser, which never captures a delivery date at all,
+    // Manual Order Creation used to write it into parsed_data.order_info —
+    // but that blob is fully replaced on every re-upload/re-save, which would
+    // silently wipe a user's edit). '' = not set yet.
+    delivery_date: { type: String, default: '', trim: true },
   },
   { versionKey: false, minimize: false }
 );

@@ -6,7 +6,9 @@ dotenv.config();
 export const env = {
   port: Number(process.env.PORT) || 4000,
   nodeEnv: process.env.NODE_ENV || 'development',
-  mongoUri: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/order_intelligence',
+  // No localhost fallback: an unset MONGODB_URI must fail closed (via the
+  // mongoGuard check in db.js) rather than silently connecting elsewhere.
+  mongoUri: process.env.MONGODB_URI,
   mongoDbName: process.env.MONGODB_DB || 'order_intelligence',
   // Optional comma-separated DNS servers for Node's resolver (e.g.
   // "8.8.8.8,1.1.1.1"). Some networks (mobile hotspots, VPNs) refuse the SRV

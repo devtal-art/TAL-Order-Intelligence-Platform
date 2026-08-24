@@ -7,9 +7,12 @@ import {
   setOrderComments,
   setOrderFulfillment,
   setOrderNotes,
+  setOrderStatus,
+  setOrderDeliveryDate,
   setOrderProcessedBy,
   getDashboard,
   listDashboardOrders,
+  exportDashboard,
   autocompleteCompanies,
 } from '../../controllers/orderController.js';
 
@@ -22,10 +25,13 @@ orderRouter.get('/', listOrders);
 // Express would treat "dashboard" as a Portal Order Ref.
 orderRouter.get('/dashboard', getDashboard);
 orderRouter.get('/dashboard/orders', listDashboardOrders);
+orderRouter.get('/dashboard/export', exportDashboard);
 orderRouter.get('/companies/autocomplete', autocompleteCompanies);
 orderRouter.get('/:ref', getOrder);
 orderRouter.patch('/:ref/comments', setOrderComments);
 orderRouter.patch('/:ref/fulfillment', setOrderFulfillment);
 orderRouter.patch('/:ref/notes', setOrderNotes);
+orderRouter.patch('/:ref/status', setOrderStatus);
+orderRouter.patch('/:ref/delivery-date', setOrderDeliveryDate);
 orderRouter.patch('/:ref/processed-by', setOrderProcessedBy);
 orderRouter.patch('/:ref', updateOrder);

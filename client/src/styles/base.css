@@ -78,9 +78,20 @@ button:focus-visible,
 input:focus-visible,
 [tabindex]:focus-visible{outline:none;box-shadow:var(--ring)}
 
+<<<<<<< HEAD
 /* Content shell — comfortable dashboard width */
 #app{max-width:1120px;margin:0 auto;padding:28px 28px 88px}
 
+=======
+/* Content shell — comfortable reading width for form-like screens */
+#app{max-width:1120px;margin:0 auto;padding:28px 28px 88px}
+
+/* Dashboard: data-dense (card grid + wide table) — let it use the space
+   beside the sidebar instead of the 1120px reading-width cap, which was
+   leaving large, uneven gutters on both sides. */
+#app.app-wide{max-width:1900px}
+
+>>>>>>> 87432db (New Dashboard)
 /* Focused (single-column) screens read better constrained */
 #s-proc,#s-results,#s-error,#s-batch-results{max-width:800px;margin:0 auto}
 

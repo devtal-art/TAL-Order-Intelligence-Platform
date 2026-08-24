@@ -2,8 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
+<<<<<<< HEAD
 import { orderService } from '../services/orderService.js';
 import { deliveryMeta, commentMeta } from '../utils/order.js';
+=======
+import SortTh from '../components/SortableHeader.jsx';
+import { orderService } from '../services/orderService.js';
+import { deliveryMeta, commentMeta, orderStatusMeta, discountBucketMeta } from '../utils/order.js';
+>>>>>>> 87432db (New Dashboard)
 
 const PAGE_SIZE = 25;
 
@@ -16,9 +22,54 @@ export default function DashboardList() {
   const type = params.get('type') || '';
   const value = params.get('value') || '';
   const page = Math.max(1, Math.floor(Number(params.get('page'))) || 1);
+<<<<<<< HEAD
 
   const meta = type === 'status' ? deliveryMeta(value) : type === 'comment' ? commentMeta(value) : null;
   const badgeClass = type === 'status' ? `ds-badge ds-${meta?.tone}` : `cm-badge cm-${meta?.tone}`;
+=======
+  const sortBy = params.get('sortBy') || '';
+  const sortDir = params.get('sortDir') === 'desc' ? 'desc' : 'asc';
+
+  // Clicking a header sorts by it (ascending first); clicking the same
+  // header again flips direction. Changing the sort resets to page 1 so the
+  // reader isn't left on a page number that no longer makes sense once the
+  // order changes.
+  const toggleSort = (column) => {
+    const nextDir = sortBy === column && sortDir === 'asc' ? 'desc' : 'asc';
+    setParams({ type, value, page: '1', sortBy: column, sortDir: nextDir });
+  };
+
+  // Discount (V4.7): title needs the bucket's own label baked in (unlike
+  // the generic fallback subtitles below), so it's built up front here.
+  const discMeta = type === 'discount' ? discountBucketMeta(value) : null;
+
+  const meta =
+    type === 'status'
+      ? deliveryMeta(value)
+      : type === 'comment'
+        ? commentMeta(value)
+        : type === 'orderStatus'
+          ? orderStatusMeta(value)
+          : type === 'discount'
+            ? (discMeta ? { ...discMeta, title: `Orders with ${discMeta.label}` } : null)
+            : type === 'channel'
+              ? { label: value, tone: value === 'Orders - Email' ? 'problem' : 'cancelled', title: `${value} orders` }
+              : type === 'orderComment' && value === 'has'
+            ? { label: 'Order Comments', tone: 'comments', title: 'Orders with an Order Comment' }
+            : type === 'deliveryDate'
+              ? { label: `Delivery: ${value}`, tone: 'released', title: `Orders for delivery date ${value}` }
+              : type === 'today'
+                ? { label: "Today's Orders", tone: 'released', title: 'Orders processed today' }
+                : type === 'todayProcessor'
+                  ? { label: `Today: ${value}`, tone: 'released', title: `Orders processed today by ${value}` }
+                  : type === 'allOrders'
+                    ? { label: 'All Orders', tone: 'released', title: 'All orders' }
+                    : type === 'processor'
+                      ? { label: `Processor: ${value}`, tone: 'released', title: `Orders processed by ${value}` }
+                      : null;
+  const badgeClass =
+    type === 'status' ? `ds-badge ds-${meta?.tone}` : type === 'comment' ? `cm-badge cm-${meta?.tone}` : `os-badge os-${meta?.tone || 'released'}`;
+>>>>>>> 87432db (New Dashboard)
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +86,11 @@ export default function DashboardList() {
     setLoading(true);
     setError('');
     orderService
+<<<<<<< HEAD
       .dashboardOrders({ type, value, page, limit: PAGE_SIZE })
+=======
+      .dashboardOrders({ type, value, page, limit: PAGE_SIZE, sortBy: sortBy || undefined, sortDir })
+>>>>>>> 87432db (New Dashboard)
       .then((r) => {
         if (!cancelled) setResult(r);
       })
@@ -49,7 +104,11 @@ export default function DashboardList() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- meta derives from type/value
+<<<<<<< HEAD
   }, [type, value, page, refreshToken]);
+=======
+  }, [type, value, page, sortBy, sortDir, refreshToken]);
+>>>>>>> 87432db (New Dashboard)
 
   const openOrder = useCallback(
     async (ref) => {
@@ -66,7 +125,18 @@ export default function DashboardList() {
     []
   );
 
+<<<<<<< HEAD
   const gotoPage = (p) => setParams({ type, value, page: String(p) });
+=======
+  const gotoPage = (p) => {
+    const next = { type, value, page: String(p) };
+    if (sortBy) {
+      next.sortBy = sortBy;
+      next.sortDir = sortDir;
+    }
+    setParams(next);
+  };
+>>>>>>> 87432db (New Dashboard)
 
   if (!meta) {
     return (
@@ -92,7 +162,18 @@ export default function DashboardList() {
           <Link className="dl-back" to="/dashboard">← Back to Dashboard</Link>
           <h2 className="dl-title">
             <span className={badgeClass}>{meta.label}</span>
+<<<<<<< HEAD
             {type === 'status' ? 'Orders by delivery status' : 'Orders by comment'}
+=======
+            {meta.title ||
+              (type === 'status'
+                ? 'Orders by item status'
+                : type === 'comment'
+                  ? 'Orders by reason'
+                  : type === 'orderComment'
+                    ? 'Orders with an Order Comment'
+                    : 'Orders by order status')}
+>>>>>>> 87432db (New Dashboard)
           </h2>
           {!loading && (
             <span className="dl-total">
@@ -106,17 +187,38 @@ export default function DashboardList() {
         {loading && !result ? (
           <div className="dw-loading">Loading orders…</div>
         ) : rows.length === 0 ? (
+<<<<<<< HEAD
           <div className="dl-empty">No orders with a “{meta.label}” product yet.</div>
+=======
+          <div className="dl-empty">
+            {type === 'orderComment'
+              ? 'No orders with an Order Comment yet.'
+              : type === 'orderStatus'
+                ? `No orders with Order Status “${meta.label}” yet.`
+                : `No orders found for “${meta.label}”.`}
+          </div>
+>>>>>>> 87432db (New Dashboard)
         ) : (
           <div className="dl-table-wrap">
             <table className="dl-table">
               <thead>
                 <tr>
+<<<<<<< HEAD
                   <th>Order #</th>
                   <th>Customer</th>
                   <th>Processed By</th>
                   <th>Order Date</th>
                   <th className="dl-num">Products</th>
+=======
+                  <SortTh column="ref" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order #</SortTh>
+                  <SortTh column="customer" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Customer</SortTh>
+                  {type === 'orderComment' ? <th>Order Comment</th> : null}
+                  <SortTh column="processedBy" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Processed By</SortTh>
+                  <SortTh column="orderDate" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order Date</SortTh>
+                  {type === 'orderComment' ? null : (
+                    <SortTh column="products" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} numeric>Products</SortTh>
+                  )}
+>>>>>>> 87432db (New Dashboard)
                   <th aria-label="Actions" />
                 </tr>
               </thead>
@@ -125,9 +227,20 @@ export default function DashboardList() {
                   <tr key={o.id}>
                     <td className="dl-ref">{o.portalOrderRef}</td>
                     <td>{o.customerName || '—'}</td>
+<<<<<<< HEAD
                     <td>{o.processedBy || <span className="dl-muted">Not Assigned</span>}</td>
                     <td>{o.orderDate || '—'}</td>
                     <td className="dl-num">{o.totalProducts}</td>
+=======
+                    {type === 'orderComment' ? (
+                      <td className="dl-comment" title={o.orderComment}>
+                        {o.orderComment || '—'}
+                      </td>
+                    ) : null}
+                    <td>{o.processedBy || <span className="dl-muted">Not Assigned</span>}</td>
+                    <td>{o.orderDate || '—'}</td>
+                    {type === 'orderComment' ? null : <td className="dl-num">{o.totalProducts}</td>}
+>>>>>>> 87432db (New Dashboard)
                     <td className="dl-act">
                       <button
                         className="dw-view"

@@ -57,6 +57,17 @@ async function request(path, options = {}) {
   return handleResponse(res);
 }
 
+<<<<<<< HEAD
+=======
+// Extracts the filename from a Content-Disposition header, if present —
+// falls back to `defaultName` (e.g. for a 500 that never set the header).
+function filenameFromDisposition(res, defaultName) {
+  const header = res.headers.get('Content-Disposition') || '';
+  const match = header.match(/filename="?([^";]+)"?/i);
+  return match ? match[1] : defaultName;
+}
+
+>>>>>>> 87432db (New Dashboard)
 export const apiClient = {
   get: (path) => request(path),
   post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
@@ -69,5 +80,32 @@ export const apiClient = {
       headers: { ...apiKeyHeaders, ...getAuthHeaders() },
       body: formData,
     }).then(handleResponse),
+<<<<<<< HEAD
+=======
+  // Binary file download (e.g. the dashboard export .xlsx) — unlike every
+  // other method here this doesn't parse JSON; it saves the response body
+  // as a file via a throwaway object URL + <a download> click. Auth/401
+  // handling reuses handleResponse for the error path, but success returns
+  // nothing (the browser save dialog is the "result").
+  download: async (path, defaultFilename) => {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers: { ...apiKeyHeaders, ...getAuthHeaders() },
+    });
+    if (!res.ok) {
+      await handleResponse(res); // reuses the same error-shaping/401 redirect logic
+      return;
+    }
+    const filename = filenameFromDisposition(res, defaultFilename);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+>>>>>>> 87432db (New Dashboard)
 };
 

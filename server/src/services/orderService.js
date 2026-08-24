@@ -40,7 +40,7 @@ function deliveryPostcode(doc) {
 // Processor" widget silently drops a real processor's count back to 0 (only
 // names in THIS list get a key in getDashboardSummary's releasedByProcessor
 // map below).
-export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Shashwat'];
+export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Shashwat', 'Gagandeep'];
 
 // Map the stored (snake_case) document to the API DTO (camelCase).
 export function toDto(doc) {
@@ -59,12 +59,25 @@ export function toDto(doc) {
     resolutionStatus: doc.resolution_status,
     // 'HTML' for orders saved before V3.1 (Manual Order Creation) — undefined reads as HTML.
     orderSource: doc.order_source || 'HTML',
+    // '' for orders not yet backfilled by migrateOrderChannel.js — display-
+    // only, never written to the DB (V3.5). Distinct from orderSource above.
+    orderChannel: doc.order_channel || '',
     parsedData: doc.parsed_data,
     resolutionData: doc.resolution_data,
     productComments: doc.product_comments || {},
     productFulfillment: doc.product_fulfillment || {},
     // Older orders have no product_notes field — treat as empty (V1.7).
     productNotes: doc.product_notes || {},
+    // Orders whose status hasn't landed yet (the brief window between the
+    // core save and the follow-up setOrderStatus call, or a failed one) show
+    // as '' — display-only, never written to the DB. No 'Unknown' fallback
+    // (V3.3): the frontend renders '' as a plain "—", not a fake status.
+    orderStatus: doc.order_status || '',
+    orderComment: doc.order_comment || '',
+    // Falls back to the legacy Manual Order Creation location (parsed_data.
+    // order_info.delivery_date) for orders saved before delivery_date became
+    // its own top-level field (V4.2) — display-only, never written back.
+    deliveryDate: doc.delivery_date || doc.parsed_data?.order_info?.delivery_date || '',
   };
 }
 
@@ -83,8 +96,16 @@ export function toSummaryDto(doc) {
     totalProducts: doc.total_products,
     resolutionStatus: doc.resolution_status,
     orderSource: doc.order_source || 'HTML',
+    orderChannel: doc.order_channel || '',
   };
 }
+
+// Order Channel values (V3.5) — see order_channel's schema comment for why
+// this is separate from ORDER_SOURCES/order_source below. Never presented as
+// a user-facing choice (upsertOrder derives it automatically); exported only
+// so migrateOrderChannel.js shares the exact same literal values as the
+// write path instead of re-declaring them.
+export const ORDER_CHANNELS = ['Orders - Email', 'Order - Kumkum'];
 
 // Create-or-update one order by Portal Order Ref No. Re-uploading the same ref
 // overwrites the previous snapshot (idempotent by design).
@@ -130,6 +151,13 @@ export async function upsertOrder({
   if (src) {
     set.order_source = src;
   }
+
+  // Order Channel (V3.5) — derived automatically from the SAME signal as
+  // order_source above, never asked of the user. Always included (both
+  // insert and every re-save/re-upload of an existing order) since it's a
+  // deterministic fact about the order that never changes — no default
+  // needed, and no risk of it silently drifting between saves.
+  set.order_channel = src === 'MANUAL' ? 'Order - Kumkum' : 'Orders - Email';
 
   const doc = await Order.findOneAndUpdate(
     { portal_order_ref: portalOrderRef },
@@ -179,6 +207,75 @@ export async function setProcessedBy(portalOrderRef, processedBy) {
   return toDto(doc);
 }
 
+// Overall order status (V3.2; 'Unknown' removed V3.3 — no order is ever
+// left in an unclassified legacy state anymore). Distinct from
+// PRODUCT_COMMENTS/DELIVERY_STATUSES: this is a single order-level field,
+// not a per-lineId map. 'Order Comments' removed V3.4 — no order ever used
+// it (verified against the live DB before removal); the dashboard's Order
+// Comments section is now driven by a non-empty order_comment instead.
+export const ORDER_STATUSES = [
+  'Order Released',
+  'Order Hold',
+  'Order Cancelled',
+  'Order Released but Problem',
+];
+
+// Longest accepted Order Comment (mirrors NOTE_MAX_LENGTH's per-product cap).
+export const ORDER_COMMENT_MAX_LENGTH = 2000;
+
+// Set the overall Order Status + Order Comment (V3.2). Both are order-level,
+// independent of every per-product field (Item Status, Reason, Comments).
+// orderStatus must be one of ORDER_STATUSES — arbitrary values (including
+// 'Unknown') are rejected. orderComment is optional free text.
+export async function setOrderStatus(portalOrderRef, { orderStatus, orderComment } = {}) {
+  if (!ORDER_STATUSES.includes(orderStatus)) {
+    throw new AppError('VALIDATION_ERROR', `Order Status must be one of: ${ORDER_STATUSES.join(', ')}.`, {
+      status: 400,
+      details: [{ field: 'orderStatus', issue: 'invalid value' }],
+    });
+  }
+
+  const comment = orderComment === null || orderComment === undefined ? '' : String(orderComment);
+  const trimmed = comment.trim();
+  if (trimmed.length > ORDER_COMMENT_MAX_LENGTH) {
+    throw new AppError('VALIDATION_ERROR', `Order Comment must be ${ORDER_COMMENT_MAX_LENGTH} characters or fewer.`, {
+      status: 400,
+      details: [{ field: 'orderComment', issue: `max ${ORDER_COMMENT_MAX_LENGTH} characters` }],
+    });
+  }
+
+  const doc = await Order.findOneAndUpdate(
+    { portal_order_ref: portalOrderRef },
+    { $set: { order_status: orderStatus, order_comment: trimmed } },
+    { new: true }
+  );
+  if (!doc) {
+    throw new AppError('NOT_FOUND', `No order found with Portal Order Ref "${portalOrderRef}".`, {
+      status: 404,
+    });
+  }
+  return toDto(doc);
+}
+
+// Set (or clear, with '') the order's Delivery Date (V4.2). Plain free text
+// like order_date — no fixed format enforced, and no requirement (unlike
+// Order Status). Editable at any time, independent of the initial save.
+export async function setDeliveryDate(portalOrderRef, deliveryDate) {
+  const value = deliveryDate === null || deliveryDate === undefined ? '' : String(deliveryDate).trim();
+
+  const doc = await Order.findOneAndUpdate(
+    { portal_order_ref: portalOrderRef },
+    { $set: { delivery_date: value } },
+    { new: true }
+  );
+  if (!doc) {
+    throw new AppError('NOT_FOUND', `No order found with Portal Order Ref "${portalOrderRef}".`, {
+      status: 404,
+    });
+  }
+  return toDto(doc);
+}
+
 // Update only the resolution snapshot (used after a product is approved) and
 // recompute the derived order status.
 export async function updateResolution(portalOrderRef, resolutionData) {
@@ -198,12 +295,48 @@ export async function updateResolution(portalOrderRef, resolutionData) {
   return toDto(doc);
 }
 
-// The only per-product comment values the platform knows. 'Not Found' (V2.1)
-// marks matching as intentionally skipped for THIS order only — it is stored
-// exactly like the other comments and deliberately has NO effect anywhere
-// else: it never creates an Approved Mapping, never touches the Product
-// Catalog, and never influences the matching engine or future orders.
-export const PRODUCT_COMMENTS = ['Released', 'OS', 'Not Found'];
+// The per-product Reason values selectable going forward (V3.2). 'Released'
+// was removed from this set — that concept now belongs to the per-product
+// Item Status (product_fulfillment.status) instead, to avoid two fields
+// meaning the same thing. Existing orders with a stored 'Released' comment
+// are NOT migrated or blocked: setProductComments only validates new writes,
+// and the frontend's commentMeta() still renders the legacy value correctly
+// wherever it's displayed — it just can't be chosen again from the dropdown.
+// 'Not Found' (V2.1) marks matching as intentionally skipped for THIS order
+// only — it is stored exactly like 'OS' and deliberately has NO effect
+// anywhere else: it never creates an Approved Mapping, never touches the
+// Product Catalog, and never influences the matching engine or future orders.
+export const PRODUCT_COMMENTS = ['OS', 'Not Found'];
+
+// Discount dashboard section (V4.7 — new, additive, read-only). An order is
+// classified into exactly ONE of these buckets, derived live from its
+// stored parsed_data — nothing new to write or backfill, so every past AND
+// future order is covered automatically:
+//   'sales_rep' — a discount row in parsed_data.financials.discounts (or the
+//                 legacy singular discount/discount_label pair) whose label
+//                 mentions "Sales Rep"
+//   'rdd'       — same, but the label mentions "Range Density"/"RDD"
+//   'both'      — an order with at least one discount row of EACH kind above
+//   'other'     — no financials discount row of either kind, but the word
+//                 "Discount" appears in the order's Additional Comment
+// An order with none of the above simply doesn't belong to this section at
+// all (matches no bucket) — see DISCOUNT_BUCKET_EXPR below.
+export const DISCOUNT_BUCKETS = ['sales_rep', 'rdd', 'both', 'other'];
+
+// Legacy comment value no longer selectable (see above) but still counted,
+// alongside the Item Status 'delivered' value, toward the Dashboard's
+// "Released" signal — see getDashboardSummary's released_by_processor facet.
+const LEGACY_RELEASED_COMMENT = 'Released';
+
+// Values setProductComments accepts on WRITE — a superset of the selectable
+// PRODUCT_COMMENTS. The saved-order edit UI always resubmits every line's
+// CURRENT comment on save, not just the ones the user actually changed, so
+// an untouched legacy 'Released' line must still round-trip successfully
+// (rejecting it would make it impossible to edit any other field on an
+// order that has ANY 'Released' line — a real regression, not a feature).
+// New selections still can't produce 'Released' since it's absent from the
+// PRODUCT_COMMENTS the dropdown is built from.
+const PRODUCT_COMMENTS_WRITE_ALLOWED = [...PRODUCT_COMMENTS, LEGACY_RELEASED_COMMENT];
 
 // Merge per-product comments into an order without touching anything else.
 // `comments` = { [lineId]: 'Released' | 'OS' | 'N/A' | 'Not Found' | null } —
@@ -216,7 +349,7 @@ export async function setProductComments(portalOrderRef, comments) {
     if (value === null || value === undefined || String(value).trim() === '') {
       unset[key] = '';
     } else {
-      if (!PRODUCT_COMMENTS.includes(value)) {
+      if (!PRODUCT_COMMENTS_WRITE_ALLOWED.includes(value)) {
         throw new AppError('VALIDATION_ERROR', `Comment must be one of: ${PRODUCT_COMMENTS.join(', ')}.`, {
           status: 400,
           details: [{ field: `comments.${lineId}`, issue: 'invalid value' }],
@@ -436,6 +569,99 @@ function mapEntries(field) {
   };
 }
 
+// Classifies one order into a DISCOUNT_BUCKETS value (or null). Self-
+// contained ($let all the way down) so it works standalone inside the
+// $project stage below regardless of same-stage field-reference quirks.
+const DISCOUNT_BUCKET_EXPR = {
+  $let: {
+    vars: {
+      // Every discount row's label, lower-cased. Prefers the `discounts`
+      // array (every row an order has, V1.10); falls back to the legacy
+      // singular discount/discount_label pair for older-shaped snapshots
+      // that predate that array but still recorded exactly one discount.
+      labels: {
+        $let: {
+          vars: { arr: { $ifNull: ['$parsed_data.financials.discounts', []] } },
+          in: {
+            $cond: [
+              { $gt: [{ $size: '$$arr' }, 0] },
+              { $map: { input: '$$arr', as: 'd', in: { $toLower: { $ifNull: ['$$d.label', ''] } } } },
+              {
+                $cond: [
+                  { $ne: [{ $ifNull: ['$parsed_data.financials.discount', 0] }, 0] },
+                  [{ $toLower: { $ifNull: ['$parsed_data.financials.discount_label', ''] } }],
+                  [],
+                ],
+              },
+            ],
+          },
+        },
+      },
+    },
+    in: {
+      $let: {
+        vars: {
+          hasSalesRep: {
+            $gt: [
+              {
+                $size: {
+                  $filter: {
+                    input: '$$labels',
+                    as: 'l',
+                    cond: { $regexMatch: { input: '$$l', regex: 'sales\\s*rep', options: 'i' } },
+                  },
+                },
+              },
+              0,
+            ],
+          },
+          hasRdd: {
+            $gt: [
+              {
+                $size: {
+                  $filter: {
+                    input: '$$labels',
+                    as: 'l',
+                    cond: {
+                      $or: [
+                        { $regexMatch: { input: '$$l', regex: 'range\\s*density', options: 'i' } },
+                        { $regexMatch: { input: '$$l', regex: '\\brdd\\b', options: 'i' } },
+                      ],
+                    },
+                  },
+                },
+              },
+              0,
+            ],
+          },
+        },
+        in: {
+          $switch: {
+            branches: [
+              { case: { $and: ['$$hasSalesRep', '$$hasRdd'] }, then: 'both' },
+              { case: '$$hasSalesRep', then: 'sales_rep' },
+              { case: '$$hasRdd', then: 'rdd' },
+              {
+                // 'other' (V4.7): no financials discount row of either kind,
+                // but the word "Discount" appears in the Additional Comment.
+                case: {
+                  $regexMatch: {
+                    input: { $toLower: { $ifNull: ['$parsed_data.order_info.additional_comments', ''] } },
+                    regex: 'discount',
+                    options: 'i',
+                  },
+                },
+                then: 'other',
+              },
+            ],
+            default: null,
+          },
+        },
+      },
+    },
+  },
+};
+
 // Shared first stage: strip each order to the summary fields the dashboard
 // cards need, plus flat arrays of its products' delivery statuses / comments.
 // parsed_data / resolution_data are dropped immediately so the heavy blobs
@@ -451,8 +677,62 @@ const DASHBOARD_FIELDS_STAGE = {
     resolution_status: 1,
     delivery_statuses: { $map: { input: mapEntries('product_fulfillment'), as: 'e', in: '$$e.v.status' } },
     comment_values: { $map: { input: mapEntries('product_comments'), as: 'e', in: '$$e.v' } },
+    // Fulfillment/comment entry arrays kept for item-level counting (V4 dashboard).
+    _fulfillment_entries: mapEntries('product_fulfillment'),
+    _comment_entries: mapEntries('product_comments'),
+    // Direct scalar field (not a per-line map). No 'Unknown' fallback here
+    // (V3.3) — an order with no status set simply matches none of the
+    // dashboard's order-status buckets until it actually has one.
+    order_status: 1,
+    // Free-text order-level comment (V3.2) — projected for the Order
+    // Comments dashboard section (V3.4), which matches on non-empty text
+    // rather than a fixed value like the buckets above.
+    order_comment: 1,
+    // Order Channel (V3.5) — 'Orders - Email' | 'Order - Kumkum'.
+    order_channel: 1,
+    // Discount dashboard section (V4.7) — see DISCOUNT_BUCKET_EXPR above.
+    discount_bucket: DISCOUNT_BUCKET_EXPR,
+    // Delivery date (V4 dashboard). Prefers the top-level field (V4.2,
+    // directly editable) when it's actually set; falls back to the legacy
+    // Manual Order Creation location for orders saved before that field
+    // existed. NOTE: can't use a plain $ifNull chain here — the schema
+    // default makes delivery_date '' (present, not null) on every order that
+    // has never had one set, which would short-circuit $ifNull before ever
+    // reaching the fallback.
+    delivery_date: {
+      $cond: [
+        { $and: [{ $ne: ['$delivery_date', null] }, { $ne: ['$delivery_date', ''] }] },
+        '$delivery_date',
+        { $ifNull: ['$parsed_data.order_info.delivery_date', ''] },
+      ],
+    },
+    // Resolution results — projected only for unique-item counting; the
+    // heavy per-candidate arrays are NOT included (only match.itemNo).
+    _resolution_item_nos: {
+      $map: {
+        input: {
+          $cond: [
+            { $isArray: '$resolution_data.results' },
+            '$resolution_data.results',
+            [],
+          ],
+        },
+        as: 'r',
+        in: '$$r.match.itemNo',
+      },
+    },
   },
 };
+
+// Presence check for the Order Comments dashboard section (V3.4) — an order
+// belongs here when it has a real, non-empty Order Comment. Unlike the
+// buckets above (fixed enum value equality) this matches on non-emptiness,
+// so it isn't expressed through the bucket()/DASHBOARD_ORDER_STATUSES
+// machinery.
+const HAS_ORDER_COMMENT_MATCH = { order_comment: { $exists: true, $ne: '' } };
+
+// Order Status dashboard buckets (V3.2; 'Unknown' bucket removed V3.3).
+const DASHBOARD_ORDER_STATUSES = ORDER_STATUSES;
 
 // Map a dashboard-projected document to the card DTO. Deliberately lean —
 // exactly what an order card renders (ref, customer, processed by, date).
@@ -467,6 +747,11 @@ function toDashboardCardDto(doc) {
       doc.upload_timestamp instanceof Date ? doc.upload_timestamp.toISOString() : doc.upload_timestamp,
     totalProducts: doc.total_products ?? 0,
     resolutionStatus: doc.resolution_status || 'needs_review',
+    // Only meaningful for the Order Comments section (V3.4); harmless '' on
+    // every other card, which never reads this field.
+    orderComment: doc.order_comment || '',
+    // Delivery date from the parsed email (V4 dashboard).
+    deliveryDate: doc.delivery_date || '',
   };
 }
 
@@ -494,6 +779,14 @@ export async function getDashboardSummary({ previewLimit } = {}) {
   };
   DELIVERY_STATUSES.forEach((status, i) => bucket(`s${i}`, 'delivery_statuses', status));
   PRODUCT_COMMENTS.forEach((comment, i) => bucket(`c${i}`, 'comment_values', comment));
+  DASHBOARD_ORDER_STATUSES.forEach((status, i) => bucket(`os${i}`, 'order_status', status));
+  DISCOUNT_BUCKETS.forEach((value, i) => bucket(`disc${i}`, 'discount_bucket', value));
+
+  // Order Comments section (V3.4) — a single bucket keyed on presence of a
+  // non-empty order_comment, not a fixed value, so it can't go through the
+  // bucket() helper above.
+  facets.ocm_orders = [{ $match: HAS_ORDER_COMMENT_MATCH }, { $sort: { upload_timestamp: -1 } }, { $limit: limit }];
+  facets.ocm_count = [{ $match: HAS_ORDER_COMMENT_MATCH }, { $count: 'n' }];
 
   // Overview stats — total orders, orders uploaded today, and Released orders
   // broken down by processor — power the three summary cards atop the page.
@@ -501,9 +794,105 @@ export async function getDashboardSummary({ previewLimit } = {}) {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   facets.today_count = [{ $match: { upload_timestamp: { $gte: startOfToday } } }, { $count: 'n' }];
+  // 'Released' signal (V3.2): union of the legacy per-product comment value
+  // and the current Item Status 'delivered' value (product_fulfillment.status
+  // — displayed as "Released"), since Reason can no longer produce 'Released'
+  // for new orders. Historical orders keep counting via either signal; future
+  // orders count via the delivery-status signal only.
   facets.released_by_processor = [
-    { $match: { comment_values: 'Released' } },
+    { $match: { $or: [{ comment_values: LEGACY_RELEASED_COMMENT }, { delivery_statuses: 'delivered' }] } },
     { $group: { _id: '$processed_by', n: { $sum: 1 } } },
+  ];
+
+  // ── V4 dashboard facets ──────────────────────────────────────────────
+
+  // Channel counts — 'Orders - Email' / 'Order - Kumkum' (V3.5 field).
+  facets.channel_counts = [
+    { $group: { _id: '$order_channel', n: { $sum: 1 } } },
+  ];
+
+  // Total items = sum of total_products across all orders.
+  facets.total_items = [
+    { $group: { _id: null, n: { $sum: '$total_products' } } },
+  ];
+
+  // Unique items = distinct matched item numbers from resolution results.
+  facets.unique_items = [
+    { $unwind: '$_resolution_item_nos' },
+    { $match: { _resolution_item_nos: { $ne: null } } },
+    { $group: { _id: '$_resolution_item_nos' } },
+    { $count: 'n' },
+  ];
+
+  // Item-level status counts — flatten product_fulfillment entries and
+  // count each status value (delivered/half_delivered/not_delivered).
+  facets.item_status_counts = [
+    { $unwind: '$_fulfillment_entries' },
+    { $match: { '_fulfillment_entries.v.status': { $in: DELIVERY_STATUSES } } },
+    { $group: { _id: '$_fulfillment_entries.v.status', n: { $sum: 1 } } },
+  ];
+
+  // Item-level reason counts — flatten product_comments entries and count
+  // each reason value (OS / Not Found).
+  facets.item_reason_counts = [
+    { $unwind: '$_comment_entries' },
+    { $match: { '_comment_entries.v': { $in: PRODUCT_COMMENTS } } },
+    { $group: { _id: '$_comment_entries.v', n: { $sum: 1 } } },
+  ];
+
+  // Delivery dates — group by delivery_date, count orders per date, return
+  // the top 10 nearest upcoming dates (or most recent past) with previews.
+  facets.delivery_dates = [
+    // NOTE: was written as { $ne: '', $ne: null } — a JS object literal with
+    // a duplicate key, so the first $ne silently lost to the second and
+    // empty-string delivery dates were never actually excluded. $nin fixes
+    // it without the duplicate-key trap.
+    { $match: { delivery_date: { $exists: true, $nin: ['', null] } } },
+    { $sort: { upload_timestamp: -1 } },
+    {
+      $group: {
+        _id: '$delivery_date',
+        count: { $sum: 1 },
+        orders: { $push: '$$ROOT' },
+      },
+    },
+    { $sort: { _id: -1 } },
+    { $limit: 10 },
+    {
+      $project: {
+        _id: 1,
+        count: 1,
+        orders: { $slice: ['$orders', limit] },
+      },
+    },
+  ];
+
+  // Today's orders by processor — same startOfToday, grouped by processed_by.
+  facets.today_by_processor = [
+    { $match: { upload_timestamp: { $gte: startOfToday } } },
+    { $group: { _id: '$processed_by', n: { $sum: 1 } } },
+  ];
+
+  // All orders by processor — for the Employee section.
+  facets.all_by_processor = [
+    { $group: { _id: '$processed_by', n: { $sum: 1 } } },
+  ];
+
+  // Today's orders preview (latest 5 for the card).
+  facets.today_orders_preview = [
+    { $match: { upload_timestamp: { $gte: startOfToday } } },
+    { $sort: { upload_timestamp: -1 } },
+    { $limit: limit },
+  ];
+
+  // Last 7 days' daily order counts (incl. today) — powers the Today's
+  // Orders card's trend sparkline. Real data, not decorative: grouped by
+  // calendar day on upload_timestamp.
+  const sevenDaysAgo = new Date(startOfToday);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  facets.last_7_days = [
+    { $match: { upload_timestamp: { $gte: sevenDaysAgo } } },
+    { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$upload_timestamp' } }, n: { $sum: 1 } } },
   ];
 
   const [agg] = await Order.aggregate([DASHBOARD_FIELDS_STAGE, { $facet: facets }]);
@@ -520,6 +909,71 @@ export async function getDashboardSummary({ previewLimit } = {}) {
     if (row._id in releasedByProcessor) releasedByProcessor[row._id] = row.n;
   }
 
+  // ── V4 — assemble new dashboard fields ──────────────────────────────
+
+  // Channel counts
+  const channelCounts = {};
+  for (const ch of ORDER_CHANNELS) channelCounts[ch] = 0;
+  for (const row of agg.channel_counts || []) {
+    if (row._id && row._id in channelCounts) channelCounts[row._id] = row.n;
+  }
+
+  // Item-level status counts
+  const itemStatusCounts = {};
+  for (const s of DELIVERY_STATUSES) itemStatusCounts[s] = 0;
+  for (const row of agg.item_status_counts || []) {
+    if (row._id in itemStatusCounts) itemStatusCounts[row._id] = row.n;
+  }
+
+  // Item-level reason counts
+  const itemReasonCounts = {};
+  for (const c of PRODUCT_COMMENTS) itemReasonCounts[c] = 0;
+  for (const row of agg.item_reason_counts || []) {
+    if (row._id in itemReasonCounts) itemReasonCounts[row._id] = row.n;
+  }
+
+  // Delivery dates (sorted newest-first by the date string — proper date
+  // comparison handled below; the pipeline already sorts _id descending).
+  const deliveryDates = (agg.delivery_dates || []).map((g) => ({
+    date: g._id,
+    count: g.count,
+    orders: (g.orders || []).map(toDashboardCardDto),
+  }));
+  // Sort delivery dates chronologically (nearest upcoming first). Attempt
+  // Date.parse — if the strings are ISO or common date formats it works;
+  // otherwise fall back to lexicographic (still better than random).
+  deliveryDates.sort((a, b) => {
+    const da = new Date(a.date);
+    const db = new Date(b.date);
+    if (!isNaN(da) && !isNaN(db)) return db - da;
+    return a.date > b.date ? -1 : a.date < b.date ? 1 : 0;
+  });
+
+  // Today by processor
+  const todayByProcessor = {};
+  for (const user of PROCESSED_BY_USERS) todayByProcessor[user] = 0;
+  for (const row of agg.today_by_processor || []) {
+    if (row._id && row._id in todayByProcessor) todayByProcessor[row._id] = row.n;
+  }
+
+  // All orders by processor (Employee section)
+  const allByProcessor = {};
+  for (const user of PROCESSED_BY_USERS) allByProcessor[user] = 0;
+  for (const row of agg.all_by_processor || []) {
+    if (row._id && row._id in allByProcessor) allByProcessor[row._id] = row.n;
+  }
+
+  // Last 7 days — fill every day (including zero-order days) so the
+  // sparkline always has exactly 7 points in chronological order.
+  const byDay = new Map((agg.last_7_days || []).map((row) => [row._id, row.n]));
+  const last7Days = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    const d = new Date(startOfToday);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    last7Days.push({ date: key, count: byDay.get(key) || 0 });
+  }
+
   return {
     previewLimit: limit,
     totalOrders: agg.total_count?.[0]?.n ?? 0,
@@ -527,49 +981,226 @@ export async function getDashboardSummary({ previewLimit } = {}) {
     releasedByProcessor,
     statuses: DELIVERY_STATUSES.map((status, i) => readBucket(`s${i}`, status)),
     comments: PRODUCT_COMMENTS.map((comment, i) => readBucket(`c${i}`, comment)),
+    orderStatuses: DASHBOARD_ORDER_STATUSES.map((status, i) => readBucket(`os${i}`, status)),
+    // Discount section (V4.7) — see DISCOUNT_BUCKETS/DISCOUNT_BUCKET_EXPR.
+    discountBuckets: DISCOUNT_BUCKETS.map((value, i) => readBucket(`disc${i}`, value)),
+    // Single bucket, not one per DASHBOARD_ORDER_STATUSES-style value —
+    // "has an Order Comment" is the only state this section tracks.
+    orderComments: readBucket('ocm', 'has'),
+    // V4 dashboard additions
+    channelCounts,
+    totalItems: agg.total_items?.[0]?.n ?? 0,
+    uniqueItems: agg.unique_items?.[0]?.n ?? 0,
+    itemStatusCounts,
+    itemReasonCounts,
+    deliveryDates,
+    todayByProcessor,
+    allByProcessor,
+    todayOrdersPreview: (agg.today_orders_preview || []).map(toDashboardCardDto),
+    last7Days,
   };
 }
 
-// Full filtered list for a single dashboard bucket ("View All"), paginated.
-// `type` = 'status' (delivery status) | 'comment' (product comment); `value`
-// is validated against the platform's known values so the match can never be
-// driven by arbitrary input.
-export async function listDashboardOrders({ type, value, page, limit } = {}) {
-  const known = { status: DELIVERY_STATUSES, comment: PRODUCT_COMMENTS };
-  const allowed = known[type];
-  if (!allowed) {
-    throw new AppError('VALIDATION_ERROR', "type must be 'status' or 'comment'.", {
-      status: 400,
-      details: [{ field: 'type', issue: 'invalid value' }],
-    });
-  }
-  if (!allowed.includes(value)) {
-    throw new AppError('VALIDATION_ERROR', `value must be one of: ${allowed.join(', ')}.`, {
-      status: 400,
-      details: [{ field: 'value', issue: 'invalid value' }],
-    });
-  }
-
-  const pageN = clampInt(page, 1, 1, 100000);
-  const limitN = clampInt(limit, 25, 1, 100);
-  const matchField = type === 'status' ? 'delivery_statuses' : 'comment_values';
-
-  const [agg] = await Order.aggregate([
-    DASHBOARD_FIELDS_STAGE,
-    { $match: { [matchField]: value } },
-    { $sort: { upload_timestamp: -1 } },
+// Full dataset for the "Export Dashboard" workbook (V4.8, read-only). One
+// aggregation pass fetches every order with exactly what every sheet needs —
+// order-level fields, the discount bucket (same DISCOUNT_BUCKET_EXPR the
+// dashboard/View-All use, so the workbook can never disagree with what's on
+// screen), and the raw line items + per-line comments/fulfillment/resolution
+// match so the "All Items"/"Unique Items" sheets can be built without a
+// second query. Deliberately NOT paginated — a full report needs every order,
+// and 500-600 orders is small enough to hold in memory once.
+export async function getDashboardExportOrders() {
+  const docs = await Order.aggregate([
     {
-      $facet: {
-        data: [{ $skip: (pageN - 1) * limitN }, { $limit: limitN }],
-        count: [{ $count: 'n' }],
+      $project: {
+        portal_order_ref: 1,
+        customer_name: 1,
+        processed_by: 1,
+        order_date: 1,
+        order_status: 1,
+        order_channel: 1,
+        order_comment: 1,
+        total_products: 1,
+        delivery_date: {
+          $cond: [
+            { $and: [{ $ne: ['$delivery_date', null] }, { $ne: ['$delivery_date', ''] }] },
+            '$delivery_date',
+            { $ifNull: ['$parsed_data.order_info.delivery_date', ''] },
+          ],
+        },
+        discount_bucket: DISCOUNT_BUCKET_EXPR,
+        line_items: { $ifNull: ['$parsed_data.line_items', []] },
+        product_comments: { $ifNull: ['$product_comments', {}] },
+        product_fulfillment: { $ifNull: ['$product_fulfillment', {}] },
+        product_notes: { $ifNull: ['$product_notes', {}] },
+        resolution_results: { $ifNull: ['$resolution_data.results', []] },
       },
     },
   ]);
 
+  // Numeric refs sort naturally (100 after 99); non-numeric ones (the
+  // "KS-..." Kumkum refs) sort alphabetically after every numeric one.
+  docs.sort((a, b) => {
+    const na = Number(a.portal_order_ref);
+    const nb = Number(b.portal_order_ref);
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+    if (Number.isFinite(na)) return -1;
+    if (Number.isFinite(nb)) return 1;
+    return String(a.portal_order_ref).localeCompare(String(b.portal_order_ref));
+  });
+
+  return docs;
+}
+
+// Full filtered list for a single dashboard bucket ("View All"), paginated.
+// `type` = 'status' | 'comment' | 'orderStatus' | 'orderComment' |
+// 'deliveryDate' | 'today' | 'todayProcessor' | 'allOrders' | 'processor'
+// (V4 dashboard additions); `value` is validated against the platform's
+// known values so the match can never be driven by arbitrary input.
+// Column -> computed sort key for the "View All" list (V4.1). portal_order_ref
+// is a numeric-looking String, so a plain string sort would put "100" before
+// "99" — converted to a number instead. customer/processedBy are
+// lower-cased so sort order isn't case-sensitive. 'orderDate' sorts by the
+// actual order_date value shown in that column (DD/MM/YYYY, verified
+// consistent across all 472 existing orders), rearranged to YYYYMMDD so it
+// sorts chronologically instead of lexicographically (a plain string sort
+// would put "22/06/2026" before "16/08/2026"). Malformed/blank values (not
+// currently present, but not schema-guaranteed) sort to the front in
+// ascending order rather than crashing the aggregation.
+const ORDER_DATE_SORT_KEY = {
+  $let: {
+    vars: { d: { $ifNull: ['$order_date', ''] } },
+    in: {
+      $cond: [
+        { $eq: [{ $strLenCP: '$$d' }, 10] },
+        { $concat: [{ $substrCP: ['$$d', 6, 4] }, { $substrCP: ['$$d', 3, 2] }, { $substrCP: ['$$d', 0, 2] }] },
+        '',
+      ],
+    },
+  },
+};
+const SORT_KEY_EXPR = {
+  ref: { $convert: { input: '$portal_order_ref', to: 'int', onError: 0, onNull: 0 } },
+  customer: { $toLower: { $ifNull: ['$customer_name', ''] } },
+  processedBy: { $toLower: { $ifNull: ['$processed_by', ''] } },
+  orderDate: ORDER_DATE_SORT_KEY,
+  products: { $ifNull: ['$total_products', 0] },
+};
+
+export async function listDashboardOrders({ type, value, page, limit, sortBy, sortDir } = {}) {
+  // Security: `type`/`value` come straight from req.query, and Express's
+  // default query parser turns bracket-notation like `?value[$ne]=` into a
+  // nested OBJECT ({ $ne: '' }), not a string. Every branch below either
+  // puts `value` directly into a Mongo $match object or compares it against
+  // a whitelist — an unstripped object would let a caller inject arbitrary
+  // Mongo operators into the filter (confirmed exploitable: it bypassed the
+  // deliveryDate filter entirely and matched hundreds of unrelated orders).
+  // Forcing both to plain strings up front closes that for every branch at
+  // once, since a legitimate type/value is never anything but a string.
+  type = type === undefined || type === null ? '' : String(type);
+  value = value === undefined || value === null ? '' : String(value);
+
+  const pageN = clampInt(page, 1, 1, 100000);
+  const limitN = clampInt(limit, 25, 1, 100);
+  const sortKeyExpr = SORT_KEY_EXPR[sortBy];
+  const dir = sortDir === 'asc' ? 1 : -1;
+
+  let matchStage;
+  if (type === 'orderComment') {
+    if (value !== 'has') {
+      throw new AppError('VALIDATION_ERROR', "value must be 'has'.", {
+        status: 400,
+        details: [{ field: 'value', issue: 'invalid value' }],
+      });
+    }
+    matchStage = HAS_ORDER_COMMENT_MATCH;
+  } else if (type === 'deliveryDate') {
+    // Filter by a specific delivery date string.
+    if (!value) {
+      throw new AppError('VALIDATION_ERROR', 'value (delivery date) is required.', {
+        status: 400,
+        details: [{ field: 'value', issue: 'required' }],
+      });
+    }
+    matchStage = { delivery_date: value };
+  } else if (type === 'today') {
+    const sot = new Date(); sot.setHours(0, 0, 0, 0);
+    matchStage = { upload_timestamp: { $gte: sot } };
+  } else if (type === 'todayProcessor') {
+    if (!value) {
+      throw new AppError('VALIDATION_ERROR', 'value (processor name) is required.', {
+        status: 400,
+        details: [{ field: 'value', issue: 'required' }],
+      });
+    }
+    const sot = new Date(); sot.setHours(0, 0, 0, 0);
+    matchStage = { upload_timestamp: { $gte: sot }, processed_by: value };
+  } else if (type === 'allOrders') {
+    matchStage = {}; // no filter — all orders
+  } else if (type === 'processor') {
+    if (!value) {
+      throw new AppError('VALIDATION_ERROR', 'value (processor name) is required.', {
+        status: 400,
+        details: [{ field: 'value', issue: 'required' }],
+      });
+    }
+    matchStage = { processed_by: value };
+  } else {
+    const known = {
+      status: DELIVERY_STATUSES,
+      comment: PRODUCT_COMMENTS,
+      orderStatus: DASHBOARD_ORDER_STATUSES,
+      discount: DISCOUNT_BUCKETS,
+      channel: ORDER_CHANNELS,
+    };
+    const allowed = known[type];
+    if (!allowed) {
+      throw new AppError('VALIDATION_ERROR', "type must be 'status', 'comment', 'orderStatus', 'orderComment', 'discount', 'channel', 'deliveryDate', 'today', 'todayProcessor', 'allOrders', or 'processor'.", {
+        status: 400,
+        details: [{ field: 'type', issue: 'invalid value' }],
+      });
+    }
+    if (!allowed.includes(value)) {
+      throw new AppError('VALIDATION_ERROR', `value must be one of: ${allowed.join(', ')}.`, {
+        status: 400,
+        details: [{ field: 'value', issue: 'invalid value' }],
+      });
+    }
+    const matchField =
+      type === 'status'
+        ? 'delivery_statuses'
+        : type === 'comment'
+          ? 'comment_values'
+          : type === 'discount'
+            ? 'discount_bucket'
+            : type === 'channel'
+              ? 'order_channel'
+              : 'order_status';
+    matchStage = { [matchField]: value };
+  }
+
+  const pipeline = [DASHBOARD_FIELDS_STAGE, { $match: matchStage }];
+  if (sortKeyExpr) {
+    // Unrecognized sortBy falls through to the default below rather than
+    // erroring — sorting is a display nicety, not something a bad/unknown
+    // query param should ever 400 on.
+    pipeline.push({ $addFields: { _sortKey: sortKeyExpr } }, { $sort: { _sortKey: dir, upload_timestamp: -1 } });
+  } else {
+    pipeline.push({ $sort: { upload_timestamp: -1 } });
+  }
+  pipeline.push({
+    $facet: {
+      data: [{ $skip: (pageN - 1) * limitN }, { $limit: limitN }],
+      count: [{ $count: 'n' }],
+    },
+  });
+
+  const [agg] = await Order.aggregate(pipeline);
+
   const total = agg?.count?.[0]?.n ?? 0;
   return {
     data: (agg?.data || []).map(toDashboardCardDto),
-    meta: { type, value, total, page: pageN, limit: limitN, pages: Math.max(1, Math.ceil(total / limitN)) },
+    meta: { type, value, total, page: pageN, limit: limitN, pages: Math.max(1, Math.ceil(total / limitN)), sortBy: sortKeyExpr ? sortBy : null, sortDir: sortKeyExpr ? (dir === 1 ? 'asc' : 'desc') : null },
   };
 }
 

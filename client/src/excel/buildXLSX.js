@@ -6,7 +6,11 @@
 // ────────────────────────────────────────────────
 import * as XLSX from 'xlsx';
 
+<<<<<<< HEAD
 export function buildXLSX(d, resolution, comments = {}){
+=======
+export function buildXLSX(d, resolution, comments = {}, orderStatus = '', orderComment = '', deliveryDate = ''){
+>>>>>>> 87432db (New Dashboard)
   const wb=XLSX.utils.book_new();
   const inf=d.order_info||{},bil=d.billing_address||{},del=d.delivery_address||{},fin=d.financials||{};
   const items=d.line_items||[];
@@ -76,16 +80,33 @@ export function buildXLSX(d, resolution, comments = {}){
   };
 
   // Sheet 1 — Order Summary
+<<<<<<< HEAD
+=======
+  // Order Status / Order Comment (V3.2, order-level — distinct from the
+  // per-product Item Status / Reason / Comments): included only when a
+  // caller actually has them (a saved order); the review-flow's pre-save
+  // callers simply omit the args and these fall back to ''/''. No 'Unknown'
+  // fallback (V3.3) — every real order carries an actual status value.
+>>>>>>> 87432db (New Dashboard)
   add([
     ['ORDER SUMMARY'],[''],
     ['FIELD','VALUE'],
     ['Portal Order Ref No.',inf.order_ref||''],
     ['Customer ID',inf.customer_id||''],
     ['Order Date',inf.order_date||''],
+<<<<<<< HEAD
+=======
+    ['Delivery Date',deliveryDate||inf.delivery_date||''],
+>>>>>>> 87432db (New Dashboard)
     ['Representative',inf.representative||''],
     ['PO Number',inf.po_number||''],
     ['Payment Type',inf.payment_type||''],
     ['Additional Comments',inf.additional_comments||''],
+<<<<<<< HEAD
+=======
+    ['Order Status',orderStatus||''],
+    ['Order Comment',orderComment||''],
+>>>>>>> 87432db (New Dashboard)
   ],'Order Summary',[30,50],[{s:{r:0,c:0},e:{r:0,c:1}}]);
 
   // Sheet 2 — Addresses

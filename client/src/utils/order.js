@@ -29,6 +29,7 @@ export function deriveOrderStatus(results) {
 
 // Team members who can be assigned as an order's processor (V1.9). Order-level
 // identification only — deliberately NOT authentication or user management.
+<<<<<<< HEAD
 export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Shashwat'];
 
 // The per-product fulfilment comments the platform knows (V1.3).
@@ -40,6 +41,21 @@ export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehba
 //                 creates a mapping and never affects future orders — it is
 //                 stored exactly like the other comments (product_comments).
 export const PRODUCT_COMMENTS = ['Released', 'OS', 'Not Found'];
+=======
+export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Shashwat', 'Gagandeep'];
+
+// The per-product Reason values selectable going forward (V3.2).
+//   'OS'        — out of stock
+//   'Not Found' — product doesn't exist in our records and matching is
+//                 INTENTIONALLY skipped for THIS order only (V2.1). Never
+//                 creates a mapping and never affects future orders — it is
+//                 stored exactly like 'OS' (product_comments).
+// 'Released' was removed from this list — that concept now belongs to Item
+// Status (DELIVERY_STATUSES below) instead, so the two fields don't overlap.
+// Legacy orders that already have a stored 'Released' comment still display
+// it correctly via commentMeta() below; it just can't be re-selected.
+export const PRODUCT_COMMENTS = ['OS', 'Not Found'];
+>>>>>>> 87432db (New Dashboard)
 
 // The comment value that intentionally skips matching for the order (V2.1).
 export const NOT_FOUND_COMMENT = 'Not Found';
@@ -70,6 +86,7 @@ export function commentMeta(comment) {
   }
 }
 
+<<<<<<< HEAD
 // Per-product delivery statuses (V1.4): stored value + display label.
 export const DELIVERY_STATUSES = [
   { value: 'delivered', label: 'Delivered' },
@@ -78,15 +95,87 @@ export const DELIVERY_STATUSES = [
 ];
 
 // Human label + style token for a delivery status (badge rendering).
+=======
+// Per-product Item Status (V1.4, relabeled V3.2): stored value + display
+// label. Stored values (delivered/half_delivered/not_delivered) are
+// UNCHANGED for backward compatibility — only the display labels changed,
+// from Delivered/Half Delivered/Not Delivered to Released/Half Released/Not
+// Released, to match the renamed "Item Status" column.
+export const DELIVERY_STATUSES = [
+  { value: 'delivered', label: 'Released' },
+  { value: 'half_delivered', label: 'Half Released' },
+  { value: 'not_delivered', label: 'Not Released' },
+];
+
+// Human label + style token for an Item Status (badge rendering).
+>>>>>>> 87432db (New Dashboard)
 //   delivered → green, half_delivered → yellow, not_delivered → red.
 export function deliveryMeta(status) {
   switch (status) {
     case 'delivered':
+<<<<<<< HEAD
       return { label: 'Delivered', tone: 'delivered' };
     case 'half_delivered':
       return { label: 'Half Delivered', tone: 'half' };
     case 'not_delivered':
       return { label: 'Not Delivered', tone: 'not' };
+=======
+      return { label: 'Released', tone: 'delivered' };
+    case 'half_delivered':
+      return { label: 'Half Released', tone: 'half' };
+    case 'not_delivered':
+      return { label: 'Not Released', tone: 'not' };
+    default:
+      return null;
+  }
+}
+
+// Overall Order Status (V3.2; extended V3.3) — distinct from the per-product
+// Item Status above. 'Unknown' removed V3.3 — every order now carries a
+// real value from this list. 'Order Comments' removed V3.4 — it collided
+// with the free-text Order Comment field and is superseded by the
+// dashboard's dedicated Order Comments section (driven by non-empty
+// order_comment, not by this status enum). No stored order ever used this
+// value, so no display fallback is needed for it.
+export const ORDER_STATUSES = [
+  'Order Released',
+  'Order Hold',
+  'Order Cancelled',
+  'Order Released but Problem',
+];
+
+// Human label + style token for the overall Order Status (badge rendering).
+export function orderStatusMeta(status) {
+  switch (status) {
+    case 'Order Released':
+      return { label: 'Order Released', tone: 'released' };
+    case 'Order Hold':
+      return { label: 'Order Hold', tone: 'hold' };
+    case 'Order Cancelled':
+      return { label: 'Order Cancelled', tone: 'cancelled' };
+    case 'Order Released but Problem':
+      return { label: 'Order Released but Problem', tone: 'problem' };
+    default:
+      return null;
+  }
+}
+
+// Discount dashboard section (V4.7) — see DISCOUNT_BUCKETS in the server's
+// orderService.js for the classification rules (the client only needs the
+// display labels below, never the bucket list itself). Colours mirror the
+// Order Status tones (green/yellow/red/blue) purely for visual reuse — the
+// underlying meaning is unrelated to Order Status.
+export function discountBucketMeta(value) {
+  switch (value) {
+    case 'sales_rep':
+      return { label: 'Sales Rep Special Discount', tone: 'released' };
+    case 'rdd':
+      return { label: 'RDD - Range Density Discount', tone: 'hold' };
+    case 'both':
+      return { label: 'Both or Combined Discounts', tone: 'cancelled' };
+    case 'other':
+      return { label: 'Other Discount', tone: 'problem' };
+>>>>>>> 87432db (New Dashboard)
     default:
       return null;
   }

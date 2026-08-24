@@ -4,7 +4,11 @@ import { mappingService } from '../services/mappingService.js';
 import { catalogService } from '../services/catalogService.js';
 import { orderService } from '../services/orderService.js';
 import { appendManualProduct } from '../utils/manualProduct.js';
+<<<<<<< HEAD
 import { portalOrderRef } from '../utils/order.js';
+=======
+import { portalOrderRef, ORDER_STATUSES } from '../utils/order.js';
+>>>>>>> 87432db (New Dashboard)
 import {
   emptyAddress,
   emptyProductRow,
@@ -38,6 +42,14 @@ export function useManualOrderForm() {
   const [productRows, setProductRows] = useState([emptyProductRow()]);
   const [masterTotalRows, setMasterTotalRows] = useState([emptyMasterTotalRow()]);
 
+<<<<<<< HEAD
+=======
+  // Overall Order Status / Order Comment (V3.2) — required before save,
+  // same rule as the HTML upload flow's Review screen.
+  const [orderStatus, setOrderStatus] = useState('');
+  const [orderComment, setOrderComment] = useState('');
+
+>>>>>>> 87432db (New Dashboard)
   const [companySuggestions, setCompanySuggestions] = useState([]);
 
   const [validationError, setValidationError] = useState('');
@@ -149,6 +161,13 @@ export function useManualOrderForm() {
         setValidationError(err);
         return false;
       }
+<<<<<<< HEAD
+=======
+      if (!ORDER_STATUSES.includes(orderStatus)) {
+        setValidationError('Order Status must be selected before saving.');
+        return false;
+      }
+>>>>>>> 87432db (New Dashboard)
       setValidationError('');
 
       const billingAddr = { ...billing, company_name: companyName };
@@ -251,6 +270,18 @@ export function useManualOrderForm() {
           resolutionData: resolution,
           orderSource: 'MANUAL',
         });
+<<<<<<< HEAD
+=======
+        await orderService.setOrderStatus(ref, { orderStatus, orderComment });
+        // Delivery Date (V4.2) now lives in its own top-level, directly-
+        // editable field — flushed best-effort here too (mirrors the HTML
+        // upload Review flow) so it survives future re-edits via Saved Order
+        // Lookup instead of only living inside the parsed_data snapshot that
+        // upsertOrder above fully replaces.
+        if (deliveryDate) {
+          orderService.setDeliveryDate(ref, deliveryDate).catch((e) => console.warn('Delivery date flush failed:', e.message));
+        }
+>>>>>>> 87432db (New Dashboard)
         setSaved(true);
         setSavedRef(ref);
         return true;
@@ -261,7 +292,11 @@ export function useManualOrderForm() {
         setSaving(false);
       }
     },
+<<<<<<< HEAD
     [companyName, orderNumber, orderDate, deliveryDate, referenceNumber, notes, billing, delivery, sameAsBilling, productRows, masterTotalRows]
+=======
+    [companyName, orderNumber, orderDate, deliveryDate, referenceNumber, notes, billing, delivery, sameAsBilling, productRows, masterTotalRows, orderStatus, orderComment]
+>>>>>>> 87432db (New Dashboard)
   );
 
   const cancelDuplicate = useCallback(() => setDuplicate(null), []);
@@ -278,6 +313,11 @@ export function useManualOrderForm() {
     setNotes('');
     setProductRows([emptyProductRow()]);
     setMasterTotalRows([emptyMasterTotalRow()]);
+<<<<<<< HEAD
+=======
+    setOrderStatus('');
+    setOrderComment('');
+>>>>>>> 87432db (New Dashboard)
     setCompanySuggestions([]);
     setValidationError('');
     setSaving(false);
@@ -299,6 +339,10 @@ export function useManualOrderForm() {
     notes, setNotes,
     productRows, addProductRow, removeProductRow, updateProductRow,
     masterTotalRows, addMasterTotalRow, removeMasterTotalRow, updateMasterTotalRow,
+<<<<<<< HEAD
+=======
+    orderStatus, setOrderStatus, orderComment, setOrderComment,
+>>>>>>> 87432db (New Dashboard)
     grandTotal,
     companySuggestions, searchCompanies, pickCompanySuggestion,
     lookupProduct,

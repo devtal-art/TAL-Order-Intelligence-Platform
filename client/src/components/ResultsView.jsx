@@ -54,7 +54,11 @@ export default function ResultsView({ data, workbook, resolution, comments = {},
     { n: items.length, l: 'Line items' },
     { n: `${updatedTot < 0 ? '-' : ''}${sym}${Math.abs(updatedTot).toFixed(2)}`, l: 'Order total' },
     { n: inf.order_ref || '—', l: 'Order ref' },
+<<<<<<< HEAD
     { n: (d.billing_address?.company_name || '—').split(' ').slice(0, 2).join(' ') || '—', l: 'Customer' },
+=======
+    { n: (d.delivery_address?.company_name || '—').split(' ').slice(0, 2).join(' ') || '—', l: 'Customer' },
+>>>>>>> 87432db (New Dashboard)
   ];
 
   const prev = items.slice(0, 6);
@@ -150,7 +154,11 @@ export default function ResultsView({ data, workbook, resolution, comments = {},
                   <td style={{ color: '#78716C', fontSize: '11px' }}>{it.package || ''}</td>
                   <td className="nr">{it.qty || 0}</td>
                   <td className={`nr${isUnitPriceNegative ? ' price-negative' : ''}`}>
+<<<<<<< HEAD
                     {isUnitPriceNegative ? '-' : ''}{sym}{Math.abs(Number(it.unit_price || 0)).toFixed(2)}
+=======
+                    {isUnitPriceNegative ? '-' : ''}{Math.abs(Number(it.unit_price || 0)).toFixed(2)}
+>>>>>>> 87432db (New Dashboard)
                   </td>
                   <td className={`nr${isTotalNegative ? ' price-negative' : ''}`} style={{ fontWeight: 600 }}>
                     {isTotalNegative ? '-' : ''}{sym}{Math.abs(Number(it.total || 0)).toFixed(2)}

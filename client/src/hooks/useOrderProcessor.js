@@ -4,7 +4,11 @@ import { buildXLSX } from '../excel/buildXLSX.js';
 import { resolveService } from '../services/resolveService.js';
 import { mappingService } from '../services/mappingService.js';
 import { orderService } from '../services/orderService.js';
+<<<<<<< HEAD
 import { portalOrderRef } from '../utils/order.js';
+=======
+import { portalOrderRef, ORDER_STATUSES } from '../utils/order.js';
+>>>>>>> 87432db (New Dashboard)
 import { appendManualProduct, removeManualProduct, remapAfterRemoval } from '../utils/manualProduct.js';
 import { sleep } from '../utils/timing.js';
 
@@ -19,9 +23,19 @@ export function useOrderProcessor() {
   const [resolution, setResolution] = useState(null); // resolve API response
   const [result, setResult] = useState(null); // { data, workbook }
   const [error, setError] = useState('');
+<<<<<<< HEAD
   const [comments, setComments] = useState({}); // { [lineId]: 'Released' | 'OS' | 'N/A' } (V1.3)
   const [fulfillment, setFulfillment] = useState({}); // { [lineId]: { pendingQty, status } } (V1.4)
   const [notes, setNotes] = useState({}); // { [lineId]: string } — free-text Additional Comments (V1.7)
+=======
+  const [comments, setComments] = useState({}); // { [lineId]: 'OS' | 'Not Found' } (V1.3, values narrowed V3.2)
+  const [fulfillment, setFulfillment] = useState({}); // { [lineId]: { pendingQty, status } } (V1.4)
+  const [notes, setNotes] = useState({}); // { [lineId]: string } — free-text Additional Comments (V1.7)
+  const [orderStatus, setOrderStatus] = useState(''); // '' = not yet chosen — required before Save (V3.2)
+  const [orderComment, setOrderComment] = useState(''); // optional order-level comment (V3.2)
+  const [deliveryDate, setDeliveryDate] = useState(''); // optional, always-editable (V4.2)
+  const [saveError, setSaveError] = useState(''); // surfaced by ReviewView when Save fails (V3.2)
+>>>>>>> 87432db (New Dashboard)
   const [pending, setPending] = useState(null); // duplicate upload awaiting a decision: { data, resolved, prev, ref }
   const [saved, setSaved] = useState(false); // true once the order has been explicitly saved to the DB (V2.0)
   const orderRefRef = useRef(null); // Portal Order Ref of the PERSISTED order (set only after the first save)
@@ -49,18 +63,42 @@ export function useOrderProcessor() {
   const saveOrder = useCallback(async () => {
     const ref = plannedRefRef.current;
     if (!ref || !parsed || !resolution) return;
+<<<<<<< HEAD
     orderRefRef.current = ref;
+=======
+    // Order Status is required (V3.2) — ReviewView already gates the Save
+    // button on this; guard here too so saveOrder is never called without it.
+    if (!orderStatus) return;
+    orderRefRef.current = ref;
+    setSaveError('');
+>>>>>>> 87432db (New Dashboard)
     try {
       await orderService.save({
         portalOrderRef: ref,
         filename: file?.name || '',
+<<<<<<< HEAD
         customerName: parsed.billing_address?.company_name || '',
+=======
+        // Customer is the DELIVERY address's company name (V4.3) — the actual
+        // site being delivered to, not who's billed. Postcode already used
+        // delivery_address (see deliveryPostcode in orderService.js); this
+        // makes customer_name consistent with it.
+        customerName: parsed.delivery_address?.company_name || '',
+>>>>>>> 87432db (New Dashboard)
         orderDate: parsed.order_info?.order_date || '',
         totalProducts: (parsed.line_items || []).length,
         parsedData: parsed,
         resolutionData: resolution,
         // processedBy is intentionally omitted — the server sets it from req.user.name.
       });
+<<<<<<< HEAD
+=======
+      // Order Status/Comment are required, unlike the best-effort flushes
+      // below — a failure here must surface to the user (via saveError)
+      // rather than be silently swallowed, so the selection is never
+      // silently discarded.
+      await orderService.setOrderStatus(ref, { orderStatus, orderComment });
+>>>>>>> 87432db (New Dashboard)
       setSaved(true);
       // Flush per-product edits made before the save (best-effort — a DB
       // failure must NOT block the review → Excel flow).
@@ -82,10 +120,24 @@ export function useOrderProcessor() {
         for (const [lineId, v] of Object.entries(notes)) payload[lineId] = v ? v.trim() : null;
         orderService.setNotes(ref, payload).catch((e) => console.warn('Order notes flush failed:', e.message));
       }
+<<<<<<< HEAD
     } catch (e) {
       console.warn('Order save failed:', e.message);
     }
   }, [file, parsed, resolution, comments, fulfillment, notes]);
+=======
+      // Delivery Date is optional (unlike Order Status), so it flushes
+      // best-effort like the per-product fields above rather than blocking
+      // the save on failure. Only sent when the user actually entered one.
+      if (deliveryDate) {
+        orderService.setDeliveryDate(ref, deliveryDate).catch((e) => console.warn('Delivery date flush failed:', e.message));
+      }
+    } catch (e) {
+      console.warn('Order save failed:', e.message);
+      setSaveError(e.message || 'Could not save the order. Please try again.');
+    }
+  }, [file, parsed, resolution, comments, fulfillment, notes, orderStatus, orderComment, deliveryDate]);
+>>>>>>> 87432db (New Dashboard)
 
   // Show the Review screen for a parsed + resolved order (V2.0). Carries over
   // manual lines from the previously saved order (`prev`, re-upload path).
@@ -125,6 +177,23 @@ export function useOrderProcessor() {
       // processedBy is no longer pre-populated (V3.0 — JWT Auth).
       // The authenticated user is automatically assigned at save time.
 
+<<<<<<< HEAD
+=======
+      // Order Status/Comment (V3.2): pre-populate from the previously saved
+      // order on a re-upload, mirroring the old processedBy pre-fill — Order
+      // Status is still required to be a real selection, but a re-upload of
+      // an order that already has one shouldn't force blanking it out. Only
+      // a genuine ORDER_STATUSES value carries over; anything else (missing,
+      // or a stale value predating V3.3) stays blank so the user must make
+      // a real choice, same as SavedOrderLookup.
+      setOrderStatus(ORDER_STATUSES.includes(prev?.orderStatus) ? prev.orderStatus : '');
+      setOrderComment(prev?.orderComment || '');
+      // Delivery Date (V4.2): carries over on re-upload like Order Status/
+      // Comment, but has no "required real value" gate since it was never
+      // required in the first place.
+      setDeliveryDate(prev?.deliveryDate || '');
+
+>>>>>>> 87432db (New Dashboard)
       setScreen('review');
     },
     [] // no external deps — refs and setters are stable
@@ -137,6 +206,13 @@ export function useOrderProcessor() {
     setComments({});
     setFulfillment({});
     setNotes({});
+<<<<<<< HEAD
+=======
+    setOrderStatus('');
+    setOrderComment('');
+    setDeliveryDate('');
+    setSaveError('');
+>>>>>>> 87432db (New Dashboard)
     setSaved(false); // reset saved flag for the new upload (V2.0)
     setPending(null);
     orderRefRef.current = null;
@@ -288,7 +364,11 @@ export function useOrderProcessor() {
           .save({
             portalOrderRef: orderRefRef.current,
             filename: file?.name || '',
+<<<<<<< HEAD
             customerName: appended.parsed.billing_address?.company_name || '',
+=======
+            customerName: appended.parsed.delivery_address?.company_name || '',
+>>>>>>> 87432db (New Dashboard)
             orderDate: appended.parsed.order_info?.order_date || '',
             totalProducts: appended.parsed.line_items.length,
             parsedData: appended.parsed,
@@ -328,7 +408,11 @@ export function useOrderProcessor() {
           .save({
             portalOrderRef: ref,
             filename: file?.name || '',
+<<<<<<< HEAD
             customerName: removed.parsed.billing_address?.company_name || '',
+=======
+            customerName: removed.parsed.delivery_address?.company_name || '',
+>>>>>>> 87432db (New Dashboard)
             orderDate: removed.parsed.order_info?.order_date || '',
             totalProducts: removed.parsed.line_items.length,
             parsedData: removed.parsed,
@@ -380,10 +464,20 @@ export function useOrderProcessor() {
   // buildXLSX) and show the results screen. Triggered from the Review screen.
   const generateExcel = useCallback(() => {
     if (!parsed) return;
+<<<<<<< HEAD
     const workbook = buildXLSX(parsed, resolution, comments);
     setResult({ data: parsed, workbook });
     setScreen('results');
   }, [parsed, resolution, comments]);
+=======
+    // Only reachable after Save (canGenerate requires saved === true), so
+    // orderStatus/orderComment/deliveryDate are already the real persisted
+    // values here.
+    const workbook = buildXLSX(parsed, resolution, comments, orderStatus, orderComment, deliveryDate);
+    setResult({ data: parsed, workbook });
+    setScreen('results');
+  }, [parsed, resolution, comments, orderStatus, orderComment, deliveryDate]);
+>>>>>>> 87432db (New Dashboard)
 
   const reset = useCallback(() => {
     setFile(null);
@@ -394,6 +488,13 @@ export function useOrderProcessor() {
     setComments({});
     setFulfillment({});
     setNotes({});
+<<<<<<< HEAD
+=======
+    setOrderStatus('');
+    setOrderComment('');
+    setDeliveryDate('');
+    setSaveError('');
+>>>>>>> 87432db (New Dashboard)
     setSaved(false); // V2.0
     setPending(null);
     orderRefRef.current = null;
@@ -402,5 +503,9 @@ export function useOrderProcessor() {
     setScreen('upload');
   }, []);
 
+<<<<<<< HEAD
   return { screen, file, steps, parsed, resolution, result, error, comments, fulfillment, notes, saved, pending, pickFile, run, approveProduct, addProduct, removeProduct, setProductComment, setProductFulfillment, setProductNote, chooseProcessedBy, saveOrder, continueDuplicate, updateDuplicateOrder, generateExcel, reset };
+=======
+  return { screen, file, steps, parsed, resolution, result, error, comments, fulfillment, notes, orderStatus, setOrderStatus, orderComment, setOrderComment, deliveryDate, setDeliveryDate, saveError, saved, pending, pickFile, run, approveProduct, addProduct, removeProduct, setProductComment, setProductFulfillment, setProductNote, chooseProcessedBy, saveOrder, continueDuplicate, updateDuplicateOrder, generateExcel, reset };
+>>>>>>> 87432db (New Dashboard)
 }

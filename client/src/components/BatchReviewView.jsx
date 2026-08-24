@@ -28,7 +28,11 @@ export default function BatchReviewView({ batchSession, uniqueResults, batchStat
           portalOrderRef: portalOrderRef(order.parsedData, order.filename),
           hasRef: hasRealRef(order.parsedData),
           filename: order.filename,
+<<<<<<< HEAD
           customer: order.parsedData.billing_address?.company_name || '',
+=======
+          customer: order.parsedData.delivery_address?.company_name || '',
+>>>>>>> 87432db (New Dashboard)
           postcode: order.parsedData.delivery_address?.post_code || '',
           currency: order.parsedData.financials?.currency || 'GBP',
           orderDate: inf.order_date || '',

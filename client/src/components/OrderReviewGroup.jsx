@@ -15,7 +15,11 @@ import { deriveOrderStatus, statusMeta } from '../utils/order.js';
 // (single-file review), each row gets a Comment selector; the batch review
 // passes nothing and renders exactly as before.
 // `fulfillment` + `onFulfillment` are optional (V1.4): when `onFulfillment` is
+<<<<<<< HEAD
 // provided, each row gets Pending Qty + Order Status delivery tracking.
+=======
+// provided, each row gets Pending Qty + Item Status delivery tracking.
+>>>>>>> 87432db (New Dashboard)
 // `notes` + `onNote` are optional (V1.7): free-text Additional Comment column.
 // `onRemove` is optional (V1.7): delete action for manually added rows only.
 export default function OrderReviewGroup({ order, onApprove, comments, onComment, fulfillment, onFulfillment, notes, onNote, onRemove, defaultOpen = true }) {
@@ -75,8 +79,13 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
                   <th className="rt-grp rt-grp-email" colSpan={5}>Order details · from email</th>
                   <th className="rt-grp rt-grp-match" colSpan={4}>Website match · from catalog</th>
                   {onFulfillment && <th className="rt-grp rt-grp-fulfil" colSpan={2}>Delivery</th>}
+<<<<<<< HEAD
                   {onComment && <th className="rt-grp rt-grp-comment" rowSpan={2}>Comment</th>}
                   {onNote && <th className="rt-grp rt-grp-note" rowSpan={2}>Additional Comment</th>}
+=======
+                  {onComment && <th className="rt-grp rt-grp-comment" rowSpan={2}>Reason</th>}
+                  {onNote && <th className="rt-grp rt-grp-note" rowSpan={2}>Comments</th>}
+>>>>>>> 87432db (New Dashboard)
                   <th className="rt-grp rt-grp-act" rowSpan={2}>Action</th>
                 </tr>
                 <tr className="rt-cols">
@@ -90,7 +99,11 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
                   <th className="rt-match rt-num">Match</th>
                   <th className="rt-match">Status</th>
                   {onFulfillment && <th className="rt-fulfil rt-num">Pending Qty</th>}
+<<<<<<< HEAD
                   {onFulfillment && <th className="rt-fulfil">Order Status</th>}
+=======
+                  {onFulfillment && <th className="rt-fulfil">Item Status</th>}
+>>>>>>> 87432db (New Dashboard)
                 </tr>
               </thead>
               <tbody>

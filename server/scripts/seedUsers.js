@@ -24,6 +24,10 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 import bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
+<<<<<<< HEAD
+=======
+import { assertExpectedMongoTarget } from '../src/config/mongoGuard.js';
+>>>>>>> 87432db (New Dashboard)
 
 // ── Inline User schema (avoids depending on the compiled app module graph) ──
 const userSchema = new mongoose.Schema(
@@ -51,18 +55,32 @@ const USERS_TO_SEED = [
   { name: 'Alpa',      password: process.env.SEED_PASSWORD_ALPA,      role: 'staff' },
   { name: 'Sehbaz',    password: process.env.SEED_PASSWORD_SEHBAZ,    role: 'staff' },
   { name: 'Shashwat',  password: process.env.SEED_PASSWORD_SHASHWAT,  role: 'staff' },
+<<<<<<< HEAD
   // Read-only demo account (V?.?) — server-side write-blocking is enforced by
   // blockViewerWrites middleware based on this role; the client also hides
   // every edit control for it. See server/src/middleware/blockViewerWrites.js.
   { name: 'Gagandeep', password: process.env.SEED_PASSWORD_GAGANDEEP, role: 'viewer' },
+=======
+  // Promoted from the read-only 'viewer' role to full 'staff' access — full
+  // edit rights, and counted in PROCESSED_BY_USERS on both client and
+  // server so orders processed under this name show up on the dashboard
+  // (Team Performance, Released by Processor, Today by Processor).
+  { name: 'Gagandeep', password: process.env.SEED_PASSWORD_GAGANDEEP, role: 'staff' },
+>>>>>>> 87432db (New Dashboard)
 ];
 
 const BCRYPT_ROUNDS = 12; // OWASP minimum recommendation for 2024
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
+<<<<<<< HEAD
   const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/order_intelligence';
   const mongoDbName = process.env.MONGODB_DB || 'order_intelligence';
+=======
+  const mongoUri = process.env.MONGODB_URI;
+  const mongoDbName = process.env.MONGODB_DB || 'order_intelligence';
+  assertExpectedMongoTarget(mongoUri, mongoDbName);
+>>>>>>> 87432db (New Dashboard)
 
   console.log(`\n🔗 Connecting to MongoDB (db: ${mongoDbName})…`);
 

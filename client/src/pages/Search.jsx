@@ -1,6 +1,13 @@
+<<<<<<< HEAD
 import { useCallback, useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import SavedOrderLookup, { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
+=======
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Layout from '../components/Layout.jsx';
+import SavedOrderLookup, { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
+import SortTh from '../components/SortableHeader.jsx';
+>>>>>>> 87432db (New Dashboard)
 import { orderService } from '../services/orderService.js';
 import { statusMeta } from '../utils/order.js';
 
@@ -41,6 +48,47 @@ function RecentOrders({ refreshToken, onChanged }) {
   const [viewOrder, setViewOrder] = useState(null);
   const [viewBusyRef, setViewBusyRef] = useState('');
 
+<<<<<<< HEAD
+=======
+  // Only 5 rows are ever loaded here, so sorting is done entirely client-side
+  // — no server round trip needed. 'orderDate' sorts by the actual date shown
+  // in that column (DD/MM/YYYY), rearranged to YYYYMMDD so it sorts
+  // chronologically — a plain string/Date sort on order_date would put
+  // "22/06/2026" before "16/08/2026", and uploadTimestamp is a DIFFERENT
+  // field (when the order was saved, not the order's own date) that can
+  // legitimately disagree with it.
+  const [sortBy, setSortBy] = useState('');
+  const [sortDir, setSortDir] = useState('asc');
+  const toggleSort = (column) => {
+    setSortDir((d) => (sortBy === column && d === 'asc' ? 'desc' : 'asc'));
+    setSortBy(column);
+  };
+  const orderDateSortKey = (o) => {
+    const d = o.orderDate || '';
+    return d.length === 10 ? `${d.slice(6, 10)}${d.slice(3, 5)}${d.slice(0, 2)}` : '';
+  };
+  const SORT_KEYS = {
+    ref: (o) => Number(o.portalOrderRef) || 0,
+    customer: (o) => (o.customerName || '').toLowerCase(),
+    processedBy: (o) => (o.processedBy || '').toLowerCase(),
+    orderDate: orderDateSortKey,
+    products: (o) => o.totalProducts || 0,
+  };
+  const sortedRows = useMemo(() => {
+    if (!rows || !sortBy) return rows;
+    const keyFn = SORT_KEYS[sortBy];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const ka = keyFn(a);
+      const kb = keyFn(b);
+      if (ka < kb) return -1 * dir;
+      if (ka > kb) return 1 * dir;
+      return 0;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- SORT_KEYS is a stable literal
+  }, [rows, sortBy, sortDir]);
+
+>>>>>>> 87432db (New Dashboard)
   useEffect(() => {
     let cancelled = false;
     setError('');
@@ -90,17 +138,30 @@ function RecentOrders({ refreshToken, onChanged }) {
           <table className="dl-table">
             <thead>
               <tr>
+<<<<<<< HEAD
                 <th>Order #</th>
                 <th>Customer</th>
                 <th>Processed By</th>
                 <th>Order Date</th>
                 <th>Status</th>
                 <th className="dl-num">Products</th>
+=======
+                <SortTh column="ref" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order #</SortTh>
+                <SortTh column="customer" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Customer</SortTh>
+                <SortTh column="processedBy" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Processed By</SortTh>
+                <SortTh column="orderDate" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order Date</SortTh>
+                <th>Status</th>
+                <SortTh column="products" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} numeric>Products</SortTh>
+>>>>>>> 87432db (New Dashboard)
                 <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
+<<<<<<< HEAD
               {rows.map((o) => {
+=======
+              {sortedRows.map((o) => {
+>>>>>>> 87432db (New Dashboard)
                 const meta = statusMeta(o.resolutionStatus);
                 return (
                   <tr key={o.id}>

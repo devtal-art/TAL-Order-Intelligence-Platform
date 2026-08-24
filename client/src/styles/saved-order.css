@@ -5,6 +5,14 @@
 
 .sol-search{display:flex;gap:8px;margin-top:16px;position:relative}
 
+<<<<<<< HEAD
+=======
+/* Small clarifying note under the search bar (V4.6) — shown only when
+   searching by Company Name, since that field is matched against the
+   DELIVERY address's company name, not the billing one. */
+.sol-search-hint{font-size:11.5px;color:var(--muted);margin-top:6px}
+
+>>>>>>> 87432db (New Dashboard)
 .sol-search-type-select{
   padding:10px 14px;border:1px solid var(--border-strong);
   border-radius:10px;font-size:13.5px;font-family:var(--font-ui);outline:none;

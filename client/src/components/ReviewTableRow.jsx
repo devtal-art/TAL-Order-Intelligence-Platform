@@ -16,7 +16,11 @@ import { PRODUCT_COMMENTS, DELIVERY_STATUSES, clampPendingQty, isMatchingSkipped
 //
 // `fulfillment` + `onFulfillment` (V1.4, optional): when `onFulfillment` is
 // provided the row gets delivery tracking — a Pending Qty input (0 ≤ n ≤ the
+<<<<<<< HEAD
 // line's ordered quantity) and an Order Status selector — saved with the order.
+=======
+// line's ordered quantity) and an Item Status selector — saved with the order.
+>>>>>>> 87432db (New Dashboard)
 //
 // `note` + `onNote` (V1.7, optional): free-text Additional Comment, saved with
 // the order; independent from `comment`. `onRemove` (V1.7, optional): delete
@@ -32,7 +36,11 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
   // Already-approved rows have no matching controls, so nothing to disable.
   const skipped = !approved && isMatchingSkipped(comment);
   // When 'Released' is selected the order line is confirmed fulfilled —
+<<<<<<< HEAD
   // Pending Qty and Order Status are irrelevant and should be greyed out.
+=======
+  // Pending Qty and Item Status are irrelevant and should be greyed out.
+>>>>>>> 87432db (New Dashboard)
   const released = comment === 'Released';
   const [chosen, setChosen] = useState(null); // product picked from search (overrides suggestion)
   const [busy, setBusy] = useState(false);
@@ -41,6 +49,12 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
 
   const sym = currencySymbol(currency);
   const money = (n) => `${Number(n) < 0 ? '-' : ''}${sym}${Math.abs(Number(n) || 0).toFixed(2)}`;
+<<<<<<< HEAD
+=======
+  // Unit Price column deliberately omits the currency symbol (V4.4) — only
+  // this column; Total Price and every order-total calculation keep it.
+  const moneyNoSym = (n) => `${Number(n) < 0 ? '-' : ''}${Math.abs(Number(n) || 0).toFixed(2)}`;
+>>>>>>> 87432db (New Dashboard)
 
   // Ordered quantity of this line — the Pending Qty upper bound. When known,
   // Pending Qty renders as a 0..qty dropdown so invalid values can't be typed.
@@ -78,7 +92,11 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
       </td>
       <td className="rt-email">{item ? item.package : '—'}</td>
       <td className="rt-email rt-num rt-highlight">{item ? item.qty : '—'}</td>
+<<<<<<< HEAD
       <td className={`rt-email rt-num rt-highlight${isUnitPriceNegative ? ' price-negative' : ''}`}>{item ? money(item.unit_price) : '—'}</td>
+=======
+      <td className={`rt-email rt-num rt-highlight${isUnitPriceNegative ? ' price-negative' : ''}`}>{item ? moneyNoSym(item.unit_price) : '—'}</td>
+>>>>>>> 87432db (New Dashboard)
       <td className={`rt-email rt-num${isTotalNegative ? ' price-negative' : ''}`}>{item ? money(item.total) : '—'}</td>
 
       {/* ── Match (green) ── */}
@@ -115,7 +133,11 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
                 onChange={(e) => onFulfillment(result.lineId, { pendingQty: e.target.value === '' ? '' : Number(e.target.value) })}
                 aria-label="Pending quantity"
                 disabled={released}
+<<<<<<< HEAD
                 title={released ? 'Not applicable when comment is Released' : undefined}
+=======
+                title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
+>>>>>>> 87432db (New Dashboard)
               >
                 <option value="">—</option>
                 {Array.from({ length: orderedQty + 1 }, (_, n) => (
@@ -134,7 +156,11 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
                 onChange={(e) => onFulfillment(result.lineId, { pendingQty: clampPendingQty(e.target.value, item?.qty) })}
                 aria-label="Pending quantity"
                 disabled={released}
+<<<<<<< HEAD
                 title={released ? 'Not applicable when comment is Released' : undefined}
+=======
+                title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
+>>>>>>> 87432db (New Dashboard)
               />
             )}
           </td>
@@ -143,9 +169,15 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
               className={`ds-select${fulfillment?.status ? ` is-${fulfillment.status}` : ''}`}
               value={fulfillment?.status ?? ''}
               onChange={(e) => onFulfillment(result.lineId, { status: e.target.value || null })}
+<<<<<<< HEAD
               aria-label="Order status"
               disabled={released}
               title={released ? 'Not applicable when comment is Released' : undefined}
+=======
+              aria-label="Item status"
+              disabled={released}
+              title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
+>>>>>>> 87432db (New Dashboard)
             >
               <option value="">—</option>
               {DELIVERY_STATUSES.map((s) => (
@@ -163,7 +195,11 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
             className="cm-select"
             value={comment}
             onChange={(e) => onComment(result.lineId, e.target.value)}
+<<<<<<< HEAD
             aria-label="Product comment"
+=======
+            aria-label="Reason"
+>>>>>>> 87432db (New Dashboard)
           >
             <option value="">—</option>
             {PRODUCT_COMMENTS.map((c) => (
@@ -183,7 +219,11 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
             value={note}
             onChange={(e) => onNote(result.lineId, e.target.value, false)}
             onBlur={(e) => onNote(result.lineId, e.target.value, true)}
+<<<<<<< HEAD
             aria-label="Additional comment"
+=======
+            aria-label="Comments"
+>>>>>>> 87432db (New Dashboard)
           />
         </td>
       )}

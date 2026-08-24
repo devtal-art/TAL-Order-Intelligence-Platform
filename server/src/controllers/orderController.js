@@ -1,6 +1,7 @@
 import * as orderService from '../services/orderService.js';
 import { ensureDb } from '../utils/ensureDb.js';
 import { AppError } from '../utils/AppError.js';
+import { buildDashboardWorkbook } from '../utils/dashboardWorkbook.js';
 
 const isBlank = (v) => v === undefined || v === null || String(v).trim() === '';
 
@@ -94,9 +95,29 @@ export async function getDashboard(req, res, next) {
 export async function listDashboardOrders(req, res, next) {
   try {
     ensureDb();
-    const { type, value, page, limit } = req.query;
-    const result = await orderService.listDashboardOrders({ type, value, page, limit });
+    const { type, value, page, limit, sortBy, sortDir } = req.query;
+    const result = await orderService.listDashboardOrders({ type, value, page, limit, sortBy, sortDir });
     res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/orders/dashboard/export — full dashboard workbook download
+// (V4.8, read-only). Multi-sheet .xlsx: Summary, All Orders, per-channel
+// order lists, All Items, Unique Items, Order Status, Item Status, Discount,
+// Team Performance. Streamed directly to the response, nothing buffered
+// beyond what ExcelJS needs to write it.
+export async function exportDashboard(req, res, next) {
+  try {
+    ensureDb();
+    const orders = await orderService.getDashboardExportOrders();
+    const workbook = buildDashboardWorkbook(orders);
+    const filename = `Dashboard Export ${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (err) {
     next(err);
   }
@@ -164,6 +185,42 @@ export async function setOrderNotes(req, res, next) {
       });
     }
     const order = await orderService.setProductNotes(req.params.ref, notes);
+    res.status(200).json(order);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/v1/orders/:ref/status — set the overall Order Status + Order
+// Comment (V3.2). Distinct from /comments (per-product Reason) and /notes
+// (per-product Comments) — this is order-level, not lineId-keyed.
+// Body: { orderStatus: one of orderService.ORDER_STATUSES, orderComment?: string }
+export async function setOrderStatus(req, res, next) {
+  try {
+    ensureDb();
+    const { orderStatus, orderComment } = req.body || {};
+    const order = await orderService.setOrderStatus(req.params.ref, { orderStatus, orderComment });
+    res.status(200).json(order);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/v1/orders/:ref/delivery-date — set/clear the order's delivery
+// date (V4.2). Independent of Order Status/Comment — a plain, always-
+// editable free-text field, never required.
+// Body: { deliveryDate: string }
+export async function setOrderDeliveryDate(req, res, next) {
+  try {
+    ensureDb();
+    const { deliveryDate } = req.body || {};
+    if (deliveryDate === undefined) {
+      throw new AppError('VALIDATION_ERROR', 'Missing required field.', {
+        status: 400,
+        details: [{ field: 'deliveryDate', issue: 'required (empty string clears it)' }],
+      });
+    }
+    const order = await orderService.setDeliveryDate(req.params.ref, deliveryDate);
     res.status(200).json(order);
   } catch (err) {
     next(err);
