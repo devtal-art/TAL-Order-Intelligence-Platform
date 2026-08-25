@@ -1,17 +1,27 @@
 import { currencySymbol } from '../utils/format.js';
 
-// Master Totals editor for Manual Order Creation (V3.1 — new). Fully manual,
-// unlimited { label, amount } rows (Subtotal, VAT, Delivery, Discount,
-// Handling, Other Charges, or anything the user types) — no tie to the
-// product rows. Grand Total is the live sum of every row. Each row maps 1:1
-// onto financials.discounts[] (see manualOrderBuilder.buildFinancialsFromMasterTotals),
-// the same shape OrderFinancials.jsx / buildXLSX.js already render generically.
-export default function MasterTotalsEditor({ rows, onAdd, onRemove, onUpdate, grandTotal, currency = 'GBP' }) {
+// Master Totals editor for Manual Order Creation (V3.1 — new; auto Subtotal
+// added later). The Subtotal row is automatic — the live sum of every
+// product row's Total (qty × unit price), read-only, not one of these rows —
+// so these rows are for ADJUSTMENTS on top of it (VAT, Delivery, Discount,
+// Handling, Other Charges, or anything the user types), unlimited
+// { label, amount }, no tie to the product rows. Grand Total = productsSubtotal
+// + the live sum of every adjustment row below. Each adjustment row maps 1:1
+// onto financials.discounts[] (see manualOrderBuilder.buildFinancialsFromMasterTotals,
+// which now also receives productsSubtotal for financials.sub_total), the
+// same shape OrderFinancials.jsx / buildXLSX.js already render generically.
+export default function MasterTotalsEditor({ rows, onAdd, onRemove, onUpdate, productsSubtotal = 0, grandTotal, currency = 'GBP' }) {
   const sym = currencySymbol(currency);
 
   return (
     <div className="mo-section">
       <div className="mo-section-title">Master Totals</div>
+
+      <div className="mte-subtotal" aria-live="polite">
+        <span>Subtotal <em>(sum of product totals)</em></span>
+        <b>{sym}{productsSubtotal.toFixed(2)}</b>
+      </div>
+
       <div className="mte-rows">
         {rows.map((row, i) => (
           <div className="mte-row" key={row.id}>
@@ -19,7 +29,7 @@ export default function MasterTotalsEditor({ rows, onAdd, onRemove, onUpdate, gr
               type="text"
               className="mte-label"
               value={row.label}
-              placeholder={i === 0 ? 'e.g. Subtotal' : 'e.g. VAT, Delivery, Discount…'}
+              placeholder="e.g. VAT, Delivery, Discount…"
               onChange={(e) => onUpdate(row.id, { label: e.target.value })}
               aria-label={`Master total row ${i + 1} label`}
             />

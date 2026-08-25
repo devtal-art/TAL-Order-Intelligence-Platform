@@ -5,6 +5,7 @@ import { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOr
 import SortTh from '../components/SortableHeader.jsx';
 import { orderService } from '../services/orderService.js';
 import { deliveryMeta, commentMeta, orderStatusMeta, discountBucketMeta } from '../utils/order.js';
+import { formatDisplayDate } from '../utils/dateFormat.js';
 
 const PAGE_SIZE = 25;
 
@@ -47,7 +48,7 @@ export default function DashboardList() {
               : type === 'orderComment' && value === 'has'
             ? { label: 'Order Comments', tone: 'comments', title: 'Orders with an Order Comment' }
             : type === 'deliveryDate'
-              ? { label: `Delivery: ${value}`, tone: 'released', title: `Orders for delivery date ${value}` }
+              ? { label: `Delivery: ${formatDisplayDate(value)}`, tone: 'released', title: `Orders for delivery date ${formatDisplayDate(value)}` }
               : type === 'today'
                 ? { label: "Today's Orders", tone: 'released', title: 'Orders processed today' }
                 : type === 'todayProcessor'

@@ -29,7 +29,7 @@ export function deriveOrderStatus(results) {
 
 // Team members who can be assigned as an order's processor (V1.9). Order-level
 // identification only — deliberately NOT authentication or user management.
-export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Shashwat', 'Gagandeep'];
+export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Chat Team', 'Gagandeep'];
 
 // The per-product Reason values selectable going forward (V3.2).
 //   'OS'        — out of stock

@@ -26,9 +26,37 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
   const needs = results.length - approved;
   const meta = statusMeta(deriveOrderStatus(results));
 
+  // Toggling on click (not a native <button>, see below) needs one guard:
+  // if the click is the end of a text-selection drag (copying the Customer
+  // Name / Postcode / Order Ref), the mouseup still fires a click event —
+  // without this check the header would collapse right as the user
+  // finishes selecting, discarding their selection before they can copy it.
+  const toggleOpen = () => {
+    if (window.getSelection && String(window.getSelection())) return;
+    setOpen((v) => !v);
+  };
+  const handleHeaderKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setOpen((v) => !v);
+    }
+  };
+
   return (
     <div className={`og-card status-${meta.tone}`}>
-      <button className="og-head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+      {/* A native <button> blocks text selection inside it entirely (browsers
+          never start a selection drag on button content), which is exactly
+          why Customer Name / Postcode couldn't be copied from here — a div
+          with role="button" keeps the same click-to-toggle/keyboard/ARIA
+          behavior but allows normal text selection. */}
+      <div
+        className="og-head"
+        role="button"
+        tabIndex={0}
+        onClick={toggleOpen}
+        onKeyDown={handleHeaderKeyDown}
+        aria-expanded={open}
+      >
         <svg viewBox="0 0 24 24" className={`og-chevron${open ? ' open' : ''}`}>
           <polyline points="6 9 12 15 18 9" />
         </svg>
@@ -64,7 +92,7 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
             {needs > 0 && <span className="og-count needs">{needs} ⚠</span>}
           </span>
         </div>
-      </button>
+      </div>
 
       {open && (
         <div className="og-body">

@@ -5,16 +5,18 @@ import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import DashboardList from './pages/DashboardList.jsx';
+import DeliveryDatesList from './pages/DeliveryDatesList.jsx';
 import Search from './pages/Search.jsx';
 import CreateManualOrder from './pages/CreateManualOrder.jsx';
 
 // Route map:
-//   /login            — public, no auth required
-//   /                 — Upload & Save (protected)
-//   /dashboard        — operational widgets (protected)
-//   /dashboard/orders — bucket list "View All" (protected)
-//   /search           — saved-order search (protected)
-//   /orders/manual    — Create Manual Order (protected, V3.1 — new, additive)
+//   /login                    — public, no auth required
+//   /                         — Upload & Save (protected)
+//   /dashboard                — operational widgets (protected)
+//   /dashboard/orders         — bucket list "View All" (protected)
+//   /dashboard/delivery-dates — all upcoming delivery dates "View All" (protected)
+//   /search                   — saved-order search (protected)
+//   /orders/manual            — Create Manual Order (protected, V3.1 — new, additive)
 export default function App() {
   return (
     <AuthProvider>
@@ -44,6 +46,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <DashboardList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/delivery-dates"
+          element={
+            <ProtectedRoute>
+              <DeliveryDatesList />
             </ProtectedRoute>
           }
         />

@@ -19,6 +19,14 @@ export const orderService = {
   listByCompany: (company) => apiClient.get(`/v1/orders?company=${encodeURIComponent(company)}`),
   autocompleteCompanies: (query) => apiClient.get(`/v1/orders/companies/autocomplete?query=${encodeURIComponent(query)}`),
 
+  // Manual order number auto-generation (V5) — 'KS-YYYYMMDD-N'. nextManualRef
+  // is a preview only, for display while Create Manual Order is open;
+  // createManualOrder is the real, race-safe save (no portalOrderRef sent —
+  // the server assigns it).
+  nextManualRef: () => apiClient.get('/v1/orders/manual/next-ref'),
+  // order: { customerName, orderDate, totalProducts, parsedData, resolutionData }
+  createManualOrder: (order) => apiClient.post('/v1/orders/manual', order),
+
   // Latest N saved orders (V2.3) — the Search page's "Recent Processed Orders".
   recent: (limit = 5) => apiClient.get(`/v1/orders?limit=${encodeURIComponent(limit)}`),
 

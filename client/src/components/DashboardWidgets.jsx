@@ -35,6 +35,7 @@ import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import { orderService } from '../services/orderService.js';
 import { deliveryMeta, commentMeta, discountBucketMeta, PROCESSED_BY_USERS } from '../utils/order.js';
+import { formatDaysUntil, formatDisplayDate } from '../utils/dateFormat.js';
 
 // Dashboard widgets (V5 — MUI + Tailwind redesign). SAME information
 // architecture as before, restyled only:
@@ -224,7 +225,7 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
         <Card variant="outlined" sx={{ ...cardSx, height: '100%', display: 'flex', flexDirection: 'column' }}>
           <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', '&:last-child': { pb: 2 } }}>
             <StatLabel icon={EventRoundedIcon}>Order Delivery Date</StatLabel>
-            {(summary.deliveryDates || []).length === 0 ? (
+            {(summary.next7DeliveryDates || []).length === 0 ? (
               // flex:1 + centered: the label stays anchored top (matching
               // every other card's header), only the empty-state message
               // centers in the leftover height instead of sitting right
@@ -232,13 +233,16 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <EmptyState
                   icon={EventBusyRoundedIcon}
-                  title="No delivery dates available"
-                  sub="Delivery dates will appear here when available."
+                  title="No deliveries in the next 7 days"
+                  sub="Delivery dates will appear here when orders are scheduled."
                 />
               </Box>
             ) : (
               <>
-                {summary.deliveryDates.slice(0, 4).map((d, i) => (
+                {/* Next 7 delivery dates including today — days with no
+                    orders are already excluded server-side, so every row
+                    here has at least one order. */}
+                {summary.next7DeliveryDates.map((d, i) => (
                   <Box key={d.date}>
                     {i > 0 && <Divider />}
                     <Box
@@ -250,14 +254,19 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
                         '&:hover .dd-date': { color: 'primary.main' },
                       }}
                     >
-                      <Typography className="dd-date" variant="body2" sx={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, transition: 'color .12s' }}>
-                        {d.date}
-                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.15 }}>
+                        <Typography className="dd-date" variant="body2" sx={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, transition: 'color .12s' }}>
+                          {formatDisplayDate(d.date)}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>
+                          {formatDaysUntil(d.daysUntil)}
+                        </Typography>
+                      </Box>
                       <Chip size="small" label={`${d.count} order${d.count === 1 ? '' : 's'}`} sx={{ bgcolor: '#FAFAF8', border: '1px solid #D9D6D1', fontSize: 10.5 }} />
                     </Box>
                   </Box>
                 ))}
-                <ViewAllLink to="/dashboard/orders?type=allOrders&value=all" />
+                <ViewAllLink to="/dashboard/delivery-dates" />
               </>
             )}
           </CardContent>

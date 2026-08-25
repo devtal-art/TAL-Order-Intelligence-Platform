@@ -10,6 +10,29 @@
 // results together, the existing lineId contract (String(index + 1) into
 // line_items) keeps holding for every line, old and new.
 
+// After a MANUAL order's product list changes (add/remove, on the Saved
+// Order detail view), recompute financials.sub_total to match — same
+// meaning as Create Manual Order's auto Subtotal row (sum of every line
+// item's Total). Existing adjustment rows (discounts[]/transportation_
+// charges, from Master Totals at creation) are kept as-is; only sub_total
+// and total move. HTML orders are NEVER passed through this — their
+// sub_total is the figure parsed from the original email, an independent
+// business record that must not be silently overwritten just because a
+// product was later added/removed (buildXLSX.js already shows the
+// as-of-now adjusted figure via a display-time delta instead).
+export function recomputeManualSubtotal(financials, lineItems) {
+  const subTotal = Math.round(
+    (lineItems || []).reduce((sum, it) => sum + (Number(it.total) || 0), 0) * 100
+  ) / 100;
+  const f = financials || {};
+  const transport = Number(f.transportation_charges) || 0;
+  const adjustments = Array.isArray(f.discounts)
+    ? f.discounts.reduce((sum, d) => sum + (Number(d.amount) || 0), 0)
+    : 0;
+  const total = Math.round((subTotal + transport + adjustments) * 100) / 100;
+  return { ...f, sub_total: subTotal, total };
+}
+
 // Item numbers already approved in the order. INFORMATIONAL only (V1.9): the
 // Add Product search marks these rows "In order" as a hint — adding the same
 // catalog product again is allowed and creates an independent order line.

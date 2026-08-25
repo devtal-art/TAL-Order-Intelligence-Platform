@@ -6,6 +6,7 @@ import OrderFinancials from './OrderFinancials.jsx';
 import { portalOrderRef, hasRealRef, isMatchingSkipped, ORDER_STATUSES } from '../utils/order.js';
 import { approvedItemNos } from '../utils/manualProduct.js';
 import { currencySymbol } from '../utils/format.js';
+import { toDateInputValue, fromDateInputValue } from '../utils/dateFormat.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 // Review screen (single-file). Order-centric (V1.2): the products are wrapped in
@@ -191,11 +192,10 @@ export default function ReviewView({
             <label className="os-edit-label" htmlFor="review-delivery-date">Delivery Date</label>
             <input
               id="review-delivery-date"
-              type="text"
+              type="date"
               className="os-select"
-              placeholder="DD/MM/YYYY"
-              value={deliveryDate}
-              onChange={(e) => onDeliveryDate(e.target.value)}
+              value={toDateInputValue(deliveryDate)}
+              onChange={(e) => onDeliveryDate(fromDateInputValue(e.target.value))}
               aria-label="Delivery Date"
             />
           </div>

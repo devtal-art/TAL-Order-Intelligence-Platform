@@ -51,7 +51,7 @@ const USERS_TO_SEED = [
   { name: 'Shubham',   password: process.env.SEED_PASSWORD_SHUBHAM,   role: 'staff' },
   { name: 'Alpa',      password: process.env.SEED_PASSWORD_ALPA,      role: 'staff' },
   { name: 'Sehbaz',    password: process.env.SEED_PASSWORD_SEHBAZ,    role: 'staff' },
-  { name: 'Shashwat',  password: process.env.SEED_PASSWORD_SHASHWAT,  role: 'staff' },
+  { name: 'Chat Team', password: process.env.SEED_PASSWORD_SHASHWAT,  role: 'staff' },
   // Promoted from the read-only 'viewer' role to full 'staff' access — full
   // edit rights, and counted in PROCESSED_BY_USERS on both client and
   // server so orders processed under this name show up on the dashboard

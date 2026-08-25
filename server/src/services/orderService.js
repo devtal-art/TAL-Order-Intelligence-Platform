@@ -2,6 +2,7 @@ import { Order } from '../models/order.model.js';
 import { Product } from '../models/product.model.js';
 import { productDisplayName } from '../utils/displayName.js';
 import { AppError } from '../utils/AppError.js';
+import { parseFlexibleDate, daysBetween } from '../utils/dateUtil.js';
 
 // ────────────────────────────────────────────────
 //  ORDER SERVICE (V1.2 — new, additive)
@@ -40,7 +41,7 @@ function deliveryPostcode(doc) {
 // Processor" widget silently drops a real processor's count back to 0 (only
 // names in THIS list get a key in getDashboardSummary's releasedByProcessor
 // map below).
-export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Shashwat', 'Gagandeep'];
+export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Chat Team', 'Gagandeep'];
 
 // Map the stored (snake_case) document to the API DTO (camelCase).
 export function toDto(doc) {
@@ -171,6 +172,87 @@ export async function upsertOrder({
   return toDto(doc);
 }
 
+// Manual Order Creation — auto-numbering (V5). Every "Orders - Kumkum" order
+// number follows 'KS-YYYYMMDD-N', N a per-day sequence starting at 1 — no
+// free typing. getNextManualOrderRef is a PREVIEW only (for display while
+// the form is open); createManualOrder below is the authoritative,
+// race-safe assignment made at actual save time.
+function todayDatePrefix() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}`;
+}
+
+async function nextRefForDate(datePrefix) {
+  const re = new RegExp(`^KS-${datePrefix}-(\\d+)$`);
+  const docs = await Order.find({ portal_order_ref: re }, { portal_order_ref: 1 }).lean();
+  let maxN = 0;
+  for (const d of docs) {
+    const m = re.exec(d.portal_order_ref);
+    if (m) maxN = Math.max(maxN, Number(m[1]));
+  }
+  return `KS-${datePrefix}-${maxN + 1}`;
+}
+
+// What the next manual order's ref WOULD be right now — for display only,
+// while Create Manual Order is open. Can drift by one if someone else saves
+// a manual order in between; harmless, since createManualOrder recomputes
+// authoritatively at actual save time and the form shows whatever ref
+// really got assigned once the save succeeds.
+export async function getNextManualOrderRef() {
+  return nextRefForDate(todayDatePrefix());
+}
+
+// Create a brand-new manual order with a SERVER-assigned ref — never a
+// client-supplied one — so two people saving at the same moment can never
+// collide. Race-safe via the ref's own unique index: attempts an insert
+// with the next computed number, and on a duplicate-key collision (someone
+// else grabbed that exact number a moment earlier) recomputes and retries,
+// bounded so a persistent failure still surfaces instead of looping forever.
+export async function createManualOrder({
+  customerName = '',
+  orderDate = '',
+  totalProducts = 0,
+  parsedData = {},
+  resolutionData = {},
+  processedBy = '',
+} = {}) {
+  const resolution_status = deriveStatus(resolutionData);
+  const datePrefix = todayDatePrefix();
+  const pb = String(processedBy ?? '').trim();
+
+  const MAX_ATTEMPTS = 8;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const portalOrderRef = await nextRefForDate(datePrefix);
+    try {
+      const doc = await Order.create({
+        portal_order_ref: portalOrderRef,
+        filename: '',
+        customer_name: customerName,
+        order_date: orderDate,
+        total_products: totalProducts,
+        resolution_status,
+        parsed_data: parsedData ?? {},
+        resolution_data: resolutionData ?? {},
+        upload_timestamp: new Date(),
+        ...(pb ? { processed_by: pb } : {}),
+        order_source: 'MANUAL',
+        order_channel: 'Order - Kumkum',
+      });
+      return toDto(doc);
+    } catch (err) {
+      // E11000 duplicate key on portal_order_ref — another manual order
+      // grabbed this exact number between our read and write. Recompute
+      // and retry; any other error is a real failure, propagate it as-is.
+      if (err?.code !== 11000) throw err;
+      if (attempt === MAX_ATTEMPTS - 1) {
+        throw new AppError('CONFLICT', 'Could not assign a unique manual order number — please try again.', { status: 409 });
+      }
+    }
+  }
+}
 
 // Assign the order's Processed By (V1.9). ONE-SHOT by business rule (V1.9.1):
 // the value can be set only while the order is unassigned (legacy orders show
@@ -840,31 +922,23 @@ export async function getDashboardSummary({ previewLimit } = {}) {
     { $group: { _id: '$_comment_entries.v', n: { $sum: 1 } } },
   ];
 
-  // Delivery dates — group by delivery_date, count orders per date, return
-  // the top 10 nearest upcoming dates (or most recent past) with previews.
+  // Delivery dates — group by delivery_date, count orders per date. Feeds
+  // the "next 7 delivery dates" card and the "all upcoming delivery dates"
+  // View All list (both computed from this in JS below, since day-difference
+  // math needs an actual parsed date, not the raw grouped string). No
+  // per-date order preview is pushed here — nothing reads it (card/View All
+  // only ever show date + count, and clicking through re-queries
+  // listDashboardOrders for that one date) — and capping at a generous 2000
+  // distinct date-strings is just a defensive ceiling against dirty data,
+  // not a real display limit.
   facets.delivery_dates = [
     // NOTE: was written as { $ne: '', $ne: null } — a JS object literal with
     // a duplicate key, so the first $ne silently lost to the second and
     // empty-string delivery dates were never actually excluded. $nin fixes
     // it without the duplicate-key trap.
     { $match: { delivery_date: { $exists: true, $nin: ['', null] } } },
-    { $sort: { upload_timestamp: -1 } },
-    {
-      $group: {
-        _id: '$delivery_date',
-        count: { $sum: 1 },
-        orders: { $push: '$$ROOT' },
-      },
-    },
-    { $sort: { _id: -1 } },
-    { $limit: 10 },
-    {
-      $project: {
-        _id: 1,
-        count: 1,
-        orders: { $slice: ['$orders', limit] },
-      },
-    },
+    { $group: { _id: '$delivery_date', count: { $sum: 1 } } },
+    { $limit: 2000 },
   ];
 
   // Today's orders by processor — same startOfToday, grouped by processed_by.
@@ -932,22 +1006,32 @@ export async function getDashboardSummary({ previewLimit } = {}) {
     if (row._id in itemReasonCounts) itemReasonCounts[row._id] = row.n;
   }
 
-  // Delivery dates (sorted newest-first by the date string — proper date
-  // comparison handled below; the pipeline already sorts _id descending).
-  const deliveryDates = (agg.delivery_dates || []).map((g) => ({
-    date: g._id,
-    count: g.count,
-    orders: (g.orders || []).map(toDashboardCardDto),
-  }));
-  // Sort delivery dates chronologically (nearest upcoming first). Attempt
-  // Date.parse — if the strings are ISO or common date formats it works;
-  // otherwise fall back to lexicographic (still better than random).
-  deliveryDates.sort((a, b) => {
-    const da = new Date(a.date);
-    const db = new Date(b.date);
-    if (!isNaN(da) && !isNaN(db)) return db - da;
-    return a.date > b.date ? -1 : a.date < b.date ? 1 : 0;
-  });
+  // Delivery dates — Order Delivery Date section (V4, revised). Every group
+  // with an unparseable date string (legacy free text that never matched
+  // DD/MM/YYYY or ISO) is dropped: there's no way to compute a day
+  // difference for it, so it can't appear as "upcoming" either way. Once a
+  // date is edited through the calendar-driven input it becomes parseable,
+  // so this heals itself over time rather than needing a data migration.
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+  const parsedDeliveryDates = (agg.delivery_dates || [])
+    .map((g) => {
+      const parsed = parseFlexibleDate(g._id);
+      return parsed ? { date: g._id, count: g.count, daysUntil: daysBetween(parsed, todayMidnight) } : null;
+    })
+    .filter(Boolean);
+
+  // Upcoming = today or later, soonest first — the full set, for the
+  // Delivery Date "View All" list.
+  const upcomingDeliveryDates = parsedDeliveryDates
+    .filter((d) => d.daysUntil >= 0)
+    .sort((a, b) => a.daysUntil - b.daysUntil);
+
+  // Next 7 delivery dates including today (day offsets 0-6). Dates with no
+  // orders never entered parsedDeliveryDates in the first place (the
+  // aggregation only groups dates that have >=1 order), so this naturally
+  // skips empty days rather than needing an explicit skip step.
+  const next7DeliveryDates = upcomingDeliveryDates.filter((d) => d.daysUntil <= 6);
 
   // Today by processor
   const todayByProcessor = {};
@@ -993,7 +1077,12 @@ export async function getDashboardSummary({ previewLimit } = {}) {
     uniqueItems: agg.unique_items?.[0]?.n ?? 0,
     itemStatusCounts,
     itemReasonCounts,
-    deliveryDates,
+    // Order Delivery Date section (V4, revised): next7DeliveryDates powers
+    // the dashboard card (today + next 6 days, no-order days skipped
+    // automatically), upcomingDeliveryDates powers "View All" (every
+    // upcoming date, unbounded). Each entry: { date, count, daysUntil }.
+    next7DeliveryDates,
+    upcomingDeliveryDates,
     todayByProcessor,
     allByProcessor,
     todayOrdersPreview: (agg.today_orders_preview || []).map(toDashboardCardDto),

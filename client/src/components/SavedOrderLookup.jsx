@@ -5,8 +5,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { orderService } from '../services/orderService.js';
 import { buildXLSX } from '../excel/buildXLSX.js';
 import { statusMeta, commentMeta, deliveryMeta, orderStatusMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, ORDER_STATUSES, PROCESSED_BY_USERS, clampPendingQty } from '../utils/order.js';
-import { approvedItemNos, appendManualProduct, removeManualProduct, remapAfterRemoval } from '../utils/manualProduct.js';
+import { approvedItemNos, appendManualProduct, removeManualProduct, remapAfterRemoval, recomputeManualSubtotal } from '../utils/manualProduct.js';
 import { currencySymbol } from '../utils/format.js';
+import { toDateInputValue, fromDateInputValue } from '../utils/dateFormat.js';
 import AddProductModal from './AddProductModal.jsx';
 import OrderFinancials from './OrderFinancials.jsx';
 
@@ -389,13 +390,19 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
   // the snapshots, so they are untouched. Errors surface inside the modal.
   const addProduct = async (input) => {
     const appended = appendManualProduct(parsed, order.resolutionData || { results: [] }, input);
+    // Manual orders: the product list IS the subtotal, so keep it correct as
+    // items are added. HTML orders keep their originally-parsed financials
+    // untouched (see recomputeManualSubtotal's doc comment).
+    const parsedData = order.orderSource === 'MANUAL'
+      ? { ...appended.parsed, financials: recomputeManualSubtotal(appended.parsed.financials, appended.parsed.line_items) }
+      : appended.parsed;
     const updated = await orderService.save({
       portalOrderRef: order.portalOrderRef,
       filename: order.filename || '',
       customerName: order.customerName || '',
       orderDate: order.orderDate || '',
       totalProducts: appended.parsed.line_items.length,
-      parsedData: appended.parsed,
+      parsedData,
       resolutionData: appended.resolution,
     });
     onSaved(updated);
@@ -422,13 +429,19 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       const fl = remapAfterRemoval(fulfillment, lineId, removed.remap, ['pendingQty', 'status']);
       const nt = remapAfterRemoval(notes, lineId, removed.remap);
 
+      // Same reasoning as addProduct above: manual orders' subtotal tracks
+      // the current product list, HTML orders' financials stay untouched.
+      const parsedData = order.orderSource === 'MANUAL'
+        ? { ...removed.parsed, financials: recomputeManualSubtotal(removed.parsed.financials, removed.parsed.line_items) }
+        : removed.parsed;
+
       let updated = await orderService.save({
         portalOrderRef: order.portalOrderRef,
         filename: order.filename || '',
         customerName: order.customerName || '',
         orderDate: order.orderDate || '',
         totalProducts: removed.parsed.line_items.length,
-        parsedData: removed.parsed,
+        parsedData,
         resolutionData: removed.resolution,
       });
       if (Object.keys(cm.patch).length) updated = await orderService.setComments(order.portalOrderRef, cm.patch);
@@ -675,11 +688,10 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
             <label className="os-edit-label" htmlFor="order-delivery-date-input">Delivery Date</label>
             <input
               id="order-delivery-date-input"
-              type="text"
+              type="date"
               className="os-select"
-              placeholder="DD/MM/YYYY"
-              value={deliveryDateDraft}
-              onChange={(e) => setDeliveryDateDraft(e.target.value)}
+              value={toDateInputValue(deliveryDateDraft)}
+              onChange={(e) => setDeliveryDateDraft(fromDateInputValue(e.target.value))}
               aria-label="Delivery Date"
             />
           </div>

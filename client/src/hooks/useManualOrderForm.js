@@ -1,16 +1,17 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { resolveService } from '../services/resolveService.js';
 import { mappingService } from '../services/mappingService.js';
 import { catalogService } from '../services/catalogService.js';
 import { orderService } from '../services/orderService.js';
 import { appendManualProduct } from '../utils/manualProduct.js';
-import { portalOrderRef, ORDER_STATUSES } from '../utils/order.js';
+import { ORDER_STATUSES } from '../utils/order.js';
 import {
   emptyAddress,
   emptyProductRow,
   emptyMasterTotalRow,
   buildOrderInfo,
   buildFinancialsFromMasterTotals,
+  computeProductsSubtotal,
   isProductRowEmpty,
   isMasterTotalRowEmpty,
   validateManualOrderForm,
@@ -29,7 +30,14 @@ export function useManualOrderForm() {
   const [sameAsBilling, setSameAsBilling] = useState(true);
   const [delivery, setDelivery] = useState(emptyAddress());
 
-  const [orderNumber, setOrderNumber] = useState('');
+  // Order Number (V5) — server-assigned 'KS-YYYYMMDD-N', never typed by the
+  // user. orderNumberPreview is what's shown while the form is open; the
+  // authoritative ref is whatever createManualOrder returns at save time
+  // (see buildAndSave below) — refreshOrderNumberPreview just keeps the
+  // on-screen preview reasonably current.
+  const [orderNumberPreview, setOrderNumberPreview] = useState('');
+  const [orderNumberLoading, setOrderNumberLoading] = useState(true);
+  const [orderNumberError, setOrderNumberError] = useState('');
   const [orderDate, setOrderDate] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
@@ -50,9 +58,34 @@ export function useManualOrderForm() {
   const [saveError, setSaveError] = useState('');
   const [saved, setSaved] = useState(false);
   const [savedRef, setSavedRef] = useState('');
-  // Set when a save attempt finds an existing order with the same ref — the
-  // caller must show a confirm UI and re-invoke save({ confirmDuplicate: true }).
-  const [duplicate, setDuplicate] = useState(null); // { ref, existing } | null
+
+  // Order Number preview (V5) — fetched fresh whenever the form is ready
+  // for a new order (mount, and again after reset() for "Create Another").
+  // Display-only (the real ref is assigned server-side at save time
+  // regardless, see buildAndSave) — but a fetch failure surfaces as a
+  // visible retryable error rather than silently leaving the field blank,
+  // so a real problem (not logged in, server down, etc.) is never mistaken
+  // for "it's just generating".
+  const refreshOrderNumberPreview = useCallback(async () => {
+    setOrderNumberLoading(true);
+    setOrderNumberError('');
+    try {
+      const resp = await orderService.nextManualRef();
+      const ref = resp?.nextRef || '';
+      setOrderNumberPreview(ref);
+      if (!ref) setOrderNumberError('Server did not return an order number.');
+    } catch (e) {
+      setOrderNumberPreview('');
+      setOrderNumberError(e.message || 'Could not generate the order number.');
+    } finally {
+      setOrderNumberLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshOrderNumberPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch once on mount only
+  }, []);
 
   // ── Address / company ──
   const updateBilling = useCallback((patch) => setBilling((b) => ({ ...b, ...patch })), []);
@@ -140,16 +173,21 @@ export function useManualOrderForm() {
     []
   );
 
+  // Auto-computed sum of every product row's Total (qty × unit price) — the
+  // Master Totals rows are now adjustments (discount, transportation, etc.)
+  // on top of this, not a place to re-type it by hand.
+  const productsSubtotal = useMemo(() => computeProductsSubtotal(productRows), [productRows]);
+
   const grandTotal = useMemo(
-    () => masterTotalRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
-    [masterTotalRows]
+    () => productsSubtotal + masterTotalRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+    [productsSubtotal, masterTotalRows]
   );
 
   // ── Build the parsed_data / resolution_data pair and save ──
   const buildAndSave = useCallback(
-    async ({ confirmDuplicate = false } = {}) => {
+    async () => {
       const realRows = productRows.filter((r) => !isProductRowEmpty(r));
-      const err = validateManualOrderForm({ companyName, orderNumber, productRows: realRows });
+      const err = validateManualOrderForm({ companyName, productRows: realRows });
       if (err) {
         setValidationError(err);
         return false;
@@ -162,22 +200,13 @@ export function useManualOrderForm() {
 
       const billingAddr = { ...billing, company_name: companyName };
       const deliveryAddr = sameAsBilling ? billingAddr : { ...delivery, company_name: companyName };
-      const order_info = buildOrderInfo({ orderNumber, orderDate, deliveryDate, referenceNumber, notes });
-
-      const ref = portalOrderRef({ order_info }, '');
-
-      if (!confirmDuplicate) {
-        try {
-          const existing = await orderService.get(ref);
-          if (existing) {
-            setDuplicate({ ref, existing });
-            return false;
-          }
-        } catch {
-          /* 404 = genuinely new order — proceed */
-        }
-      }
-      setDuplicate(null);
+      // orderNumberPreview here is display-only (the informational
+      // parsed_data.order_info.order_ref sub-field) — the real, authoritative
+      // portal_order_ref is whatever createManualOrder assigns below, never
+      // this value. No duplicate-ref check is needed anymore: the server
+      // guarantees a unique number at save time (see orderService.js
+      // createManualOrder, race-safe against concurrent saves).
+      const order_info = buildOrderInfo({ orderNumber: orderNumberPreview, orderDate, deliveryDate, referenceNumber, notes });
 
       // Build line_items + resolution results in the SAME order the rows are
       // displayed. Rows with a confirmed itemNo go through appendManualProduct
@@ -243,23 +272,24 @@ export function useManualOrderForm() {
       }
 
       const financials = buildFinancialsFromMasterTotals(
-        masterTotalRows.filter((r) => !isMasterTotalRowEmpty(r))
+        masterTotalRows.filter((r) => !isMasterTotalRowEmpty(r)),
+        productsSubtotal
       );
       parsed = { ...parsed, financials };
 
       setSaving(true);
       setSaveError('');
       try {
-        await orderService.save({
-          portalOrderRef: ref,
-          filename: '',
+        const created = await orderService.createManualOrder({
           customerName: companyName,
           orderDate,
           totalProducts: parsed.line_items.length,
           parsedData: parsed,
           resolutionData: resolution,
-          orderSource: 'MANUAL',
         });
+        // The server-assigned ref — never orderNumberPreview — is the real
+        // identifier for every follow-up call and for what's shown after save.
+        const ref = created.portalOrderRef;
         await orderService.setOrderStatus(ref, { orderStatus, orderComment });
         // Delivery Date (V4.2) now lives in its own top-level, directly-
         // editable field — flushed best-effort here too (mirrors the HTML
@@ -279,17 +309,14 @@ export function useManualOrderForm() {
         setSaving(false);
       }
     },
-    [companyName, orderNumber, orderDate, deliveryDate, referenceNumber, notes, billing, delivery, sameAsBilling, productRows, masterTotalRows, orderStatus, orderComment]
+    [companyName, orderNumberPreview, orderDate, deliveryDate, referenceNumber, notes, billing, delivery, sameAsBilling, productRows, masterTotalRows, orderStatus, orderComment, productsSubtotal]
   );
-
-  const cancelDuplicate = useCallback(() => setDuplicate(null), []);
 
   const reset = useCallback(() => {
     setCompanyName('');
     setBilling(emptyAddress());
     setDelivery(emptyAddress());
     setSameAsBilling(true);
-    setOrderNumber('');
     setOrderDate('');
     setDeliveryDate('');
     setReferenceNumber('');
@@ -304,15 +331,15 @@ export function useManualOrderForm() {
     setSaveError('');
     setSaved(false);
     setSavedRef('');
-    setDuplicate(null);
-  }, []);
+    refreshOrderNumberPreview();
+  }, [refreshOrderNumberPreview]);
 
   return {
     companyName, setCompanyName,
     billing, updateBilling,
     sameAsBilling, setSameAsBilling,
     delivery, updateDelivery,
-    orderNumber, setOrderNumber,
+    orderNumberPreview, orderNumberLoading, orderNumberError, refreshOrderNumberPreview,
     orderDate, setOrderDate,
     deliveryDate, setDeliveryDate,
     referenceNumber, setReferenceNumber,
@@ -320,12 +347,11 @@ export function useManualOrderForm() {
     productRows, addProductRow, removeProductRow, updateProductRow,
     masterTotalRows, addMasterTotalRow, removeMasterTotalRow, updateMasterTotalRow,
     orderStatus, setOrderStatus, orderComment, setOrderComment,
-    grandTotal,
+    productsSubtotal, grandTotal,
     companySuggestions, searchCompanies, pickCompanySuggestion,
     lookupProduct,
     validationError,
     saving, saveError, saved, savedRef,
-    duplicate, cancelDuplicate,
     save: buildAndSave,
     reset,
   };

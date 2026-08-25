@@ -53,21 +53,43 @@ export function buildOrderInfo({ orderNumber, orderDate, deliveryDate, reference
   };
 }
 
-// Master Totals rows are fully manual (confirmed design decision — no tie to
-// product line items). Each non-empty row becomes one entry in
+// Sum of every product row's Total (unitPrice × qty), same formula
+// ManualOrderProductRow.jsx uses per-row (kept in sync manually — that
+// component computes its own row total inline for display; this is the
+// aggregate used to auto-fill the Master Totals Subtotal row and financials.
+// sub_total). Blank/invalid unit price reads as 0, same as the row display.
+export function computeProductsSubtotal(productRows) {
+  const sum = (productRows || []).reduce((acc, r) => {
+    const q = Number(r.qty) || 0;
+    const unit = String(r.unitPrice ?? '').trim() === '' ? 0 : Number(r.unitPrice) || 0;
+    return acc + unit * q;
+  }, 0);
+  return Math.round(sum * 100) / 100;
+}
+
+// Master Totals rows are for adjustments on top of the products subtotal
+// (discount, transportation, etc.) — each non-empty row becomes one entry in
 // `financials.discounts[]`, the same { label, amount } shape already rendered
 // generically by OrderFinancials.jsx and buildXLSX.js (added for multi-discount
-// HTML orders) — so no display/export code needs to change for this feature.
-export function buildFinancialsFromMasterTotals(masterTotalRows, currency = 'GBP') {
+// HTML orders). `subTotal` (the auto-computed products total, NOT a Master
+// Totals row) now populates `financials.sub_total` for real, matching how
+// parseOrderHTML.js populates it for HTML orders — `total` follows the same
+// sub_total + transportation_charges + adjustments shape (transportation_
+// charges stays 0 here; manual orders have never separated it from the
+// generic Master Totals rows, unchanged by this).
+export function buildFinancialsFromMasterTotals(masterTotalRows, subTotal = 0, currency = 'GBP') {
   const discounts = (masterTotalRows || [])
     .filter((r) => String(r.label || '').trim() && Number(r.amount) !== 0 && !Number.isNaN(Number(r.amount)))
     .map((r) => ({ label: String(r.label).trim(), amount: Math.round(Number(r.amount) * 100) / 100 }));
 
-  const total = Math.round(discounts.reduce((sum, d) => sum + d.amount, 0) * 100) / 100;
+  const adjustments = Math.round(discounts.reduce((sum, d) => sum + d.amount, 0) * 100) / 100;
+  const sub_total = Math.round((Number(subTotal) || 0) * 100) / 100;
+  const transportation_charges = 0;
+  const total = Math.round((sub_total + transportation_charges + adjustments) * 100) / 100;
 
   return {
-    sub_total: 0,
-    transportation_charges: 0,
+    sub_total,
+    transportation_charges,
     // Legacy singular fields kept for any code still reading them directly —
     // best-effort mirror of the first row, never the source of truth (discounts[] is).
     discount: discounts[0]?.amount || 0,
@@ -113,11 +135,12 @@ export function validateProductRow(row, index) {
   return '';
 }
 
-// Whole-form validation (Company, Order Number, >=1 real product row, no
-// duplicate empty rows, each row individually valid).
-export function validateManualOrderForm({ companyName, orderNumber, productRows }) {
+// Whole-form validation (Company, >=1 real product row, no duplicate empty
+// rows, each row individually valid). Order Number is no longer part of
+// this (V5) — it's server-assigned, never user input, so there's nothing
+// here to validate.
+export function validateManualOrderForm({ companyName, productRows }) {
   if (!String(companyName || '').trim()) return 'Company Name is required.';
-  if (!String(orderNumber || '').trim()) return 'Order Number is required.';
 
   const realRows = (productRows || []).filter((r) => !isProductRowEmpty(r));
   if (realRows.length === 0) return 'Add at least one product.';

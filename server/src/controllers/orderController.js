@@ -53,6 +53,45 @@ export async function saveOrder(req, res, next) {
   }
 }
 
+// GET /api/v1/orders/manual/next-ref — preview of the ref the next manual
+// order would get right now ('KS-YYYYMMDD-N'). Display only, while the
+// Create Manual Order form is open; the real assignment happens at save
+// time via POST /api/v1/orders/manual (see createManualOrder below).
+export async function nextManualOrderRef(req, res, next) {
+  try {
+    ensureDb();
+    const nextRef = await orderService.getNextManualOrderRef();
+    res.status(200).json({ nextRef });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/v1/orders/manual — create a new manual ("Orders - Kumkum")
+// order. Unlike POST /api/v1/orders, the caller never supplies the ref —
+// the server assigns 'KS-YYYYMMDD-N' itself (race-safe against concurrent
+// saves), so there's nothing left to type or get wrong (V5).
+export async function createManualOrder(req, res, next) {
+  try {
+    ensureDb();
+    const { customerName, orderDate, totalProducts, parsedData, resolutionData } = req.body || {};
+
+    const order = await orderService.createManualOrder({
+      customerName: customerName || '',
+      orderDate: orderDate || '',
+      totalProducts: Number.isFinite(Number(totalProducts)) ? Number(totalProducts) : 0,
+      parsedData: parsedData ?? {},
+      resolutionData: resolutionData ?? {},
+      // Automatically assigned from the JWT-authenticated user, same as
+      // saveOrder above — never accepted from the request body.
+      processedBy: req.user.name,
+    });
+
+    res.status(201).json(order);
+  } catch (err) {
+    next(err);
+  }
+}
 
 // GET /api/v1/orders — list orders (summary), optional ?query= ref filter,
 // ?company= exact company filter, and ?limit= result cap.
