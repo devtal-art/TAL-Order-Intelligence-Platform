@@ -1027,11 +1027,23 @@ export async function getDashboardSummary({ previewLimit } = {}) {
     .filter((d) => d.daysUntil >= 0)
     .sort((a, b) => a.daysUntil - b.daysUntil);
 
-  // Next 7 delivery dates including today (day offsets 0-6). Dates with no
-  // orders never entered parsedDeliveryDates in the first place (the
-  // aggregation only groups dates that have >=1 order), so this naturally
-  // skips empty days rather than needing an explicit skip step.
-  const next7DeliveryDates = upcomingDeliveryDates.filter((d) => d.daysUntil <= 6);
+  // Crossed = strictly before today, most recent first — the full set, for
+  // the Delivery Date "View All" list's Crossed section and the dashboard's
+  // "latest crossed" card.
+  const crossedDeliveryDates = parsedDeliveryDates
+    .filter((d) => d.daysUntil < 0)
+    .sort((a, b) => b.daysUntil - a.daysUntil);
+
+  // The next 7 DATES THAT HAVE ORDERS (not a 7-calendar-day window — a gap
+  // of no-order days no longer shrinks the card below 7 rows when there are
+  // more upcoming dates further out to fill it). Dates with no orders never
+  // entered parsedDeliveryDates in the first place (the aggregation only
+  // groups dates that have >=1 order), so empty days are already skipped.
+  const next7DeliveryDates = upcomingDeliveryDates.slice(0, 7);
+
+  // Latest 7 crossed (past) delivery dates, most recent first — mirrors
+  // next7DeliveryDates for the dashboard's "Crossed Delivery Dates" card.
+  const next7CrossedDeliveryDates = crossedDeliveryDates.slice(0, 7);
 
   // Today by processor
   const todayByProcessor = {};
@@ -1077,12 +1089,19 @@ export async function getDashboardSummary({ previewLimit } = {}) {
     uniqueItems: agg.unique_items?.[0]?.n ?? 0,
     itemStatusCounts,
     itemReasonCounts,
-    // Order Delivery Date section (V4, revised): next7DeliveryDates powers
-    // the dashboard card (today + next 6 days, no-order days skipped
-    // automatically), upcomingDeliveryDates powers "View All" (every
-    // upcoming date, unbounded). Each entry: { date, count, daysUntil }.
+    // Order Delivery Date section (V4, revised; V5.3 — added crossed dates):
+    // next7DeliveryDates powers the dashboard card (the next 7 dates that
+    // actually have orders, today included, no-order days skipped
+    // automatically), upcomingDeliveryDates powers "View All"'s Upcoming
+    // section (every upcoming date, unbounded). next7CrossedDeliveryDates
+    // powers the dashboard's Crossed Delivery Dates card (latest 7 past
+    // dates), crossedDeliveryDates powers "View All"'s Crossed section
+    // (every past date, unbounded). Each entry: { date, count, daysUntil }
+    // (daysUntil is negative for crossed dates).
     next7DeliveryDates,
     upcomingDeliveryDates,
+    next7CrossedDeliveryDates,
+    crossedDeliveryDates,
     todayByProcessor,
     allByProcessor,
     todayOrdersPreview: (agg.today_orders_preview || []).map(toDashboardCardDto),

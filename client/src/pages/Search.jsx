@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import SavedOrderLookup, { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
+import ProductSearchBox from '../components/ProductSearchBox.jsx';
 import SortTh from '../components/SortableHeader.jsx';
 import { orderService } from '../services/orderService.js';
 import { statusMeta } from '../utils/order.js';
@@ -24,6 +25,10 @@ export default function Search() {
 
         <div className="sp-search">
           <SavedOrderLookup onOrderChanged={bump} />
+        </div>
+
+        <div className="sp-search">
+          <ProductSearchBox />
         </div>
 
         <RecentOrders refreshToken={refreshToken} onChanged={bump} />

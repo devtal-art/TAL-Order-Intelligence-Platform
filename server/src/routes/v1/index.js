@@ -5,6 +5,7 @@ import { mappingRouter } from './mapping.routes.js';
 import { resolveRouter } from './resolve.routes.js';
 import { orderRouter } from './order.routes.js';
 import { authRouter } from './auth.routes.js';
+import { productLookupRouter } from './productLookup.routes.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { blockViewerWrites } from '../../middleware/blockViewerWrites.js';
 
@@ -23,4 +24,5 @@ v1Router.use('/catalog', authenticate, blockViewerWrites, catalogRouter);
 v1Router.use('/mappings', authenticate, blockViewerWrites, mappingRouter);
 v1Router.use('/resolve', authenticate, blockViewerWrites, resolveRouter);
 v1Router.use('/orders', authenticate, blockViewerWrites, orderRouter);
+v1Router.use('/products', authenticate, blockViewerWrites, productLookupRouter);
 

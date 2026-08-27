@@ -477,6 +477,21 @@
 .sp-search{max-width:720px;margin:0 auto 26px}
 .sp-search .sol-card{box-shadow:var(--shadow-sm)}
 
+/* Delivery Dates "View All" (V5.3) — Upcoming/Crossed sections. */
+.ddl-sections{display:flex;flex-direction:column;gap:28px}
+.ddl-section-head{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.ddl-section-title{font-family:var(--font-display);font-size:16px;font-weight:700;letter-spacing:-.01em}
+
+/* Crossed section alert styling (V5.7; simplified V5.8) — restrained to ONE
+   signal (a red section title + red table border) instead of painting the
+   header, table header row, AND every data value red — that flattened
+   everything to the same color with no label/value contrast, which read as
+   confusing rather than alerting. The data itself (dates, counts) stays the
+   same neutral styling as the Upcoming section, so it's still easy to read;
+   only applied once the section actually has rows. */
+.ddl-section--alert .ddl-section-title{color:var(--danger-strong)}
+.ddl-section--alert .dl-table-wrap{border-color:var(--danger-border)}
+
 .ro-card{margin-top:6px}
 .ro-head{margin-bottom:12px}
 .ro-title{

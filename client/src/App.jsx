@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import DashboardList from './pages/DashboardList.jsx';
 import DeliveryDatesList from './pages/DeliveryDatesList.jsx';
 import Search from './pages/Search.jsx';
+import ProductSearchResults from './pages/ProductSearchResults.jsx';
 import CreateManualOrder from './pages/CreateManualOrder.jsx';
 
 // Route map:
@@ -16,6 +17,7 @@ import CreateManualOrder from './pages/CreateManualOrder.jsx';
 //   /dashboard/orders         — bucket list "View All" (protected)
 //   /dashboard/delivery-dates — all upcoming delivery dates "View All" (protected)
 //   /search                   — saved-order search (protected)
+//   /search/products          — product search results (protected, V5.1 — new, additive)
 //   /orders/manual            — Create Manual Order (protected, V3.1 — new, additive)
 export default function App() {
   return (
@@ -62,6 +64,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Search />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/search/products"
+          element={
+            <ProtectedRoute>
+              <ProductSearchResults />
             </ProtectedRoute>
           }
         />

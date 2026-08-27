@@ -1,0 +1,34 @@
+/* Product Search (V5.1; results view flattened to a single list in V5.6) —
+   the Search page's "Search Products" box (reuses .step-card for the shell
+   and .sol-search/.sol-input/.sol-btn for the input row) plus the dedicated
+   results page's flat match list and bottom validation summary. */
+
+.ps-box{margin-bottom:0}
+.ps-box-head{margin-bottom:2px}
+
+.ps-list{margin-top:20px}
+
+/* Stronger header than the plain gray .dl-table default (scoped to this
+   page only, via .ps-list) — an accent-tinted row makes "Search Term" and
+   the result columns read as the page's primary content, not just another
+   quiet data table. */
+.ps-list .dl-table th{
+  background:var(--accent-soft);color:var(--accent);
+  border-bottom:1px solid var(--accent-border);
+  font-weight:700;
+}
+
+/* Search Term value as a badge, not plain text — the eye should catch which
+   query produced each row at a glance, distinct from the result data
+   (Item No / Website Name / Email Name) beside it. */
+.ps-term-badge{
+  display:inline-block;background:var(--accent-soft);color:var(--accent);
+  border:1px solid var(--accent-border);border-radius:6px;
+  padding:3px 9px;font-size:11.5px;font-weight:700;
+}
+
+/* Summary/validation footer below the results list — always states how many
+   search terms matched, and calls out any that found no exact match
+   together in one place instead of one empty card per term. */
+.ps-summary{margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.ps-summary-line{font-size:12.5px;color:var(--muted);font-weight:600}

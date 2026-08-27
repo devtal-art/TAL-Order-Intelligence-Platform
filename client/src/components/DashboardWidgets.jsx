@@ -28,6 +28,7 @@ import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import ShoppingBagRoundedIcon from '@mui/icons-material/ShoppingBagRounded';
 import EventRoundedIcon from '@mui/icons-material/EventRounded';
 import EventBusyRoundedIcon from '@mui/icons-material/EventBusyRounded';
+import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded';
 import TodayRoundedIcon from '@mui/icons-material/TodayRounded';
 import InboxRoundedIcon from '@mui/icons-material/InboxRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
@@ -83,6 +84,18 @@ const osIconFor = (status) => {
     default: return HelpRoundedIcon;
   }
 };
+
+// Shared red palette for the Crossed Delivery Dates alert card (V5.7) —
+// same red already used elsewhere on the dashboard (Order Cancelled / Not
+// Released), so "overdue delivery" reads as the same severity of alert.
+const RED = TONE.cancelled;
+
+// Order Delivery Date / Crossed Delivery Dates cards (V5.5) — a fixed cap on
+// the scrollable date list so the card's own size stays constant (matching
+// its row neighbors) no matter how many of the up to 7 dates exist; ~3 rows
+// fit before the list scrolls for the rest. Shared by both cards so they
+// stay visually identical.
+const DELIVERY_LIST_MAX_HEIGHT = 168;
 
 const cardSx = {
   // 1 × theme.shape.borderRadius (12px) — a clean rectangular card with
@@ -144,6 +157,7 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
   const fmt = (n) => Number(n || 0).toLocaleString();
   const orderStatusBuckets = summary.orderStatuses || [];
   const discountBuckets = summary.discountBuckets || [];
+  const hasCrossedDates = (summary.next7CrossedDeliveryDates || []).length > 0;
 
   return (
     <Box className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
@@ -239,33 +253,40 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
               </Box>
             ) : (
               <>
-                {/* Next 7 delivery dates including today — days with no
-                    orders are already excluded server-side, so every row
-                    here has at least one order. */}
-                {summary.next7DeliveryDates.map((d, i) => (
-                  <Box key={d.date}>
-                    {i > 0 && <Divider />}
-                    <Box
-                      component={Link}
-                      to={`/dashboard/orders?type=deliveryDate&value=${encodeURIComponent(d.date)}`}
-                      sx={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        py: 0.75, textDecoration: 'none', color: 'inherit',
-                        '&:hover .dd-date': { color: 'primary.main' },
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.15 }}>
-                        <Typography className="dd-date" variant="body2" sx={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, transition: 'color .12s' }}>
-                          {formatDisplayDate(d.date)}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>
-                          {formatDaysUntil(d.daysUntil)}
-                        </Typography>
+                {/* Fixed-height, internally-scrolling list (V5.5) — the card
+                    itself always stays the same size (matches its Row 2
+                    neighbors, which stretch to it via items-stretch) no
+                    matter how many of the up-to-7 dates exist: 1 date or 7,
+                    the card height never changes, only whether this inner
+                    box needs to scroll. Days with no orders are already
+                    excluded server-side, so every row here has at least one
+                    order. */}
+                <Box sx={{ maxHeight: DELIVERY_LIST_MAX_HEIGHT, overflowY: 'auto' }}>
+                  {summary.next7DeliveryDates.map((d, i) => (
+                    <Box key={d.date}>
+                      {i > 0 && <Divider />}
+                      <Box
+                        component={Link}
+                        to={`/dashboard/orders?type=deliveryDate&value=${encodeURIComponent(d.date)}`}
+                        sx={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          py: 0.75, textDecoration: 'none', color: 'inherit',
+                          '&:hover .dd-date': { color: 'primary.main' },
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.15 }}>
+                          <Typography className="dd-date" variant="body2" sx={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, transition: 'color .12s' }}>
+                            {formatDisplayDate(d.date)}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>
+                            {formatDaysUntil(d.daysUntil)}
+                          </Typography>
+                        </Box>
+                        <Chip size="small" label={`${d.count} order${d.count === 1 ? '' : 's'}`} sx={{ bgcolor: '#FAFAF8', border: '1px solid #D9D6D1', fontSize: 10.5 }} />
                       </Box>
-                      <Chip size="small" label={`${d.count} order${d.count === 1 ? '' : 's'}`} sx={{ bgcolor: '#FAFAF8', border: '1px solid #D9D6D1', fontSize: 10.5 }} />
                     </Box>
-                  </Box>
-                ))}
+                  ))}
+                </Box>
                 <ViewAllLink to="/dashboard/delivery-dates" />
               </>
             )}
@@ -273,10 +294,10 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
         </Card>
       </div>
 
-      {/* ═══ Row 3 — Order | Item | Today's Orders ═══ */}
+      {/* ═══ Row 3 — Order | Item | Crossed Delivery Dates ═══ */}
       {/* Natural (unstretched) heights, top-aligned: these three cards hold
-          very different amounts of content (a compact chart+legend, five
-          bucket rows, a short processor list). Forcing them to a shared
+          very different amounts of content (five bucket rows, five bucket
+          rows, up to 7 delivery-date rows). Forcing them to a shared
           stretched height (tried first) just relocated the mismatch inside
           the shorter cards as dead whitespace, which read worse than the
           cards simply being different heights — a normal, expected pattern
@@ -354,6 +375,105 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
           </CardContent>
         </Card>
 
+        {/* Crossed Delivery Dates (V5.3; alert styling V5.8) — the past-dates
+            mirror of the Order Delivery Date card in Row 2: latest 7
+            delivery dates that have already passed, most recent first, so a
+            missed/overdue delivery is never more than one glance away.
+            Alert styling is deliberately restrained to ONE signal — a red
+            border + red header — rather than painting every line of text
+            red: an earlier pass made the heading, date, "days ago" caption,
+            and order-count chip all the same red, which read as visual
+            noise with no label/value contrast. Now only the header carries
+            the alert color; the data itself (date, days-ago, count) stays
+            normal ink/muted text like every other card, so it's still
+            legible at a glance. Styling only applies when there's actually
+            something to flag — an empty card (nothing overdue) stays fully
+            neutral rather than reading as a false alarm. */}
+        <Card
+          variant="outlined"
+          sx={{
+            ...cardSx, display: 'flex', flexDirection: 'column',
+            ...(hasCrossedDates && { borderColor: RED.border }),
+          }}
+        >
+          <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', '&:last-child': { pb: 2 } }}>
+            <StatLabel icon={HistoryRoundedIcon} color={hasCrossedDates ? RED.strong : 'text.disabled'}>
+              Crossed Delivery Dates
+            </StatLabel>
+            {!hasCrossedDates ? (
+              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <EmptyState
+                  icon={EventBusyRoundedIcon}
+                  title="No crossed delivery dates"
+                  sub="Past delivery dates will appear here once an order's date has passed."
+                />
+              </Box>
+            ) : (
+              <>
+                {/* Same fixed-height, internally-scrolling list as the Order
+                    Delivery Date card above (V5.5) — card size stays
+                    constant as more crossed dates accumulate over time. */}
+                <Box sx={{ maxHeight: DELIVERY_LIST_MAX_HEIGHT, overflowY: 'auto' }}>
+                  {summary.next7CrossedDeliveryDates.map((d, i) => (
+                    <Box key={d.date}>
+                      {i > 0 && <Divider />}
+                      <Box
+                        component={Link}
+                        to={`/dashboard/orders?type=deliveryDate&value=${encodeURIComponent(d.date)}`}
+                        sx={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          py: 0.75, textDecoration: 'none', color: 'inherit',
+                          '&:hover .dd-date': { color: 'primary.main' },
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.15 }}>
+                          <Typography className="dd-date" variant="body2" sx={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, transition: 'color .12s' }}>
+                            {formatDisplayDate(d.date)}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>
+                            {formatDaysUntil(d.daysUntil)}
+                          </Typography>
+                        </Box>
+                        <Chip size="small" label={`${d.count} order${d.count === 1 ? '' : 's'}`} sx={{ bgcolor: '#FAFAF8', border: '1px solid #D9D6D1', fontSize: 10.5 }} />
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+                <ViewAllLink to="/dashboard/delivery-dates" />
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ═══ Row 3.5 — Discount (portrait, V5.4) | Today's Orders ═══ */}
+      {/* Discount switched from its old full-width landscape row layout to
+          the vertical BucketGroup stack so it no longer needs the full row
+          width — freeing up the space beside it for Today's Orders (moved
+          down from Row 3 to make room for Crossed Delivery Dates above).
+          items-start (not stretch): the two cards hold very different
+          amounts of content, same reasoning as Row 3 above. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 items-start">
+        <Card variant="outlined" sx={cardSx}>
+          <SectionHead>Discount</SectionHead>
+          <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <BucketGroup title="Discount Type" layout="row">
+              {discountBuckets.map((bucket) => (
+                <BucketRow
+                  key={bucket.value}
+                  type="discount"
+                  bucket={bucket}
+                  meta={discountBucketMeta(bucket.value)}
+                  onView={onView}
+                  viewBusyRef={viewBusyRef}
+                  isOpen={openDiscount === bucket.value}
+                  onToggle={() => setOpenDiscount((cur) => (cur === bucket.value ? null : bucket.value))}
+                />
+              ))}
+            </BucketGroup>
+          </CardContent>
+        </Card>
+
         {/* Today's Orders */}
         <Card variant="outlined" sx={cardSx}>
           <CardContent sx={{ pb: '8px !important' }}>
@@ -383,33 +503,6 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
               <EmptyState icon={InboxRoundedIcon} title="No orders processed today" compact />
             )}
           </Box>
-        </Card>
-      </div>
-
-      {/* ═══ Row 3.5 — Discount (V4.7) ═══ */}
-      {/* Full-width landscape card (per user request) — the 4 discount
-          buckets lay out horizontally in one row instead of the vertical
-          stack every other BucketGroup uses, via BucketGroup's `layout="row"`
-          prop below (opt-in, so Order/Item's groups are untouched). */}
-      <div className="mb-4">
-        <Card variant="outlined" sx={cardSx}>
-          <SectionHead>Discount</SectionHead>
-          <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <BucketGroup title="Discount Type" layout="row">
-              {discountBuckets.map((bucket) => (
-                <BucketRow
-                  key={bucket.value}
-                  type="discount"
-                  bucket={bucket}
-                  meta={discountBucketMeta(bucket.value)}
-                  onView={onView}
-                  viewBusyRef={viewBusyRef}
-                  isOpen={openDiscount === bucket.value}
-                  onToggle={() => setOpenDiscount((cur) => (cur === bucket.value ? null : bucket.value))}
-                />
-              ))}
-            </BucketGroup>
-          </CardContent>
         </Card>
       </div>
 
@@ -500,11 +593,14 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
 
 // ── Small building blocks ──────────────────────────────────────────────
 
-function StatLabel({ icon: Icon, children }) {
+// `color` (optional) overrides the default muted text.disabled tone — used
+// by the Crossed Delivery Dates card to turn its own header red when it has
+// overdue dates to flag (V5.7).
+function StatLabel({ icon: Icon, children, color = 'text.disabled' }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-      {Icon && <Icon sx={{ fontSize: 14, color: 'text.disabled' }} />}
-      <Typography variant="overline" sx={{ lineHeight: 1, color: 'text.disabled', fontWeight: 700, fontSize: 10.5 }}>
+      {Icon && <Icon sx={{ fontSize: 14, color }} />}
+      <Typography variant="overline" sx={{ lineHeight: 1, color, fontWeight: 700, fontSize: 10.5 }}>
         {children}
       </Typography>
     </Box>
@@ -631,11 +727,14 @@ function EmptyState({ icon: Icon, title, sub, compact }) {
 }
 
 // `layout="row"` (opt-in, used only by the Discount section) lays the
-// bucket rows out in a responsive grid — 4-across on desktop, 2-across on
-// tablet, stacked on mobile — instead of the default vertical stack every
-// other BucketGroup (Order/Item) still uses unchanged. `alignItems:'start'`
-// keeps each pill's own height independent, so expanding one bucket only
-// grows its own cell rather than stretching its row-mates to match.
+// bucket rows out in a 2-across grid instead of the default vertical stack
+// every other BucketGroup (Order/Item) still uses unchanged. Capped at 2
+// columns (not 4) because the Discount card itself only spans about half
+// the row's width (V5.4, paired with Today's Orders) — a breakpoint-driven
+// 4-across would go by viewport width, not the card's actual (narrower)
+// rendered width, and end up cramped. `alignItems:'start'` keeps each
+// pill's own height independent, so expanding one bucket only grows its own
+// cell rather than stretching its row-mates to match.
 function BucketGroup({ title, children, layout = 'column' }) {
   return (
     <Box>
@@ -647,7 +746,7 @@ function BucketGroup({ title, children, layout = 'column' }) {
           layout === 'row'
             ? {
                 display: 'grid',
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
                 gap: 1,
                 alignItems: 'start',
               }

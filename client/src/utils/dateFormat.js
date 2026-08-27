@@ -92,9 +92,12 @@ export function formatDisplayDate(stored) {
 }
 
 // Human label for a day-offset from today, e.g. for the Delivery Date
-// sections (0 = today).
+// sections (0 = today). Also handles negative offsets (crossed/past dates)
+// so the same helper covers both the Upcoming and Crossed sections.
 export function formatDaysUntil(n) {
   if (n === 0) return 'Today';
   if (n === 1) return 'Tomorrow';
+  if (n === -1) return 'Yesterday';
+  if (n < 0) return `${-n} days ago`;
   return `In ${n} days`;
 }
