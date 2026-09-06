@@ -106,6 +106,13 @@ const orderSchema = new mongoose.Schema(
     // but that blob is fully replaced on every re-upload/re-save, which would
     // silently wipe a user's edit). '' = not set yet.
     delivery_date: { type: String, default: '', trim: true },
+
+    // Whether the order's discount was actually provided/applied (Discount
+    // Provided toggle — new, additive). Order-level, independent of which
+    // discount bucket the order classifies into (that stays fully derived
+    // from parsed_data, never stored). Defaults false — every order starts
+    // "not provided" until explicitly toggled from the discount list pages.
+    discount_provided: { type: Boolean, default: false },
   },
   { versionKey: false, minimize: false }
 );

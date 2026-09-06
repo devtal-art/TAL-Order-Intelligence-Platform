@@ -361,6 +361,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
   // Order-level extras from the stored parsed snapshot (V1.8, display-only).
   // Older orders without them simply don't render the field/section.
   const additionalComment = String(parsed.order_info?.additional_comments || '').trim();
+  const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
   const totalNum = Number(parsed.financials?.total);
   const orderTotal = Number.isFinite(totalNum) && totalNum > 0 ? `${sym}${totalNum.toFixed(2)}` : '';
 
@@ -378,6 +379,42 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+
+  // Order Activity Log (who changed what, when) — lazy-loaded on first
+  // expand so opening the order detail modal never fires an extra request
+  // nobody asked to see.
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [logs, setLogs] = useState(null); // null = not fetched yet
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState('');
+
+  const fetchLogs = async () => {
+    setLogsLoading(true);
+    setLogsError('');
+    try {
+      const resp = await orderService.logs(order.portalOrderRef);
+      setLogs(resp.data || []);
+    } catch (e) {
+      setLogsError(e.message || 'Could not load the activity log.');
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const toggleLogs = () => {
+    const next = !logsOpen;
+    setLogsOpen(next);
+    if (next && logs === null && !logsLoading) fetchLogs();
+  };
+
+  // Any edit saved through this modal (Edit/Save, Add Product, Remove
+  // Product) writes new Activity Log entries server-side — invalidate the
+  // cached list so the next expand (or an already-open panel) shows them
+  // instead of a stale snapshot from before the edit.
+  const invalidateLogs = () => {
+    setLogs(null);
+    if (logsOpen) fetchLogs();
+  };
 
   // Item numbers already approved in the order — informational "In order"
   // tag in the Add Product search (duplicates are allowed, V1.9).
@@ -404,8 +441,10 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       totalProducts: appended.parsed.line_items.length,
       parsedData,
       resolutionData: appended.resolution,
+      reason: 'product_added',
     });
     onSaved(updated);
+    invalidateLogs();
   };
 
   const [deletingId, setDeletingId] = useState('');
@@ -443,11 +482,13 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
         totalProducts: removed.parsed.line_items.length,
         parsedData,
         resolutionData: removed.resolution,
+        reason: 'product_removed',
       });
       if (Object.keys(cm.patch).length) updated = await orderService.setComments(order.portalOrderRef, cm.patch);
       if (Object.keys(fl.patch).length) updated = await orderService.setFulfillment(order.portalOrderRef, fl.patch);
       if (Object.keys(nt.patch).length) updated = await orderService.setNotes(order.portalOrderRef, nt.patch);
       onSaved(updated);
+      invalidateLogs();
     } catch (e) {
       setSaveError(e.message || 'Could not remove the product.');
     } finally {
@@ -553,6 +594,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       });
       updated = await orderService.setDeliveryDate(order.portalOrderRef, deliveryDateDraft);
       onSaved(updated);
+      invalidateLogs();
       setEditing(false);
     } catch (e) {
       setSaveError(e.message || 'Could not save changes.');
@@ -603,6 +645,14 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
               </span>
             )}
           </span>
+          {order.discountBucket && (
+            <span
+              className={`disc-badge${order.discountProvided ? ' is-provided' : ''}`}
+              title="Set from the discount dashboard's list pages"
+            >
+              {order.discountProvided ? 'Discount Provided' : 'Discount Not Provided'}
+            </span>
+          )}
         </div>
       </div>
 
@@ -904,6 +954,43 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
         comments={comments}
         orderSource={order.orderSource}
       />
+
+      <div className="sol-log-section">
+        <button
+          type="button"
+          className="sol-log-toggle"
+          onClick={toggleLogs}
+          aria-expanded={logsOpen}
+        >
+          <svg className={`sol-log-chevron${logsOpen ? ' is-open' : ''}`} viewBox="0 0 24 24">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          Activity Log
+        </button>
+
+        {logsOpen && (
+          <div className="sol-log-body">
+            {logsLoading && <div className="sol-log-empty">Loading…</div>}
+            {logsError && <div className="sol-error">{logsError}</div>}
+            {!logsLoading && !logsError && logs && logs.length === 0 && (
+              <div className="sol-log-empty">No activity recorded for this order yet.</div>
+            )}
+            {!logsLoading && logs && logs.length > 0 && (
+              <ul className="sol-log-list">
+                {logs.map((entry) => (
+                  <li key={entry.id} className="sol-log-item">
+                    <div className="sol-log-item-line">
+                      <span className="sol-log-actor">{entry.actor}</span>
+                      <span className="sol-log-message">{entry.message}</span>
+                    </div>
+                    <div className="sol-log-time">{fmtDate(entry.createdAt)}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
       </div>
 
       {addOpen && (

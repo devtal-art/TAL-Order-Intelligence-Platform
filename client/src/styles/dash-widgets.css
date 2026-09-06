@@ -468,6 +468,35 @@
 .dl-act{text-align:right;white-space:nowrap}
 .dl-muted{color:var(--muted);font-style:italic}
 .dl-comment{max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Activity Log "View All" filter bar (date + Order Number) */
+.al-filters{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:14px 0}
+.al-filter-field{display:flex;flex-direction:column;gap:5px}
+.al-filter-field--grow{flex:1;min-width:200px}
+.al-filter-label{font-size:11.5px;font-weight:600;color:var(--ink-2)}
+.al-filters .sol-input{width:100%;box-sizing:border-box}
+.al-filter-field:not(.al-filter-field--grow) .sol-input{width:auto}
+
+/* Discount Provided toggle (discount "View All" pages only) — an actual
+   sliding switch: gray track/left thumb = not provided, red track/right
+   thumb = provided. */
+.dl-discount-cell{display:inline-flex;align-items:center;gap:8px}
+.dl-discount-switch{
+  position:relative;flex-shrink:0;width:38px;height:21px;border-radius:999px;padding:0;
+  border:1px solid var(--border-strong);background:var(--border-strong);cursor:pointer;
+  transition:background .18s,border-color .18s;
+}
+.dl-discount-switch:hover{border-color:var(--ink-2)}
+.dl-discount-switch.is-provided{background:var(--danger);border-color:var(--danger-strong)}
+.dl-discount-switch-thumb{
+  position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 2px rgba(28,25,23,.25);
+  transition:transform .18s;
+}
+.dl-discount-switch.is-provided .dl-discount-switch-thumb{transform:translateX(17px)}
+.dl-discount-switch:disabled{opacity:.6;cursor:not-allowed}
+.dl-discount-label{font-size:11.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.dl-discount-label.is-provided{color:var(--danger-strong)}
 .dl-empty{
   font-size:13px;color:var(--muted);text-align:center;padding:28px;
   background:var(--surface-2);border:1.5px dashed var(--border-strong);border-radius:var(--radius);

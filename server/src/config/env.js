@@ -29,4 +29,11 @@ export const env = {
     }
     return 'dev-insecure-fallback-secret-do-not-use-in-production';
   })(),
+
+  // Help button — sends via Brevo's transactional email API. No fallback:
+  // an unset key means helpService fails closed with a clear error rather
+  // than silently no-op'ing (see helpService.js).
+  brevoApiKey: process.env.BREVO_API_KEY,
+  brevoSenderEmail: process.env.BREVO_SENDER_EMAIL,
+  helpRecipientEmail: process.env.HELP_RECIPIENT_EMAIL || 'dev.talhouse@gmail.com',
 };

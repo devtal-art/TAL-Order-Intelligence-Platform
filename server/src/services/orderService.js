@@ -3,6 +3,7 @@ import { Product } from '../models/product.model.js';
 import { productDisplayName } from '../utils/displayName.js';
 import { AppError } from '../utils/AppError.js';
 import { parseFlexibleDate, daysBetween } from '../utils/dateUtil.js';
+import { recordLog } from './orderLogService.js';
 
 // ────────────────────────────────────────────────
 //  ORDER SERVICE (V1.2 — new, additive)
@@ -79,6 +80,11 @@ export function toDto(doc) {
     // order_info.delivery_date) for orders saved before delivery_date became
     // its own top-level field (V4.2) — display-only, never written back.
     deliveryDate: doc.delivery_date || doc.parsed_data?.order_info?.delivery_date || '',
+    // Discount Provided toggle (display-only bucket classification alongside
+    // it — see classifyDiscountBucket below). '' when the order has no
+    // discount at all, so the client knows not to show the small message.
+    discountProvided: Boolean(doc.discount_provided),
+    discountBucket: classifyDiscountBucket(doc.parsed_data) || '',
   };
 }
 
@@ -120,6 +126,13 @@ export async function upsertOrder({
   resolutionData = {},
   processedBy = '',
   orderSource,
+  actor,
+  actorRole,
+  // Optional (Order Activity Log) — the client's reason for calling this on
+  // an ALREADY-EXISTING order (Add Product / Remove Product). Omitted for a
+  // genuine first save or a re-upload of the same ref, both of which are
+  // distinguished from a plain "product added/removed" edit for the log.
+  reason,
 }) {
   const resolution_status = deriveStatus(resolutionData);
 
@@ -160,14 +173,46 @@ export async function upsertOrder({
   // needed, and no risk of it silently drifting between saves.
   set.order_channel = src === 'MANUAL' ? 'Order - Kumkum' : 'Orders - Email';
 
-  const doc = await Order.findOneAndUpdate(
+  // Mongoose 8 renamed the findOneAndUpdate "return the full driver result"
+  // option from `rawResult` to `includeResultMetadata` — `rawResult` is
+  // silently ignored (not an error), which would otherwise make this resolve
+  // to the plain document and `.value`/`.lastErrorObject` read as undefined.
+  const rawResult = await Order.findOneAndUpdate(
     { portal_order_ref: portalOrderRef },
     {
       $set: set,
       $setOnInsert: { portal_order_ref: portalOrderRef },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { new: true, upsert: true, setDefaultsOnInsert: true, includeResultMetadata: true }
   );
+  const doc = rawResult.value;
+  const wasInserted = Boolean(rawResult.lastErrorObject?.upserted);
+
+  if (actor) {
+    let action;
+    let message;
+    if (wasInserted) {
+      action = 'order_created';
+      message = `Order uploaded and saved${filename ? ` (${filename})` : ''}`;
+    } else if (reason === 'product_added') {
+      action = 'product_added';
+      message = 'Product added to order';
+    } else if (reason === 'product_removed') {
+      action = 'product_removed';
+      message = 'Product removed from order';
+    } else {
+      action = 'order_reuploaded';
+      message = 'Order re-uploaded and saved';
+    }
+    await recordLog({
+      portalOrderRef,
+      actor,
+      actorRole,
+      action,
+      message,
+      details: { filename, totalProducts },
+    });
+  }
 
   return toDto(doc);
 }
@@ -218,6 +263,8 @@ export async function createManualOrder({
   parsedData = {},
   resolutionData = {},
   processedBy = '',
+  actor,
+  actorRole,
 } = {}) {
   const resolution_status = deriveStatus(resolutionData);
   const datePrefix = todayDatePrefix();
@@ -241,6 +288,16 @@ export async function createManualOrder({
         order_source: 'MANUAL',
         order_channel: 'Order - Kumkum',
       });
+      if (actor) {
+        await recordLog({
+          portalOrderRef,
+          actor,
+          actorRole,
+          action: 'manual_order_created',
+          message: 'Manual order created',
+          details: { customerName, totalProducts },
+        });
+      }
       return toDto(doc);
     } catch (err) {
       // E11000 duplicate key on portal_order_ref — another manual order
@@ -259,7 +316,7 @@ export async function createManualOrder({
 // "Not Assigned" and can be assigned once) — after that it is immutable and
 // any change attempt is rejected. Assigning the identical value again is an
 // idempotent no-op.
-export async function setProcessedBy(portalOrderRef, processedBy) {
+export async function setProcessedBy(portalOrderRef, processedBy, { actor, actorRole } = {}) {
   const value = processedBy === null || processedBy === undefined ? '' : String(processedBy).trim();
   if (!value || !PROCESSED_BY_USERS.includes(value)) {
     throw new AppError('VALIDATION_ERROR', `Processed By must be one of: ${PROCESSED_BY_USERS.join(', ')}.`, {
@@ -286,6 +343,16 @@ export async function setProcessedBy(portalOrderRef, processedBy) {
     { $set: { processed_by: value } },
     { new: true }
   );
+  if (actor) {
+    await recordLog({
+      portalOrderRef,
+      actor,
+      actorRole,
+      action: 'processed_by_set',
+      message: `Order assigned to ${value}`,
+      details: { to: value },
+    });
+  }
   return toDto(doc);
 }
 
@@ -309,7 +376,7 @@ export const ORDER_COMMENT_MAX_LENGTH = 2000;
 // independent of every per-product field (Item Status, Reason, Comments).
 // orderStatus must be one of ORDER_STATUSES — arbitrary values (including
 // 'Unknown') are rejected. orderComment is optional free text.
-export async function setOrderStatus(portalOrderRef, { orderStatus, orderComment } = {}) {
+export async function setOrderStatus(portalOrderRef, { orderStatus, orderComment, actor, actorRole } = {}) {
   if (!ORDER_STATUSES.includes(orderStatus)) {
     throw new AppError('VALIDATION_ERROR', `Order Status must be one of: ${ORDER_STATUSES.join(', ')}.`, {
       status: 400,
@@ -326,41 +393,132 @@ export async function setOrderStatus(portalOrderRef, { orderStatus, orderComment
     });
   }
 
+  const before = await Order.findOne(
+    { portal_order_ref: portalOrderRef },
+    { order_status: 1, order_comment: 1 }
+  ).lean();
+  if (!before) {
+    throw new AppError('NOT_FOUND', `No order found with Portal Order Ref "${portalOrderRef}".`, {
+      status: 404,
+    });
+  }
+
   const doc = await Order.findOneAndUpdate(
     { portal_order_ref: portalOrderRef },
     { $set: { order_status: orderStatus, order_comment: trimmed } },
     { new: true }
   );
-  if (!doc) {
-    throw new AppError('NOT_FOUND', `No order found with Portal Order Ref "${portalOrderRef}".`, {
-      status: 404,
-    });
+
+  if (actor) {
+    const fromStatus = before.order_status || '';
+    const fromComment = before.order_comment || '';
+    const statusChanged = fromStatus !== orderStatus;
+    const commentChanged = fromComment !== trimmed;
+    // The client's Save button always resubmits Order Status + Order Comment
+    // together even when only one of them was actually edited — log only
+    // what really changed, not a no-op resend of the untouched field.
+    if (statusChanged || commentChanged) {
+      let message;
+      if (statusChanged && commentChanged) {
+        message = `Order Status changed from "${fromStatus || '—'}" to "${orderStatus}" (comment updated)`;
+      } else if (statusChanged) {
+        message = fromStatus
+          ? `Order Status changed from "${fromStatus}" to "${orderStatus}"`
+          : `Order Status set to "${orderStatus}"`;
+      } else {
+        message = 'Order Comment updated';
+      }
+      await recordLog({
+        portalOrderRef,
+        actor,
+        actorRole,
+        action: 'order_status_set',
+        message,
+        details: { fromStatus, toStatus: orderStatus, fromComment, toComment: trimmed },
+      });
+    }
   }
+
   return toDto(doc);
 }
 
 // Set (or clear, with '') the order's Delivery Date (V4.2). Plain free text
 // like order_date — no fixed format enforced, and no requirement (unlike
 // Order Status). Editable at any time, independent of the initial save.
-export async function setDeliveryDate(portalOrderRef, deliveryDate) {
+export async function setDeliveryDate(portalOrderRef, deliveryDate, { actor, actorRole } = {}) {
   const value = deliveryDate === null || deliveryDate === undefined ? '' : String(deliveryDate).trim();
+
+  const before = await Order.findOne({ portal_order_ref: portalOrderRef }, { delivery_date: 1 }).lean();
+  if (!before) {
+    throw new AppError('NOT_FOUND', `No order found with Portal Order Ref "${portalOrderRef}".`, {
+      status: 404,
+    });
+  }
 
   const doc = await Order.findOneAndUpdate(
     { portal_order_ref: portalOrderRef },
     { $set: { delivery_date: value } },
     { new: true }
   );
-  if (!doc) {
+
+  if (actor) {
+    const fromValue = before.delivery_date || '';
+    if (fromValue !== value) {
+      const message = value ? `Delivery Date set to "${value}"` : 'Delivery Date cleared';
+      await recordLog({
+        portalOrderRef,
+        actor,
+        actorRole,
+        action: 'delivery_date_set',
+        message,
+        details: { from: fromValue, to: value },
+      });
+    }
+  }
+
+  return toDto(doc);
+}
+
+// Discount Provided toggle — order-level, only meaningful for orders that
+// actually classify into a discount bucket (see classifyDiscountBucket), but
+// not restricted at the write layer: the four discount list pages are the
+// only place the client ever calls this, so there's nothing to enforce here.
+export async function setDiscountProvided(portalOrderRef, discountProvided, { actor, actorRole } = {}) {
+  const value = Boolean(discountProvided);
+
+  const before = await Order.findOne({ portal_order_ref: portalOrderRef }, { discount_provided: 1 }).lean();
+  if (!before) {
     throw new AppError('NOT_FOUND', `No order found with Portal Order Ref "${portalOrderRef}".`, {
       status: 404,
     });
   }
+
+  const doc = await Order.findOneAndUpdate(
+    { portal_order_ref: portalOrderRef },
+    { $set: { discount_provided: value } },
+    { new: true }
+  );
+
+  if (actor) {
+    const fromValue = Boolean(before.discount_provided);
+    if (fromValue !== value) {
+      await recordLog({
+        portalOrderRef,
+        actor,
+        actorRole,
+        action: 'discount_provided_set',
+        message: value ? 'Discount marked as provided' : 'Discount marked as not provided',
+        details: { from: fromValue, to: value },
+      });
+    }
+  }
+
   return toDto(doc);
 }
 
 // Update only the resolution snapshot (used after a product is approved) and
 // recompute the derived order status.
-export async function updateResolution(portalOrderRef, resolutionData) {
+export async function updateResolution(portalOrderRef, resolutionData, { actor, actorRole } = {}) {
   const resolution_status = deriveStatus(resolutionData);
 
   const doc = await Order.findOneAndUpdate(
@@ -374,6 +532,18 @@ export async function updateResolution(portalOrderRef, resolutionData) {
       status: 404,
     });
   }
+
+  if (actor) {
+    await recordLog({
+      portalOrderRef,
+      actor,
+      actorRole,
+      action: 'product_resolution_updated',
+      message: 'Product match approved/updated',
+      details: { resolutionStatus: resolution_status },
+    });
+  }
+
   return toDto(doc);
 }
 
@@ -423,13 +593,23 @@ const PRODUCT_COMMENTS_WRITE_ALLOWED = [...PRODUCT_COMMENTS, LEGACY_RELEASED_COM
 // Merge per-product comments into an order without touching anything else.
 // `comments` = { [lineId]: 'Released' | 'OS' | 'N/A' | 'Not Found' | null } —
 // null/'' clears the comment for that line. Other lines' comments are preserved.
-export async function setProductComments(portalOrderRef, comments) {
+export async function setProductComments(portalOrderRef, comments, { actor, actorRole } = {}) {
+  // The saved-order edit UI always resubmits every line's CURRENT comment on
+  // save, not just the ones actually changed (see PRODUCT_COMMENTS_WRITE_ALLOWED's
+  // comment above) — read the stored values first so the log only reports
+  // lineIds whose value actually changes, not every line resent unchanged.
+  const beforeDoc = await Order.findOne({ portal_order_ref: portalOrderRef }, { product_comments: 1 }).lean();
+  const beforeComments = beforeDoc?.product_comments || {};
+
   const set = {};
   const unset = {};
+  const changes = {};
   for (const [lineId, value] of Object.entries(comments || {})) {
     const key = `product_comments.${lineId}`;
+    const before = beforeComments[lineId] || '';
     if (value === null || value === undefined || String(value).trim() === '') {
       unset[key] = '';
+      if (before !== '') changes[lineId] = { from: before, to: '' };
     } else {
       if (!PRODUCT_COMMENTS_WRITE_ALLOWED.includes(value)) {
         throw new AppError('VALIDATION_ERROR', `Comment must be one of: ${PRODUCT_COMMENTS.join(', ')}.`, {
@@ -438,6 +618,7 @@ export async function setProductComments(portalOrderRef, comments) {
         });
       }
       set[key] = value;
+      if (before !== value) changes[lineId] = { from: before, to: value };
     }
   }
 
@@ -457,6 +638,19 @@ export async function setProductComments(portalOrderRef, comments) {
       status: 404,
     });
   }
+
+  if (actor && Object.keys(changes).length) {
+    const lineIds = Object.keys(changes);
+    await recordLog({
+      portalOrderRef,
+      actor,
+      actorRole,
+      action: 'product_comment_set',
+      message: `Reason updated for ${lineIds.length} product(s)`,
+      details: { lineIds, changes },
+    });
+  }
+
   return toDto(doc);
 }
 
@@ -468,13 +662,22 @@ export const NOTE_MAX_LENGTH = 2000;
 // `notes` = { [lineId]: string | null } — null/'' clears the note for that
 // line. Values are trimmed at the ends only, so line breaks inside the note
 // are preserved. Other lines' notes are untouched.
-export async function setProductNotes(portalOrderRef, notes) {
+export async function setProductNotes(portalOrderRef, notes, { actor, actorRole } = {}) {
+  // Mirrors setProductComments' before-read (V1.7's own doc comment above
+  // notes on the edit UI resubmitting every line unchanged) — only changed
+  // lineIds should ever reach the log.
+  const beforeDoc = await Order.findOne({ portal_order_ref: portalOrderRef }, { product_notes: 1 }).lean();
+  const beforeNotes = beforeDoc?.product_notes || {};
+
   const set = {};
   const unset = {};
+  const changedLineIds = [];
   for (const [lineId, value] of Object.entries(notes || {})) {
     const key = `product_notes.${lineId}`;
+    const before = beforeNotes[lineId] || '';
     if (value === null || value === undefined || String(value).trim() === '') {
       unset[key] = '';
+      if (before !== '') changedLineIds.push(lineId);
     } else {
       if (typeof value !== 'string') {
         throw new AppError('VALIDATION_ERROR', 'Additional comment must be text.', {
@@ -490,6 +693,7 @@ export async function setProductNotes(portalOrderRef, notes) {
         });
       }
       set[key] = trimmed;
+      if (before !== trimmed) changedLineIds.push(lineId);
     }
   }
 
@@ -509,6 +713,18 @@ export async function setProductNotes(portalOrderRef, notes) {
       status: 404,
     });
   }
+
+  if (actor && changedLineIds.length) {
+    await recordLog({
+      portalOrderRef,
+      actor,
+      actorRole,
+      action: 'product_note_set',
+      message: `Comments updated for ${changedLineIds.length} product(s)`,
+      details: { lineIds: changedLineIds },
+    });
+  }
+
   return toDto(doc);
 }
 
@@ -576,7 +792,7 @@ export function validateFulfillmentPatch(patch, orderedQty, lineId = '') {
 // { [lineId]: { pendingQty?, status? } | null } — null removes the whole
 // entry; a null/'' field inside a patch clears just that field. Other lines'
 // entries are preserved.
-export async function setProductFulfillment(portalOrderRef, fulfillment) {
+export async function setProductFulfillment(portalOrderRef, fulfillment, { actor, actorRole } = {}) {
   const entries = Object.entries(fulfillment || {});
   if (!entries.length) {
     throw new AppError('VALIDATION_ERROR', 'No fulfillment entries provided.', {
@@ -586,27 +802,42 @@ export async function setProductFulfillment(portalOrderRef, fulfillment) {
   }
 
   // Ordered quantities come from the stored parsed line items (lineId is the
-  // 1-based index into line_items) — the upper bound for pendingQty.
-  const doc = await Order.findOne({ portal_order_ref: portalOrderRef }, { parsed_data: 1 }).lean();
+  // 1-based index into line_items) — the upper bound for pendingQty. Also
+  // read product_fulfillment's current values (like setProductComments/
+  // setProductNotes) so the log only reports lineIds whose Item Status /
+  // Pending Qty actually change, not every line the edit UI resubmits as-is.
+  const doc = await Order.findOne({ portal_order_ref: portalOrderRef }, { parsed_data: 1, product_fulfillment: 1 }).lean();
   if (!doc) {
     throw new AppError('NOT_FOUND', `No order found with Portal Order Ref "${portalOrderRef}".`, {
       status: 404,
     });
   }
   const items = Array.isArray(doc.parsed_data?.line_items) ? doc.parsed_data.line_items : [];
+  const beforeFulfillment = doc.product_fulfillment || {};
 
   const set = {};
   const unset = {};
+  const changedLineIds = [];
   for (const [lineId, patch] of entries) {
     const key = `product_fulfillment.${lineId}`;
+    const beforeEntry = beforeFulfillment[lineId] || {};
     if (patch === null || patch === undefined) {
       unset[key] = '';
+      if (beforeEntry.pendingQty !== undefined || beforeEntry.status !== undefined) changedLineIds.push(lineId);
       continue;
     }
     const orderedQty = Number(items[Number(lineId) - 1]?.qty);
     const validated = validateFulfillmentPatch(patch, orderedQty, lineId);
-    for (const [field, value] of Object.entries(validated.set)) set[`${key}.${field}`] = value;
-    for (const field of validated.unset) unset[`${key}.${field}`] = '';
+    let lineChanged = false;
+    for (const [field, value] of Object.entries(validated.set)) {
+      set[`${key}.${field}`] = value;
+      if (beforeEntry[field] !== value) lineChanged = true;
+    }
+    for (const field of validated.unset) {
+      unset[`${key}.${field}`] = '';
+      if (beforeEntry[field] !== undefined) lineChanged = true;
+    }
+    if (lineChanged) changedLineIds.push(lineId);
   }
 
   const update = {};
@@ -625,6 +856,18 @@ export async function setProductFulfillment(portalOrderRef, fulfillment) {
       status: 404,
     });
   }
+
+  if (actor && changedLineIds.length) {
+    await recordLog({
+      portalOrderRef,
+      actor,
+      actorRole,
+      action: 'product_fulfillment_set',
+      message: `Item Status / Pending Qty updated for ${changedLineIds.length} product(s)`,
+      details: { lineIds: changedLineIds },
+    });
+  }
+
   return toDto(updated);
 }
 
@@ -649,6 +892,29 @@ function mapEntries(field) {
       $cond: [{ $eq: [{ $type: `$${field}` }, 'object'] }, `$${field}`, {}],
     },
   };
+}
+
+// Plain-JS mirror of DISCOUNT_BUCKET_EXPR below — same rules, same
+// precedence (both > sales_rep > rdd > other-via-comment > null). Needed
+// because getOrder() reads one document directly with .lean() (no
+// aggregation pipeline), so the Mongo-only expression can't be reused as-is.
+// KEEP THESE TWO IN SYNC — any rule change belongs in both places.
+export function classifyDiscountBucket(parsedData) {
+  const discountsArr = parsedData?.financials?.discounts;
+  let labels = [];
+  if (Array.isArray(discountsArr) && discountsArr.length > 0) {
+    labels = discountsArr.map((d) => String(d?.label || '').toLowerCase());
+  } else if (parsedData?.financials?.discount) {
+    labels = [String(parsedData.financials.discount_label || '').toLowerCase()];
+  }
+  const hasSalesRep = labels.some((l) => /sales\s*rep/i.test(l));
+  const hasRdd = labels.some((l) => /range\s*density/i.test(l) || /\brdd\b/i.test(l));
+  if (hasSalesRep && hasRdd) return 'both';
+  if (hasSalesRep) return 'sales_rep';
+  if (hasRdd) return 'rdd';
+  const comments = String(parsedData?.order_info?.additional_comments || '').toLowerCase();
+  if (/discount/i.test(comments)) return 'other';
+  return null;
 }
 
 // Classifies one order into a DISCOUNT_BUCKETS value (or null). Self-
@@ -774,6 +1040,8 @@ const DASHBOARD_FIELDS_STAGE = {
     order_channel: 1,
     // Discount dashboard section (V4.7) — see DISCOUNT_BUCKET_EXPR above.
     discount_bucket: DISCOUNT_BUCKET_EXPR,
+    // Discount Provided toggle — plain stored field, not derived.
+    discount_provided: 1,
     // Delivery date (V4 dashboard). Prefers the top-level field (V4.2,
     // directly editable) when it's actually set; falls back to the legacy
     // Manual Order Creation location for orders saved before that field
@@ -834,6 +1102,9 @@ function toDashboardCardDto(doc) {
     orderComment: doc.order_comment || '',
     // Delivery date from the parsed email (V4 dashboard).
     deliveryDate: doc.delivery_date || '',
+    // Discount Provided toggle — only rendered on the discount list pages,
+    // but harmless to include on every card.
+    discountProvided: Boolean(doc.discount_provided),
   };
 }
 

@@ -1,5 +1,6 @@
 import TopBar from './TopBar.jsx';
 import SideNav from './SideNav.jsx';
+import HelpButton from './HelpButton.jsx';
 
 // App shell: a full-width sticky app bar, then a left navigation sidebar
 // beside the centered content container (V2.3).
@@ -15,6 +16,7 @@ export default function Layout({ children, wide = false }) {
         <SideNav />
         <main id="app" className={wide ? 'app-wide' : undefined}>{children}</main>
       </div>
+      <HelpButton />
     </>
   );
 }

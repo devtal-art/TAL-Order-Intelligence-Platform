@@ -1,11 +1,13 @@
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import ScrollToTop from './components/ScrollToTop.jsx';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import DashboardList from './pages/DashboardList.jsx';
 import DeliveryDatesList from './pages/DeliveryDatesList.jsx';
+import ActivityLogList from './pages/ActivityLogList.jsx';
 import Search from './pages/Search.jsx';
 import ProductSearchResults from './pages/ProductSearchResults.jsx';
 import CreateManualOrder from './pages/CreateManualOrder.jsx';
@@ -16,12 +18,14 @@ import CreateManualOrder from './pages/CreateManualOrder.jsx';
 //   /dashboard                — operational widgets (protected)
 //   /dashboard/orders         — bucket list "View All" (protected)
 //   /dashboard/delivery-dates — all upcoming delivery dates "View All" (protected)
+//   /dashboard/activity       — full cross-order Activity Log "View All" (protected)
 //   /search                   — saved-order search (protected)
 //   /search/products          — product search results (protected, V5.1 — new, additive)
 //   /orders/manual            — Create Manual Order (protected, V3.1 — new, additive)
 export default function App() {
   return (
     <AuthProvider>
+      <ScrollToTop />
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />
@@ -56,6 +60,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <DeliveryDatesList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/activity"
+          element={
+            <ProtectedRoute>
+              <ActivityLogList />
             </ProtectedRoute>
           }
         />

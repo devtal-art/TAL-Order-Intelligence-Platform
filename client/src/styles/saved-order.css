@@ -172,6 +172,43 @@
    background styling is untouched — only the scroll mechanics change. */
 .sol-modal .rt-scroll{overflow:visible}
 
+/* Discount Provided badge (read-only) — small message in the order detail
+   header, shown only when the order actually has a discount. Toggling
+   happens only from the discount dashboard's "View All" list pages. */
+.disc-badge{
+  display:inline-flex;align-items:center;font-size:11px;font-weight:700;
+  padding:3px 9px;border-radius:999px;
+  background:var(--surface-2);color:var(--muted);border:1px solid var(--border-strong);
+}
+.disc-badge.is-provided{
+  background:var(--danger-soft);color:var(--danger-strong);border-color:var(--danger-border);
+}
+
+/* Order Activity Log — collapsible section below the product table /
+   financial summary in the order detail (both the Dashboard "View" modal
+   and Search page reuse this same component, so both get it for free). */
+.sol-log-section{margin-top:16px;border-top:1px solid var(--border);padding-top:12px}
+.sol-log-toggle{
+  display:inline-flex;align-items:center;gap:6px;
+  background:none;border:none;padding:4px 0;
+  font-size:12.5px;font-weight:600;color:var(--ink-2);font-family:var(--font-ui);
+  cursor:pointer;
+}
+.sol-log-toggle:hover{color:var(--ink)}
+.sol-log-chevron{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+.sol-log-chevron.is-open{transform:rotate(90deg)}
+.sol-log-body{margin-top:10px}
+.sol-log-empty{font-size:12.5px;color:var(--muted);padding:10px 0}
+.sol-log-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0;max-height:280px;overflow-y:auto}
+.sol-log-item{
+  padding:9px 0;border-bottom:1px solid var(--border);
+}
+.sol-log-item:last-child{border-bottom:none}
+.sol-log-item-line{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;font-size:12.5px}
+.sol-log-actor{font-weight:700;color:var(--accent)}
+.sol-log-message{color:var(--ink)}
+.sol-log-time{font-size:11px;color:var(--muted);margin-top:2px}
+
 @media (max-width:480px){
   .sol-search{flex-direction:column}
   .sol-btn{width:100%}

@@ -335,6 +335,7 @@ export function useOrderProcessor() {
             totalProducts: appended.parsed.line_items.length,
             parsedData: appended.parsed,
             resolutionData: appended.resolution,
+            reason: 'product_added',
           })
           .catch((e) => console.warn('Order persist failed:', e.message));
       }
@@ -375,6 +376,7 @@ export function useOrderProcessor() {
             totalProducts: removed.parsed.line_items.length,
             parsedData: removed.parsed,
             resolutionData: removed.resolution,
+            reason: 'product_removed',
           })
           .then(() => {
             if (Object.keys(cm.patch).length) orderService.setComments(ref, cm.patch).catch((e) => console.warn('Order comment update failed:', e.message));

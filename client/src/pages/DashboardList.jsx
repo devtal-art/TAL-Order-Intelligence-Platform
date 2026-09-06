@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
 import SortTh from '../components/SortableHeader.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { orderService } from '../services/orderService.js';
 import { deliveryMeta, commentMeta, orderStatusMeta, discountBucketMeta } from '../utils/order.js';
 import { formatDisplayDate } from '../utils/dateFormat.js';
@@ -14,6 +15,8 @@ const PAGE_SIZE = 25;
 // Same data source as the widgets (GET /v1/orders/dashboard/orders), derived
 // live from the Orders collection. View opens the order detail modal directly.
 export default function DashboardList() {
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
   const [params, setParams] = useSearchParams();
   const type = params.get('type') || '';
   const value = params.get('value') || '';
@@ -91,6 +94,28 @@ export default function DashboardList() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- meta derives from type/value
   }, [type, value, page, sortBy, sortDir, refreshToken]);
+
+  // Discount Provided toggle (only rendered when type === 'discount') — its
+  // own busy ref so toggling one row doesn't disable the whole table, and an
+  // optimistic local update of `result.data` on success so the row flips
+  // color immediately without a full refetch.
+  const [toggleBusyRef, setToggleBusyRef] = useState('');
+  const toggleDiscountProvided = useCallback(async (ref, current) => {
+    setToggleBusyRef(ref);
+    setError('');
+    try {
+      const updated = await orderService.setDiscountProvided(ref, !current);
+      setResult((r) =>
+        r
+          ? { ...r, data: r.data.map((o) => (o.portalOrderRef === ref ? { ...o, discountProvided: updated.discountProvided } : o)) }
+          : r
+      );
+    } catch (e) {
+      setError(e.message || `Could not update order ${ref}.`);
+    } finally {
+      setToggleBusyRef('');
+    }
+  }, []);
 
   const openOrder = useCallback(
     async (ref) => {
@@ -181,6 +206,7 @@ export default function DashboardList() {
                   {type === 'orderComment' ? null : (
                     <SortTh column="products" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} numeric>Products</SortTh>
                   )}
+                  {type === 'discount' && !isViewer ? <th>Discount</th> : null}
                   <th aria-label="Actions" />
                 </tr>
               </thead>
@@ -197,6 +223,26 @@ export default function DashboardList() {
                     <td>{o.processedBy || <span className="dl-muted">Not Assigned</span>}</td>
                     <td>{o.orderDate || '—'}</td>
                     {type === 'orderComment' ? null : <td className="dl-num">{o.totalProducts}</td>}
+                    {type === 'discount' && !isViewer ? (
+                      <td>
+                        <div className="dl-discount-cell">
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={o.discountProvided}
+                            className={`dl-discount-switch${o.discountProvided ? ' is-provided' : ''}`}
+                            onClick={() => toggleDiscountProvided(o.portalOrderRef, o.discountProvided)}
+                            disabled={toggleBusyRef === o.portalOrderRef}
+                            title={o.discountProvided ? 'Discount provided — click to mark as not provided' : 'Discount not provided — click to mark as provided'}
+                          >
+                            <span className="dl-discount-switch-thumb" />
+                          </button>
+                          <span className={`dl-discount-label${o.discountProvided ? ' is-provided' : ''}`}>
+                            {o.discountProvided ? 'Provided' : 'Not Provided'}
+                          </span>
+                        </div>
+                      </td>
+                    ) : null}
                     <td className="dl-act">
                       <button
                         className="dw-view"

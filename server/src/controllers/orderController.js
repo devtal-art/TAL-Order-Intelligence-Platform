@@ -1,9 +1,15 @@
 import * as orderService from '../services/orderService.js';
+import * as orderLogService from '../services/orderLogService.js';
 import { ensureDb } from '../utils/ensureDb.js';
 import { AppError } from '../utils/AppError.js';
 import { buildDashboardWorkbook } from '../utils/dashboardWorkbook.js';
 
 const isBlank = (v) => v === undefined || v === null || String(v).trim() === '';
+
+// Order Activity Log — the client's stated reason for calling POST /orders on
+// an already-existing ref (Add Product / Remove Product). Whitelisted so an
+// arbitrary request body can never inject an unrecognized log action.
+const SAVE_REASONS = ['product_added', 'product_removed'];
 
 // POST /api/v1/orders — create or update (upsert) one order by Portal Order Ref.
 // The `processedBy` field is set automatically from the authenticated user
@@ -22,6 +28,7 @@ export async function saveOrder(req, res, next) {
       parsedData,
       resolutionData,
       orderSource,
+      reason,
     } = req.body || {};
 
     if (isBlank(portalOrderRef)) {
@@ -45,6 +52,11 @@ export async function saveOrder(req, res, next) {
       // Optional (V3.1 — Manual Order Creation). Omitted by the HTML upload
       // flow, so those orders keep the schema default ('HTML').
       orderSource: orderSource === 'MANUAL' ? 'MANUAL' : undefined,
+      // Order Activity Log — who's calling, and (optionally) why on an
+      // already-existing order. Never trust an unrecognized reason string.
+      actor: req.user.name,
+      actorRole: req.user.role,
+      reason: SAVE_REASONS.includes(reason) ? reason : undefined,
     });
 
     res.status(200).json(order);
@@ -85,6 +97,8 @@ export async function createManualOrder(req, res, next) {
       // Automatically assigned from the JWT-authenticated user, same as
       // saveOrder above — never accepted from the request body.
       processedBy: req.user.name,
+      actor: req.user.name,
+      actorRole: req.user.role,
     });
 
     res.status(201).json(order);
@@ -185,7 +199,10 @@ export async function setOrderComments(req, res, next) {
         details: [{ field: 'comments', issue: 'required object of { lineId: comment }' }],
       });
     }
-    const order = await orderService.setProductComments(req.params.ref, comments);
+    const order = await orderService.setProductComments(req.params.ref, comments, {
+      actor: req.user.name,
+      actorRole: req.user.role,
+    });
     res.status(200).json(order);
   } catch (err) {
     next(err);
@@ -204,7 +221,10 @@ export async function setOrderFulfillment(req, res, next) {
         details: [{ field: 'fulfillment', issue: 'required object of { lineId: { pendingQty, status } }' }],
       });
     }
-    const order = await orderService.setProductFulfillment(req.params.ref, fulfillment);
+    const order = await orderService.setProductFulfillment(req.params.ref, fulfillment, {
+      actor: req.user.name,
+      actorRole: req.user.role,
+    });
     res.status(200).json(order);
   } catch (err) {
     next(err);
@@ -223,7 +243,10 @@ export async function setOrderNotes(req, res, next) {
         details: [{ field: 'notes', issue: 'required object of { lineId: note }' }],
       });
     }
-    const order = await orderService.setProductNotes(req.params.ref, notes);
+    const order = await orderService.setProductNotes(req.params.ref, notes, {
+      actor: req.user.name,
+      actorRole: req.user.role,
+    });
     res.status(200).json(order);
   } catch (err) {
     next(err);
@@ -238,7 +261,12 @@ export async function setOrderStatus(req, res, next) {
   try {
     ensureDb();
     const { orderStatus, orderComment } = req.body || {};
-    const order = await orderService.setOrderStatus(req.params.ref, { orderStatus, orderComment });
+    const order = await orderService.setOrderStatus(req.params.ref, {
+      orderStatus,
+      orderComment,
+      actor: req.user.name,
+      actorRole: req.user.role,
+    });
     res.status(200).json(order);
   } catch (err) {
     next(err);
@@ -259,7 +287,32 @@ export async function setOrderDeliveryDate(req, res, next) {
         details: [{ field: 'deliveryDate', issue: 'required (empty string clears it)' }],
       });
     }
-    const order = await orderService.setDeliveryDate(req.params.ref, deliveryDate);
+    const order = await orderService.setDeliveryDate(req.params.ref, deliveryDate, {
+      actor: req.user.name,
+      actorRole: req.user.role,
+    });
+    res.status(200).json(order);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/v1/orders/:ref/discount-provided — toggle whether the order's
+// discount was actually provided/applied. Body: { discountProvided: boolean }
+export async function setOrderDiscountProvided(req, res, next) {
+  try {
+    ensureDb();
+    const { discountProvided } = req.body || {};
+    if (typeof discountProvided !== 'boolean') {
+      throw new AppError('VALIDATION_ERROR', 'discountProvided must be a boolean.', {
+        status: 400,
+        details: [{ field: 'discountProvided', issue: 'required boolean' }],
+      });
+    }
+    const order = await orderService.setDiscountProvided(req.params.ref, discountProvided, {
+      actor: req.user.name,
+      actorRole: req.user.role,
+    });
     res.status(200).json(order);
   } catch (err) {
     next(err);
@@ -278,7 +331,10 @@ export async function setOrderProcessedBy(req, res, next) {
         details: [{ field: 'processedBy', issue: 'required (empty string clears the assignment)' }],
       });
     }
-    const order = await orderService.setProcessedBy(req.params.ref, processedBy);
+    const order = await orderService.setProcessedBy(req.params.ref, processedBy, {
+      actor: req.user.name,
+      actorRole: req.user.role,
+    });
     res.status(200).json(order);
   } catch (err) {
     next(err);
@@ -296,8 +352,45 @@ export async function updateOrder(req, res, next) {
         details: [{ field: 'resolutionData', issue: 'required' }],
       });
     }
-    const order = await orderService.updateResolution(req.params.ref, resolutionData);
+    const order = await orderService.updateResolution(req.params.ref, resolutionData, {
+      actor: req.user.name,
+      actorRole: req.user.role,
+    });
     res.status(200).json(order);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/orders/:ref/logs — one order's Activity Log, paginated, newest first.
+export async function getOrderLogs(req, res, next) {
+  try {
+    ensureDb();
+    const result = await orderLogService.getOrderLogs(req.params.ref, {
+      page: req.query.page,
+      limit: req.query.limit,
+    });
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/orders/logs/recent — cross-order Recent Activity feed for the
+// Dashboard. Registered before GET /:ref in the router (see order.routes.js).
+export async function getRecentActivity(req, res, next) {
+  try {
+    ensureDb();
+    const result = await orderLogService.getRecentLogs({
+      page: req.query.page,
+      limit: req.query.limit,
+      date: req.query.date,
+      portalOrderRef: req.query.portalOrderRef,
+      actor: req.query.actor,
+      sortBy: req.query.sortBy,
+      sortDir: req.query.sortDir,
+    });
+    res.status(200).json(result);
   } catch (err) {
     next(err);
   }

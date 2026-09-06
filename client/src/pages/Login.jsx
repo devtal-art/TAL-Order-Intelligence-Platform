@@ -16,16 +16,29 @@ export default function Login() {
 
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  // 'idle' -> 'loading' (awaiting the API) -> 'success' (plays the Sign In
+  // animation below, then navigates away) | back to 'idle' on failure.
+  const [phase, setPhase] = useState('idle');
   const [error, setError] = useState('');
+  // Separate from `phase`: the truck-animation markup must already be
+  // mounted at its RESTING state (no "animate" class) for at least one
+  // paint before that class is added — CSS transitions (the text crossfade)
+  // never play on an element's very first frame, only on a change to an
+  // already-rendered one. Keyframe animations (the truck driving) don't
+  // have this problem, which is why only the text used to snap instantly.
+  const [animateNow, setAnimateNow] = useState(false);
 
   // Detect session-expired redirect from apiClient.js.
   const sessionExpired = searchParams.get('expired') === '1';
 
-  // Already logged in → skip login page entirely.
+  // Already logged in → skip login page entirely. Skipped during the 'success'
+  // phase — handleSubmit's own setTimeout navigates once the animation
+  // finishes; without this guard, login() flipping isAuthenticated to true
+  // would fire this effect immediately and cut the animation off before it
+  // ever plays.
   useEffect(() => {
-    if (isAuthenticated) navigate('/', { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated && phase !== 'success') navigate('/', { replace: true });
+  }, [isAuthenticated, phase, navigate]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -33,7 +46,7 @@ export default function Login() {
       setError('Please select a name and enter your password.');
       return;
     }
-    setLoading(true);
+    setPhase('loading');
     setError('');
     try {
       const res = await fetch(`${BASE_URL}/v1/auth/login`, {
@@ -44,16 +57,31 @@ export default function Login() {
       const data = await res.json();
       if (!res.ok) {
         setError(data?.error?.message || 'Invalid credentials. Please try again.');
+        setPhase('idle');
+        setAnimateNow(false);
         return;
       }
       login(data.token);
-      navigate('/', { replace: true });
+      // Play the Sign In success animation (~3.5s) before navigating away,
+      // so it's actually visible rather than instantly replaced by the redirect.
+      setPhase('success');
+      // Mount the truck markup this render (resting state, no .animate).
+      // Wait two frames before adding .animate — one frame just guarantees
+      // React committed the DOM; the browser can still coalesce that with
+      // the next style/paint. A second frame is the standard, reliable way
+      // to force the "resting" style to actually paint first.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setAnimateNow(true));
+      });
+      setTimeout(() => navigate('/', { replace: true }), 4000);
     } catch {
       setError('Cannot reach the server. Please check your connection.');
-    } finally {
-      setLoading(false);
+      setPhase('idle');
+      setAnimateNow(false);
     }
   }
+
+  const loading = phase !== 'idle';
 
   return (
     <div className="login-shell">
@@ -145,13 +173,40 @@ export default function Login() {
 
             <button
               type="submit"
-              className="login-btn"
+              className={`login-btn${phase === 'success' ? ` signin-anim-btn${animateNow ? ' animate' : ''}` : ''}`}
               disabled={loading || !name || !password}
             >
-              {loading ? (
+              {phase === 'loading' ? (
                 <>
                   <span className="login-spinner" aria-hidden="true" />
                   Signing in…
+                </>
+              ) : phase === 'success' ? (
+                <>
+                  <span className="signin-anim-default">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                      <polyline points="10 17 15 12 10 7" />
+                      <line x1="15" y1="12" x2="3" y2="12" />
+                    </svg>
+                    Sign In
+                  </span>
+                  <span className="signin-anim-success">
+                    Signed In
+                    <svg viewBox="0 0 12 10" aria-hidden="true">
+                      <polyline points="1.5 6 4.5 9 10.5 1" />
+                    </svg>
+                  </span>
+                  <div className="signin-anim-box" />
+                  <div className="signin-anim-truck">
+                    <div className="signin-anim-back" />
+                    <div className="signin-anim-front">
+                      <div className="signin-anim-window" />
+                    </div>
+                    <div className="signin-anim-light top" />
+                    <div className="signin-anim-light bottom" />
+                  </div>
+                  <div className="signin-anim-lines" />
                 </>
               ) : (
                 <>

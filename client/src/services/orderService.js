@@ -56,6 +56,10 @@ export const orderService = {
   setDeliveryDate: (portalOrderRef, deliveryDate) =>
     apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/delivery-date`, { deliveryDate }),
 
+  // discountProvided: boolean — toggled only from the discount "View All" pages.
+  setDiscountProvided: (portalOrderRef, discountProvided) =>
+    apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/discount-provided`, { discountProvided }),
+
   // Dashboard summary (V2.2, read-only): per delivery status / comment bucket,
   // the total count plus the latest `limit` orders. Derived live server-side
   // from the Orders collection — never from a duplicated summary store.
@@ -72,4 +76,19 @@ export const orderService = {
 
   // Full multi-sheet dashboard workbook download (V4.8, read-only).
   exportDashboard: () => apiClient.download('/v1/orders/dashboard/export', 'Dashboard Export.xlsx'),
+
+  // Order Activity Log — one order's history, paginated, newest first.
+  logs: (portalOrderRef, { page = 1, limit = 25 } = {}) =>
+    apiClient.get(`/v1/orders/${encodeURIComponent(portalOrderRef)}/logs?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`),
+
+  // Cross-order Recent Activity feed — powers the Dashboard widget.
+  recentActivity: ({ page = 1, limit = 10, date, portalOrderRef, actor, sortBy, sortDir } = {}) => {
+    let qs = `page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`;
+    if (date) qs += `&date=${encodeURIComponent(date)}`;
+    if (portalOrderRef) qs += `&portalOrderRef=${encodeURIComponent(portalOrderRef)}`;
+    if (actor) qs += `&actor=${encodeURIComponent(actor)}`;
+    if (sortBy) qs += `&sortBy=${encodeURIComponent(sortBy)}`;
+    if (sortDir) qs += `&sortDir=${encodeURIComponent(sortDir)}`;
+    return apiClient.get(`/v1/orders/logs/recent?${qs}`);
+  },
 };

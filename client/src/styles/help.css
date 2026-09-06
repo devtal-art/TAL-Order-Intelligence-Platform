@@ -1,0 +1,36 @@
+/* Help button (new, additive) — fixed bottom-left "contact the team" entry
+   point, rendered once from Layout.jsx so it appears on every protected page. */
+.help-fab{
+  position:fixed;left:20px;bottom:20px;z-index:40;
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--btn-brand);color:#fff;border:1px solid var(--btn-brand-border);
+  border-radius:999px;padding:11px 18px 11px 14px;
+  font-size:13px;font-weight:600;font-family:var(--font-ui);cursor:pointer;
+  box-shadow:0 4px 14px rgba(47,79,162,.35);
+  transition:background .2s,transform .15s,box-shadow .15s;
+}
+.help-fab:hover{background:var(--btn-brand-hover);transform:translateY(-1px);box-shadow:0 6px 18px rgba(47,79,162,.4)}
+.help-fab:active{transform:none}
+.help-fab svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.help-modal{max-width:440px}
+.help-modal-body{padding:0 20px 20px}
+.help-textarea{
+  width:100%;box-sizing:border-box;resize:vertical;min-height:120px;
+  padding:11px 13px;border:1px solid var(--border-strong);border-radius:10px;
+  font-size:13.5px;font-family:var(--font-ui);color:var(--ink);outline:none;
+  transition:border-color .15s,box-shadow .15s;
+}
+.help-textarea::placeholder{color:var(--muted)}
+.help-textarea:focus{border-color:var(--accent);box-shadow:var(--ring)}
+.help-textarea:disabled{opacity:.6;cursor:not-allowed}
+.help-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+
+.help-sent{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0 4px;text-align:center}
+.help-sent-title{font-size:14.5px;font-weight:700;color:var(--ink)}
+.help-sent-sub{font-size:12.5px;color:var(--ink-2);margin-bottom:8px}
+
+@media (max-width:480px){
+  .help-fab{left:14px;bottom:14px;padding:10px 16px 10px 12px}
+  .help-fab span{display:none}
+}

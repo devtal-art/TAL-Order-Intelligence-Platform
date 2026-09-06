@@ -29,6 +29,7 @@ import ShoppingBagRoundedIcon from '@mui/icons-material/ShoppingBagRounded';
 import EventRoundedIcon from '@mui/icons-material/EventRounded';
 import EventBusyRoundedIcon from '@mui/icons-material/EventBusyRounded';
 import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded';
+import UpdateRoundedIcon from '@mui/icons-material/UpdateRounded';
 import TodayRoundedIcon from '@mui/icons-material/TodayRounded';
 import InboxRoundedIcon from '@mui/icons-material/InboxRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
@@ -534,6 +535,11 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
         })}
       </div>
 
+      {/* ═══ Row 3.8 — Recent Activity, full width (Order Activity Log) ═══ */}
+      <div className="mb-4">
+        <RecentActivityCard refreshToken={refreshToken} onView={onView} viewBusyRef={viewBusyRef} />
+      </div>
+
       {/* ═══ Row 4 — Team Performance, full width ═══ */}
       <Card variant="outlined" sx={cardSx}>
         <SectionHead icon={GroupsRoundedIcon} sub="Orders processed by team members">
@@ -953,6 +959,130 @@ function ViewAllLinkFlat({ to }) {
       View All
       <ChevronRightRoundedIcon sx={{ fontSize: 15 }} />
     </Box>
+  );
+}
+
+// Recent Activity — cross-order Order Activity Log feed (who changed what,
+// when, on any order). Deliberately fetched independently of the main
+// dashboard summary (its own endpoint, GET /v1/orders/logs/recent) rather
+// than folded into it, so this card's data is always exactly as fresh as
+// what it shows — no extra fields threaded through getDashboardSummary just
+// for this one card. Refetches whenever `refreshToken` changes, same trigger
+// every other widget already reacts to (any order edit saved from this
+// page's View modal — see Dashboard.jsx's bump()).
+const RECENT_ACTIVITY_PAGE_SIZE = 15;
+function RecentActivityCard({ refreshToken, onView, viewBusyRef }) {
+  const [entries, setEntries] = useState(null); // null = loading
+  const [error, setError] = useState('');
+  const [nextPage, setNextPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Same infinite-scroll shape as BucketRow below: page 1 loads on mount/
+  // refreshToken change, replacing the list; later pages append. Never a
+  // fixed cap — the reader can keep scrolling through the whole log.
+  const loadPage = useCallback(async (page) => {
+    setLoadingMore(true);
+    setError('');
+    try {
+      const res = await orderService.recentActivity({ page, limit: RECENT_ACTIVITY_PAGE_SIZE });
+      setEntries((prev) => {
+        if (page === 1) return res.data;
+        // Skip/limit paging can drift if new entries are written between
+        // page fetches (a real order edit landing while someone's mid-
+        // scroll) — an offset that was valid a moment ago can re-surface an
+        // already-seen row. De-dupe by id so that never renders as a
+        // repeated row (and a repeated React key).
+        const seen = new Set((prev || []).map((e) => e.id));
+        return [...(prev || []), ...res.data.filter((e) => !seen.has(e.id))];
+      });
+      setNextPage(page + 1);
+      setHasMore(page < (res.meta?.pages || 1));
+    } catch (e) {
+      if (page === 1) setError(e.message || 'Could not load recent activity.');
+      else setHasMore(false); // keep whatever already loaded; just stop paging
+    } finally {
+      setLoadingMore(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadPage is stable; refreshToken is the real trigger
+  }, [refreshToken]);
+
+  const onListScroll = (e) => {
+    if (loadingMore || !hasMore) return;
+    const el = e.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 100) {
+      loadPage(nextPage);
+    }
+  };
+
+  const fmtWhen = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
+
+  return (
+    <Card variant="outlined" sx={cardSx}>
+      <SectionHead icon={UpdateRoundedIcon} sub="Latest changes across every order">
+        Recent Activity
+      </SectionHead>
+      {error ? (
+        <CardContent>
+          <Alert severity="error" variant="outlined">{error}</Alert>
+        </CardContent>
+      ) : entries === null ? (
+        <CardContent>
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} height={28} sx={{ my: 0.5 }} />
+          ))}
+        </CardContent>
+      ) : entries.length === 0 ? (
+        <EmptyState icon={InboxRoundedIcon} title="No activity recorded yet" compact />
+      ) : (
+        // maxHeight ≈ 4 rows (each ~58px with its padding) before scrolling
+        // kicks in — mirrors BucketRow's own maxHeight:260 preview below.
+        <Box sx={{ maxHeight: 240, overflowY: 'auto' }} onScroll={onListScroll}>
+          {entries.map((entry, i) => (
+            <Box key={entry.id}>
+              {i > 0 && <Divider />}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 2.25, py: 1.1 }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
+                    <Typography variant="caption" sx={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, color: 'text.secondary' }}>
+                      #{entry.portalOrderRef}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{entry.actor}</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>{entry.message}</Typography>
+                  </Box>
+                  <Typography variant="caption" sx={{ color: 'text.disabled' }}>{fmtWhen(entry.createdAt)}</Typography>
+                </Box>
+                <Box
+                  component="button"
+                  type="button"
+                  onClick={() => onView(entry.portalOrderRef)}
+                  disabled={viewBusyRef === entry.portalOrderRef}
+                  sx={{
+                    border: '1px solid #D9D6D1', borderRadius: 1.5, bgcolor: '#fff',
+                    px: 1.5, py: 0.5, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+                    color: 'text.secondary',
+                    '&:hover': { borderColor: 'primary.main', color: 'primary.main', bgcolor: 'primary.light' },
+                    '&:disabled': { color: 'text.disabled', cursor: 'not-allowed' },
+                  }}
+                >
+                  {viewBusyRef === entry.portalOrderRef ? '…' : 'View'}
+                </Box>
+              </Box>
+            </Box>
+          ))}
+          {loadingMore && (
+            <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: 'text.disabled', py: 1 }}>
+              Loading more…
+            </Typography>
+          )}
+        </Box>
+      )}
+      {entries && entries.length > 0 && <ViewAllLinkFlat to="/dashboard/activity" />}
+    </Card>
   );
 }
 
