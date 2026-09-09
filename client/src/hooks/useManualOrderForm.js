@@ -277,6 +277,22 @@ export function useManualOrderForm() {
       );
       parsed = { ...parsed, financials };
 
+      const productNotesPayload = {};
+      const productFulfillmentPayload = {};
+      const productCommentsPayload = {};
+      realRows.forEach((row, i) => {
+        const lineId = String(i + 1);
+        if (row.notes && String(row.notes).trim()) {
+          productNotesPayload[lineId] = String(row.notes).trim();
+        }
+        if (row.itemStatus && String(row.itemStatus).trim()) {
+          productFulfillmentPayload[lineId] = { status: String(row.itemStatus).trim() };
+        }
+        if (row.reason && String(row.reason).trim()) {
+          productCommentsPayload[lineId] = String(row.reason).trim();
+        }
+      });
+
       setSaving(true);
       setSaveError('');
       try {
@@ -286,11 +302,22 @@ export function useManualOrderForm() {
           totalProducts: parsed.line_items.length,
           parsedData: parsed,
           resolutionData: resolution,
+          productNotes: productNotesPayload,
+          orderComment,
         });
         // The server-assigned ref — never orderNumberPreview — is the real
         // identifier for every follow-up call and for what's shown after save.
         const ref = created.portalOrderRef;
         await orderService.setOrderStatus(ref, { orderStatus, orderComment });
+        if (Object.keys(productNotesPayload).length > 0) {
+          orderService.setNotes(ref, productNotesPayload).catch((e) => console.warn('Product notes flush failed:', e.message));
+        }
+        if (Object.keys(productFulfillmentPayload).length > 0) {
+          orderService.setFulfillment(ref, productFulfillmentPayload).catch((e) => console.warn('Product fulfillment flush failed:', e.message));
+        }
+        if (Object.keys(productCommentsPayload).length > 0) {
+          orderService.setComments(ref, productCommentsPayload).catch((e) => console.warn('Product comments flush failed:', e.message));
+        }
         // Delivery Date (V4.2) now lives in its own top-level, directly-
         // editable field — flushed best-effort here too (mirrors the HTML
         // upload Review flow) so it survives future re-edits via Saved Order

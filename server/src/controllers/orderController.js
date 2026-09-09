@@ -86,7 +86,7 @@ export async function nextManualOrderRef(req, res, next) {
 export async function createManualOrder(req, res, next) {
   try {
     ensureDb();
-    const { customerName, orderDate, totalProducts, parsedData, resolutionData } = req.body || {};
+    const { customerName, orderDate, totalProducts, parsedData, resolutionData, productNotes, orderComment } = req.body || {};
 
     const order = await orderService.createManualOrder({
       customerName: customerName || '',
@@ -94,6 +94,8 @@ export async function createManualOrder(req, res, next) {
       totalProducts: Number.isFinite(Number(totalProducts)) ? Number(totalProducts) : 0,
       parsedData: parsedData ?? {},
       resolutionData: resolutionData ?? {},
+      productNotes: productNotes ?? {},
+      orderComment: orderComment || '',
       // Automatically assigned from the JWT-authenticated user, same as
       // saveOrder above — never accepted from the request body.
       processedBy: req.user.name,

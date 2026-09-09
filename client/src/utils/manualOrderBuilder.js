@@ -30,6 +30,8 @@ export function emptyProductRow() {
     qty: '1',
     unitPrice: '',
     notes: '',
+    itemStatus: '',  // Item Status (delivery status) — optional at creation
+    reason: '',      // Reason (product comment: OS | Not Found) — optional at creation
   };
 }
 

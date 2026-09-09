@@ -767,6 +767,13 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
         </div>
       )}
 
+      {order.orderComment && (
+        <div className="oc-note" role="note" aria-label="Order comment">
+          <div className="oc-note-title">Order Comment</div>
+          <div className="oc-note-text">{order.orderComment}</div>
+        </div>
+      )}
+
       {hasStatuses && (
         <div className="sol-status-summary" aria-label="Delivery status summary">
           {DELIVERY_STATUSES.map(({ value }) => {
