@@ -57,6 +57,12 @@ const USERS_TO_SEED = [
   // server so orders processed under this name show up on the dashboard
   // (Team Performance, Released by Processor, Today by Processor).
   { name: 'Gagandeep', password: process.env.SEED_PASSWORD_GAGANDEEP, role: 'staff' },
+  // Internal development/support login. Deliberately NOT part of
+  // PROCESSED_BY_USERS (client/src/utils/order.js and
+  // server/src/services/orderService.js), so it can sign in and use the app
+  // without appearing as a processor in Team Performance or the
+  // Processed By dropdowns.
+  { name: 'Dev Team',  password: process.env.SEED_PASSWORD_DEV_TEAM,  role: 'staff' },
 ];
 
 const BCRYPT_ROUNDS = 12; // OWASP minimum recommendation for 2024

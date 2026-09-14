@@ -160,6 +160,16 @@ export function clampPendingQty(raw, orderedQty) {
   return n;
 }
 
+// Actual Delivered Qty (V6.0) — clamp for the free numeric input. Mirrors
+// clampPendingQty except there is NO upper bound: a delivery can arrive
+// short OR over the ordered quantity, and the field has to record both.
+export function clampDeliveredQty(raw) {
+  if (raw === '' || raw === null || raw === undefined) return '';
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n)) return '';
+  return n < 0 ? 0 : n;
+}
+
 // Human label + style token for a status.
 export function statusMeta(status) {
   switch (status) {

@@ -78,3 +78,15 @@
 .sol-save-btn:hover{background:var(--btn-brand-hover);transform:translateY(-1px)}
 .sol-save-btn:active{transform:none}
 .sol-save-btn:disabled{opacity:.6;cursor:default;transform:none}
+
+/* ── Actual Delivered Qty (V6.0) — read-only cell ────────────────────────
+   The number, plus a small signed delta against the ordered quantity when
+   the two differ, so a short (or over) delivery is visible at a glance
+   without having to compare the column with QTY by eye. */
+.dq-cell{display:inline-flex;align-items:baseline;gap:5px;justify-content:flex-end}
+.dq-delta{
+  font-size:10px;font-weight:700;line-height:1;
+  border-radius:999px;padding:2px 5px;white-space:nowrap;
+}
+.dq-delta.is-short{background:var(--danger-soft);color:var(--danger-strong);border:1px solid var(--danger-border)}
+.dq-delta.is-over{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-border)}

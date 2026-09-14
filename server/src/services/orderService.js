@@ -262,8 +262,6 @@ export async function createManualOrder({
   totalProducts = 0,
   parsedData = {},
   resolutionData = {},
-  productNotes = {},
-  orderComment = '',
   processedBy = '',
   actor,
   actorRole,
@@ -285,8 +283,6 @@ export async function createManualOrder({
         resolution_status,
         parsed_data: parsedData ?? {},
         resolution_data: resolutionData ?? {},
-        product_notes: productNotes ?? {},
-        order_comment: String(orderComment ?? '').trim(),
         upload_timestamp: new Date(),
         ...(pb ? { processed_by: pb } : {}),
         order_source: 'MANUAL',
@@ -366,6 +362,9 @@ export async function setProcessedBy(portalOrderRef, processedBy, { actor, actor
 // not a per-lineId map. 'Order Comments' removed V3.4 — no order ever used
 // it (verified against the live DB before removal); the dashboard's Order
 // Comments section is now driven by a non-empty order_comment instead.
+// 'Order Released but Half' removed V5.9 — no longer needed at order level;
+// a half-released line is still recorded per product in product_fulfillment
+// ('half_delivered', shown as Item Status "Half Released").
 export const ORDER_STATUSES = [
   'Order Released',
   'Order Hold',
@@ -736,10 +735,12 @@ export async function setProductNotes(portalOrderRef, notes, { actor, actorRole 
 // display labels (Delivered / Half Delivered / Not Delivered).
 export const DELIVERY_STATUSES = ['delivered', 'half_delivered', 'not_delivered'];
 
-// Validate one line's fulfilment patch (V1.4). Pure — unit-testable, no DB.
-// `patch` = { pendingQty?, status? }; either field may be null/'' to clear it.
-// `orderedQty` is the line's parsed quantity (pendingQty may never exceed it);
-// a non-finite orderedQty skips the upper bound (line item missing/unparsable).
+// Validate one line's fulfilment patch (V1.4; deliveredQty added V6.0). Pure
+// — unit-testable, no DB. `patch` = { pendingQty?, status?, deliveredQty? };
+// any field may be null/'' to clear it. `orderedQty` is the line's parsed
+// quantity (pendingQty may never exceed it); a non-finite orderedQty skips
+// the upper bound (line item missing/unparsable). deliveredQty is
+// deliberately NOT bounded by orderedQty — see its block below.
 // Returns { set: {…}, unset: […] } with field names relative to the entry.
 export function validateFulfillmentPatch(patch, orderedQty, lineId = '') {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
@@ -774,6 +775,27 @@ export function validateFulfillmentPatch(patch, orderedQty, lineId = '') {
     }
   }
 
+  // Actual Delivered Qty (V6.0) — how many units of this line actually
+  // arrived. Unlike pendingQty this has NO upper bound: a delivery is
+  // usually short but can also come in over the ordered quantity, and both
+  // need to be recordable, so `orderedQty` is deliberately not consulted
+  // here. Still an integer >= 0.
+  if ('deliveredQty' in patch) {
+    const raw = patch.deliveredQty;
+    if (raw === null || String(raw).trim() === '') {
+      unset.push('deliveredQty');
+    } else {
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0) {
+        throw new AppError('VALIDATION_ERROR', 'Actual delivered quantity must be an integer of 0 or more.', {
+          status: 400,
+          details: [{ field: `fulfillment.${lineId}.deliveredQty`, issue: 'must be an integer ≥ 0' }],
+        });
+      }
+      set.deliveredQty = n;
+    }
+  }
+
   if ('status' in patch) {
     const raw = patch.status;
     if (raw === null || String(raw).trim() === '') {
@@ -793,9 +815,9 @@ export function validateFulfillmentPatch(patch, orderedQty, lineId = '') {
 
 // Merge per-product delivery tracking into an order without touching anything
 // else (V1.4 — mirrors setProductComments). `fulfillment` =
-// { [lineId]: { pendingQty?, status? } | null } — null removes the whole
-// entry; a null/'' field inside a patch clears just that field. Other lines'
-// entries are preserved.
+// { [lineId]: { pendingQty?, status?, deliveredQty? } | null } — null removes
+// the whole entry; a null/'' field inside a patch clears just that field.
+// Other lines' entries are preserved.
 export async function setProductFulfillment(portalOrderRef, fulfillment, { actor, actorRole } = {}) {
   const entries = Object.entries(fulfillment || {});
   if (!entries.length) {
@@ -827,7 +849,11 @@ export async function setProductFulfillment(portalOrderRef, fulfillment, { actor
     const beforeEntry = beforeFulfillment[lineId] || {};
     if (patch === null || patch === undefined) {
       unset[key] = '';
-      if (beforeEntry.pendingQty !== undefined || beforeEntry.status !== undefined) changedLineIds.push(lineId);
+      if (
+        beforeEntry.pendingQty !== undefined ||
+        beforeEntry.status !== undefined ||
+        beforeEntry.deliveredQty !== undefined
+      ) changedLineIds.push(lineId);
       continue;
     }
     const orderedQty = Number(items[Number(lineId) - 1]?.qty);
@@ -867,7 +893,7 @@ export async function setProductFulfillment(portalOrderRef, fulfillment, { actor
       actor,
       actorRole,
       action: 'product_fulfillment_set',
-      message: `Item Status / Pending Qty updated for ${changedLineIds.length} product(s)`,
+      message: `Item Status / Pending Qty / Delivered Qty updated for ${changedLineIds.length} product(s)`,
       details: { lineIds: changedLineIds },
     });
   }
@@ -1085,6 +1111,17 @@ const DASHBOARD_FIELDS_STAGE = {
 // machinery.
 const HAS_ORDER_COMMENT_MATCH = { order_comment: { $exists: true, $ne: '' } };
 
+// Presence check for the "Half Released" dashboard row (V5.9) — an
+// order belongs here when AT LEAST ONE of its products carries a Reason of
+// 'OS' or 'Not Found'. Deliberately an order-level count, not an item-level
+// one: the Item card's OS / Not Found rows count individual products (an
+// order with 3 OS lines adds 3 there), whereas this counts the ORDER once no
+// matter how many flagged lines it has, and once — not twice — when it has
+// both an OS line and a Not Found line. $in over the denormalized
+// comment_values array gives exactly that de-duplication for free, since a
+// document either matches the array predicate or it doesn't.
+const HAS_ITEM_ISSUE_MATCH = { comment_values: { $in: PRODUCT_COMMENTS } };
+
 // Order Status dashboard buckets (V3.2; 'Unknown' bucket removed V3.3).
 const DASHBOARD_ORDER_STATUSES = ORDER_STATUSES;
 
@@ -1144,6 +1181,11 @@ export async function getDashboardSummary({ previewLimit } = {}) {
   // bucket() helper above.
   facets.ocm_orders = [{ $match: HAS_ORDER_COMMENT_MATCH }, { $sort: { upload_timestamp: -1 } }, { $limit: limit }];
   facets.ocm_count = [{ $match: HAS_ORDER_COMMENT_MATCH }, { $count: 'n' }];
+
+  // Half Released section (V5.9) — same single-bucket shape as the
+  // Order Comments section above, keyed on HAS_ITEM_ISSUE_MATCH.
+  facets.iss_orders = [{ $match: HAS_ITEM_ISSUE_MATCH }, { $sort: { upload_timestamp: -1 } }, { $limit: limit }];
+  facets.iss_count = [{ $match: HAS_ITEM_ISSUE_MATCH }, { $count: 'n' }];
 
   // Overview stats — total orders, orders uploaded today, and Released orders
   // broken down by processor — power the three summary cards atop the page.
@@ -1358,6 +1400,10 @@ export async function getDashboardSummary({ previewLimit } = {}) {
     // Single bucket, not one per DASHBOARD_ORDER_STATUSES-style value —
     // "has an Order Comment" is the only state this section tracks.
     orderComments: readBucket('ocm', 'has'),
+    // Orders with at least one OS / Not Found product (V5.9). Counted per
+    // ORDER and de-duplicated — see HAS_ITEM_ISSUE_MATCH. Same single-bucket
+    // shape as orderComments above.
+    orderIssues: readBucket('iss', 'has'),
     // V4 dashboard additions
     channelCounts,
     totalItems: agg.total_items?.[0]?.n ?? 0,
@@ -1497,6 +1543,14 @@ export async function listDashboardOrders({ type, value, page, limit, sortBy, so
       });
     }
     matchStage = HAS_ORDER_COMMENT_MATCH;
+  } else if (type === 'orderIssue') {
+    if (value !== 'has') {
+      throw new AppError('VALIDATION_ERROR', "value must be 'has'.", {
+        status: 400,
+        details: [{ field: 'value', issue: 'invalid value' }],
+      });
+    }
+    matchStage = HAS_ITEM_ISSUE_MATCH;
   } else if (type === 'deliveryDate') {
     // Filter by a specific delivery date string.
     if (!value) {
@@ -1538,7 +1592,7 @@ export async function listDashboardOrders({ type, value, page, limit, sortBy, so
     };
     const allowed = known[type];
     if (!allowed) {
-      throw new AppError('VALIDATION_ERROR', "type must be 'status', 'comment', 'orderStatus', 'orderComment', 'discount', 'channel', 'deliveryDate', 'today', 'todayProcessor', 'allOrders', or 'processor'.", {
+      throw new AppError('VALIDATION_ERROR', "type must be 'status', 'comment', 'orderStatus', 'orderComment', 'orderIssue', 'discount', 'channel', 'deliveryDate', 'today', 'todayProcessor', 'allOrders', or 'processor'.", {
         status: 400,
         details: [{ field: 'type', issue: 'invalid value' }],
       });

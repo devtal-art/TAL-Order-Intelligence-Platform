@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { orderService } from '../services/orderService.js';
 import { buildXLSX } from '../excel/buildXLSX.js';
-import { statusMeta, commentMeta, deliveryMeta, orderStatusMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, ORDER_STATUSES, PROCESSED_BY_USERS, clampPendingQty } from '../utils/order.js';
+import { statusMeta, commentMeta, deliveryMeta, orderStatusMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, ORDER_STATUSES, PROCESSED_BY_USERS, clampPendingQty, clampDeliveredQty } from '../utils/order.js';
 import { approvedItemNos, appendManualProduct, removeManualProduct, remapAfterRemoval, recomputeManualSubtotal } from '../utils/manualProduct.js';
 import { currencySymbol } from '../utils/format.js';
 import { toDateInputValue, fromDateInputValue } from '../utils/dateFormat.js';
@@ -465,7 +465,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
     setSaveError('');
     try {
       const cm = remapAfterRemoval(comments, lineId, removed.remap);
-      const fl = remapAfterRemoval(fulfillment, lineId, removed.remap, ['pendingQty', 'status']);
+      const fl = remapAfterRemoval(fulfillment, lineId, removed.remap, ['pendingQty', 'status', 'deliveredQty']);
       const nt = remapAfterRemoval(notes, lineId, removed.remap);
 
       // Same reasoning as addProduct above: manual orders' subtotal tracks
@@ -521,6 +521,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       comment: comments[r.lineId] || '',
       note: notes[r.lineId] || '',
       pendingQty: f.pendingQty,
+      deliveredQty: f.deliveredQty,
       deliveryStatus: f.status || '',
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- results/items/fulfillment/comments/sym all derive from `order`
@@ -539,6 +540,26 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
     return counts;
   }, [rows, editing, draft]);
   const hasStatuses = Object.values(statusCounts).some((n) => n > 0);
+
+  // Delivered quantities handed to OrderFinancials for the "Actually
+  // Delivered" totals card. Taken from the draft while editing so the card
+  // tracks what is being typed, from the stored values otherwise. Only this
+  // field is merged — Reason (which decides whether a line counts at all)
+  // keeps coming from the saved order, exactly as the Updated card reads it,
+  // so the two cards never disagree about the same line.
+  const effectiveFulfillment = useMemo(() => {
+    if (!editing) return fulfillment;
+    const merged = { ...fulfillment };
+    for (const [lineId, d] of Object.entries(draft)) {
+      const raw = d?.deliveredQty;
+      const entry = { ...merged[lineId] };
+      if (raw === '' || raw === null || raw === undefined) delete entry.deliveredQty;
+      else entry.deliveredQty = Number(raw);
+      merged[lineId] = entry;
+    }
+    return merged;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fulfillment derives from `order`
+  }, [order, editing, draft]);
   // The remove column only exists when the order has manually added lines, so
   // orders without them render exactly as before (V1.7). Never shown to a
   // view-only account — removal is a mutation like Add Product / Edit.
@@ -549,6 +570,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
     for (const row of rows) {
       d[row.lineId] = {
         pendingQty: row.pendingQty ?? '',
+        deliveredQty: row.deliveredQty ?? '',
         status: row.deliveryStatus,
         comment: row.comment,
         note: row.note,
@@ -562,8 +584,11 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
     setEditing(true);
   };
 
-  const editLine = (lineId, patch) =>
+  const editLine = (lineId, patch) => {
     setDraft((d) => ({ ...d, [lineId]: { ...d[lineId], ...patch } }));
+    // No auto-upgrade of the order status on a half-release — the
+    // 'Order Released but Half' status it used to set was removed (V5.9).
+  };
 
   const saveEdit = async () => {
     if (!ORDER_STATUSES.includes(orderStatusDraft)) {
@@ -580,6 +605,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
       for (const [lineId, f] of Object.entries(draft)) {
         fulfillmentPayload[lineId] = {
           pendingQty: f.pendingQty === '' ? null : Number(f.pendingQty),
+          deliveredQty: f.deliveredQty === '' ? null : Number(f.deliveredQty),
           status: f.status || null,
         };
         commentsPayload[lineId] = f.comment || null;
@@ -767,13 +793,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
         </div>
       )}
 
-      {order.orderComment && (
-        <div className="oc-note" role="note" aria-label="Order comment">
-          <div className="oc-note-title">Order Comment</div>
-          <div className="oc-note-text">{order.orderComment}</div>
-        </div>
-      )}
-
       {hasStatuses && (
         <div className="sol-status-summary" aria-label="Delivery status summary">
           {DELIVERY_STATUSES.map(({ value }) => {
@@ -803,6 +822,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
               <th>Website Product</th>
               <th>Status</th>
               <th className="rt-num">Pending Qty</th>
+              <th className="rt-num">Actual Delivered Qty</th>
               <th>Item Status</th>
               <th>Reason</th>
               <th>Comments</th>
@@ -867,6 +887,42 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                       )
                     ) : row.pendingQty != null ? (
                       row.pendingQty
+                    ) : (
+                      <span className="rt-empty">—</span>
+                    )}
+                  </td>
+                  {/* Actual Delivered Qty (V6.0) — what really arrived for
+                      this line. A free numeric input, NOT a 0..ordered-qty
+                      dropdown like Pending Qty next to it: a delivery is
+                      usually short but can also come in over, and both have
+                      to be recordable. Stays editable on legacy
+                      Reason='Released' lines (unlike Pending Qty / Item
+                      Status) — it is a new field and applies to them too. */}
+                  <td className="rt-num">
+                    {editing ? (
+                      <input
+                        type="number"
+                        className="fl-input"
+                        value={draft[row.lineId]?.deliveredQty ?? ''}
+                        min={0}
+                        step={1}
+                        placeholder="—"
+                        onChange={(e) => editLine(row.lineId, { deliveredQty: clampDeliveredQty(e.target.value) })}
+                        aria-label="Actual delivered quantity"
+                      />
+                    ) : row.deliveredQty != null ? (
+                      <span className="dq-cell">
+                        {row.deliveredQty}
+                        {Number.isFinite(row.orderedQty) && row.deliveredQty !== row.orderedQty && (
+                          <span
+                            className={`dq-delta${row.deliveredQty < row.orderedQty ? ' is-short' : ' is-over'}`}
+                            title={`Ordered ${row.orderedQty}`}
+                          >
+                            {row.deliveredQty < row.orderedQty ? '−' : '+'}
+                            {Math.abs(row.deliveredQty - row.orderedQty)}
+                          </span>
+                        )}
+                      </span>
                     ) : (
                       <span className="rt-empty">—</span>
                     )}
@@ -959,6 +1015,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
         results={results}
         lineItems={items}
         comments={comments}
+        fulfillment={effectiveFulfillment}
         orderSource={order.orderSource}
       />
 

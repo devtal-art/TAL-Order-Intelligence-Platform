@@ -7,7 +7,7 @@ import { currencySymbol } from '../utils/format.js';
 // didn't carry are omitted, and when there is no totals data at all (older /
 // edge orders) the whole card is hidden. Shared by the Review screen and the
 // Saved Order modal so both display identically.
-export default function OrderFinancials({ financials, results = [], lineItems = [], comments = {}, orderSource }) {
+export default function OrderFinancials({ financials, results = [], lineItems = [], comments = {}, fulfillment = {}, orderSource }) {
   const f = financials || {};
   const sym = currencySymbol(f.currency);
   const money = (n) => `${Number(n) < 0 ? '-' : ''}${sym}${Math.abs(Number(n) || 0).toFixed(2)}`;
@@ -60,6 +60,42 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
     });
   }
 
+  // Actually Delivered (V6.0) — the third card. Computed as a DELTA off the
+  // Updated card rather than re-summing every line from scratch, for the
+  // same reason the Updated card is a delta off the Original: `subTotal`
+  // comes from the email's own totals block, so re-adding the line items
+  // would drift from it whenever the parser and the email disagree by a
+  // rounding penny. Working in deltas means a line with no Actual Delivered
+  // Qty recorded contributes nothing, and the card therefore matches the
+  // Updated one exactly until somebody actually enters a quantity.
+  //
+  // `assumedQty` is the quantity the Updated card already counted for that
+  // line: zero for a Not Found line (it was taken out of the totals
+  // altogether), the ordered quantity for everything else. The signed unit
+  // price is used as-is, so a negative-priced line moves the total the
+  // correct way without a special case.
+  let deliveredAdjustment = 0;
+  let hasDelivered = false;
+
+  results.forEach((r) => {
+    const raw = fulfillment[r.lineId]?.deliveredQty;
+    if (raw === null || raw === undefined || raw === '') return;
+    const deliveredQty = Number(raw);
+    if (!Number.isFinite(deliveredQty)) return;
+
+    const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
+    const item = (Number.isInteger(lineIndex) && lineIndex >= 0 && lineItems[lineIndex]) || null;
+    if (!item) return;
+
+    // A recorded quantity shows the card even when it happens to equal what
+    // was ordered — "delivered in full" is itself worth confirming.
+    hasDelivered = true;
+
+    const unitPrice = Number(item.unit_price) || 0;
+    const assumedQty = comments[r.lineId] === 'Not Found' ? 0 : (Number(item.qty) || 0);
+    deliveredAdjustment += (deliveredQty - assumedQty) * unitPrice;
+  });
+
   // Discounts: an email can carry more than one discount line (e.g. a
   // frozen-range volume discount AND a separate sales-rep discount). Prefer
   // the parser's full `discounts` list so every line's own label survives;
@@ -108,7 +144,7 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
   const originalTitle = isManualOrder ? 'Manual Order Price' : (hasAdjustments ? 'Original (Email)' : null);
 
   const originalCard = rows.length ? (
-    <div className="fin-card" aria-label={isManualOrder ? 'Manual order totals' : 'Original order totals'}>
+    <div className="fin-card" key="original" aria-label={isManualOrder ? 'Manual order totals' : 'Original order totals'}>
       {originalTitle && <div className="fin-title">{originalTitle}</div>}
       {rows.map((r) => (
         <div key={r.key} className={`fin-row${r.strong ? ' fin-total' : ''}`}>
@@ -130,7 +166,7 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
     upRows.push({ key: 'total', label: 'Total', value: money(updatedTot), strong: true });
     
     updatedCard = (
-      <div className="fin-card is-updated" aria-label="Updated order totals">
+      <div className="fin-card is-updated" key="updated" aria-label="Updated order totals">
         <div className="fin-title">Updated (with manual additions)</div>
         {upRows.map((r) => (
           <div key={r.key} className={`fin-row${r.strong ? ' fin-total' : ''}`}>
@@ -142,7 +178,7 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
     );
   } else if (hasAdjustments && !rows.length) {
     updatedCard = (
-      <div className="fin-card is-updated" aria-label="Updated order totals">
+      <div className="fin-card is-updated" key="updated" aria-label="Updated order totals">
         <div className="fin-title">Updated (with manual additions)</div>
         <div className="fin-row">
           <span className="fin-label">Manual Additions Subtotal</span>
@@ -156,14 +192,37 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
     );
   }
 
-  if (updatedCard) {
-    return (
-      <div className="fin-wrapper">
-        {updatedCard}
-        {originalCard}
+  // Discount and Transportation Charges are carried across unchanged, the
+  // same convention the Updated card follows — only the line-item side of
+  // the order is restated here.
+  let deliveredCard = null;
+  if (hasDelivered && rows.length) {
+    const baseSub = hasAdjustments ? subTotal + totalAdjustment : subTotal;
+    const baseTot = hasAdjustments ? total + totalAdjustment : total;
+    const deliveredSub = baseSub + deliveredAdjustment;
+    const delRows = [];
+    if (subTotal !== 0 || deliveredSub !== 0) delRows.push({ key: 'sub', label: 'Sub Total', value: money(deliveredSub) });
+    delRows.push(...discountRows.map((r) => ({ ...r, key: `del-${r.key}` })));
+    if (subTotal !== 0 || transport > 0 || deliveredSub !== 0) delRows.push({ key: 'trans', label: 'Transportation Charges', value: money(transport) });
+    delRows.push({ key: 'total', label: 'Total', value: money(baseTot + deliveredAdjustment), strong: true });
+
+    deliveredCard = (
+      <div className="fin-card is-delivered" key="delivered" aria-label="Actually delivered order totals">
+        <div className="fin-title">Actually Delivered</div>
+        {delRows.map((r) => (
+          <div key={r.key} className={`fin-row${r.strong ? ' fin-total' : ''}`}>
+            <span className="fin-label">{r.label}</span>
+            <span className="fin-value">{r.value}</span>
+          </div>
+        ))}
       </div>
     );
   }
 
-  return originalCard;
+  // Most-restated first, original last: Actually Delivered → Updated →
+  // Original. Any of the three can be absent, so they're assembled as a list
+  // and the side-by-side wrapper only appears once there's more than one.
+  const cards = [deliveredCard, updatedCard, originalCard].filter(Boolean);
+  if (cards.length > 1) return <div className="fin-wrapper">{cards}</div>;
+  return cards[0] || null;
 }

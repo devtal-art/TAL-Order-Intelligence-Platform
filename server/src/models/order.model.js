@@ -87,13 +87,22 @@ const orderSchema = new mongoose.Schema(
     // Overall order status (V3.2 — distinct from any per-product status
     // above; 'Unknown' removed V3.3 — every order now carries a real value;
     // 'Order Comments' removed V3.4 — verified zero orders used it before
-    // dropping it from the enum). No default: the initial order save
+    // dropping it from the enum; 'Order Released but Half' removed V5.9 —
+    // the two orders that used it were migrated back to 'Order Released',
+    // which is what they were auto-upgraded from, and the half-release
+    // itself is still recorded per line in product_fulfillment). No default:
+    // the initial order save
     // (upsertOrder) never sets this field — a separate, mandatory
     // setOrderStatus call sets it immediately after, matching how the
     // API/UI enforce it as required.
     order_status: {
       type: String,
-      enum: ['Order Released', 'Order Hold', 'Order Cancelled', 'Order Released but Problem'],
+      enum: [
+        'Order Released',
+        'Order Hold',
+        'Order Cancelled',
+        'Order Released but Problem',
+      ],
     },
     // Free-text comment for the whole order (V3.2) — independent from every
     // per-product comment/reason/note above.

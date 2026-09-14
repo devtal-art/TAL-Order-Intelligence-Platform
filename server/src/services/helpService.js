@@ -20,14 +20,9 @@ export async function sendHelpRequest({ senderName, message }) {
     throw new AppError('CONFIG_ERROR', 'Help email is not configured on the server.', { status: 500 });
   }
 
-  // Without an explicit timeZone, Intl.DateTimeFormat renders in the
-  // SERVER's local timezone (UTC on most hosts) rather than the team's —
-  // every email showed a time ~5.5 hours behind the real IST send time.
-  // The team operates in India, so render in that zone explicitly.
   const submittedOn = new Intl.DateTimeFormat('en-GB', {
     dateStyle: 'medium',
     timeStyle: 'short',
-    timeZone: 'Asia/Kolkata',
   }).format(new Date());
 
   const res = await fetch(BREVO_ENDPOINT, {

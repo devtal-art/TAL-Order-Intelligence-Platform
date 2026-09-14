@@ -58,6 +58,10 @@ const TONE = {
   // 'delivered' — alias it to the same green as the Order Status tone so
   // "Released" reads consistently green everywhere on the dashboard.
   delivered: { main: '#059669', soft: '#ECFDF3', border: '#ABEFC6', strong: '#067647' },
+  // Order Hold shares the amber warning tone with Item Status "Half
+  // Released" (tone 'half' below) — same severity, on hold/needs attention
+  // rather than settled. Order Cancelled gets the red alert tone — a
+  // decisive, closed-out outcome.
   hold: { main: '#F79009', soft: '#FFFAEB', border: '#FEDF89', strong: '#B54708' },
   cancelled: { main: '#D92D20', soft: '#FEF3F2', border: '#FECDCA', strong: '#B42318' },
   problem: { main: '#2F4FA2', soft: '#EDF2FA', border: '#C5D2EC', strong: '#27428C' },
@@ -82,6 +86,7 @@ const osIconFor = (status) => {
     case 'Order Released': return CheckCircleRoundedIcon;
     case 'Order Hold': return AccessTimeFilledRoundedIcon;
     case 'Order Cancelled': return CancelRoundedIcon;
+    case 'Order Released but Problem': return HelpRoundedIcon;
     default: return HelpRoundedIcon;
   }
 };
@@ -118,6 +123,7 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
   const [openComment, setOpenComment] = useState(null);
   const [openOrderStatus, setOpenOrderStatus] = useState(null);
   const [openOrderComment, setOpenOrderComment] = useState(false);
+  const [openOrderIssue, setOpenOrderIssue] = useState(false);
   const [openDiscount, setOpenDiscount] = useState(null);
 
   useEffect(() => {
@@ -335,6 +341,25 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
                   viewBusyRef={viewBusyRef}
                   isOpen={openOrderComment}
                   onToggle={() => setOpenOrderComment((cur) => !cur)}
+                />
+              </BucketGroup>
+            )}
+            {/* Half Released (V5.9) — orders holding at least one OS or
+                Not Found product, counted ONCE per order however many
+                flagged lines it has (and once, not twice, when it has both
+                kinds). Deliberately different from the Item card's OS /
+                Not Found rows alongside it, which count individual
+                products; see HAS_ITEM_ISSUE_MATCH on the server. */}
+            {summary.orderIssues && (
+              <BucketGroup title="Issues">
+                <BucketRow
+                  type="orderIssue"
+                  bucket={summary.orderIssues}
+                  meta={{ label: 'Half Released', tone: 'os' }}
+                  onView={onView}
+                  viewBusyRef={viewBusyRef}
+                  isOpen={openOrderIssue}
+                  onToggle={() => setOpenOrderIssue((cur) => !cur)}
                 />
               </BucketGroup>
             )}

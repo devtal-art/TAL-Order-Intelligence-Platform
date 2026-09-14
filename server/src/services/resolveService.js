@@ -84,20 +84,6 @@ export function partialSimilarity(aTokens, bNorm) {
 export const WEIGHTS = { token: 0.5, string: 0.3, partial: 0.2 };
 export const MATCH_THRESHOLD = 45; // 0..100
 
-// Score one email name against one precomputed catalog entry. Returns 0..100.
-export function scoreMatch(emailName, product) {
-  const aNorm = normalizeForMatch(emailName);
-  const aTokens = tokenize(aNorm);
-  const bNorm = product.norm ?? normalizeForMatch(product.name);
-  const bTokens = product.tokens ?? tokenize(bNorm);
-
-  const tSim = tokenSimilarity(aTokens, bTokens);
-  const sSim = stringSimilarity(aNorm, bNorm);
-  const pSim = partialSimilarity(aTokens, bNorm);
-
-  return Math.round((WEIGHTS.token * tSim + WEIGHTS.string * sSim + WEIGHTS.partial * pSim) * 100);
-}
-
 // Return ONLY the single best-scoring product (or null for an empty catalog).
 // `catalogEntries`: [{ name, item_no, norm, tokens }]
 export function findBestMatch(emailName, catalogEntries) {

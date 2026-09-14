@@ -50,6 +50,8 @@ export default function DashboardList() {
               ? { label: value, tone: value === 'Orders - Email' ? 'problem' : 'cancelled', title: `${value} orders` }
               : type === 'orderComment' && value === 'has'
             ? { label: 'Order Comments', tone: 'comments', title: 'Orders with an Order Comment' }
+            : type === 'orderIssue' && value === 'has'
+            ? { label: 'Half Released', tone: 'issues', title: 'Half Released — orders with at least one OS or Not Found item' }
             : type === 'deliveryDate'
               ? { label: `Delivery: ${formatDisplayDate(value)}`, tone: 'released', title: `Orders for delivery date ${formatDisplayDate(value)}` }
               : type === 'today'

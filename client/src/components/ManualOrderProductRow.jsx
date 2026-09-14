@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { DELIVERY_STATUSES, PRODUCT_COMMENTS } from '../utils/order.js';
 
 // One product row for Manual Order Creation (V3.1 — new). Any of the three
 // identity fields (Item Number / Website Product Name / Email Product Name)
@@ -7,8 +6,6 @@ import { DELIVERY_STATUSES, PRODUCT_COMMENTS } from '../utils/order.js';
 // fallback — Cases 1-4 from the spec): picking a suggestion autofills all
 // three fields. Typing something no lookup finds is allowed — nothing here
 // ever blocks manual entry.
-// Item Status and Reason dropdowns added (V5.1 — optional at creation,
-// same values/styles as the Saved Order edit view).
 export default function ManualOrderProductRow({ row, index, onChange, onRemove, canRemove, lookupProduct }) {
   const [suggestions, setSuggestions] = useState({ mappings: [], catalogItems: [] });
   const [openField, setOpenField] = useState(null); // 'itemNo' | 'websiteProductName' | 'emailProductName' | null
@@ -164,40 +161,6 @@ export default function ManualOrderProductRow({ row, index, onChange, onRemove, 
             placeholder="Optional"
             aria-label="Product notes"
           />
-        </label>
-
-        {/* Item Status (delivery status) — optional at creation, same values as
-            the Saved Order edit view. Reuses ds-select + status tint. */}
-        <label className="mor-field mor-narrow">
-          <span>Item Status</span>
-          <select
-            className={`ds-select${row.itemStatus ? ` is-${row.itemStatus}` : ''}`}
-            value={row.itemStatus}
-            onChange={(e) => onChange({ itemStatus: e.target.value })}
-            aria-label="Item Status"
-          >
-            <option value="">—</option>
-            {DELIVERY_STATUSES.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </label>
-
-        {/* Reason (product comment: OS | Not Found) — optional at creation,
-            same values as the Saved Order edit view. Reuses cm-select. */}
-        <label className="mor-field mor-narrow">
-          <span>Reason</span>
-          <select
-            className="cm-select"
-            value={row.reason}
-            onChange={(e) => onChange({ reason: e.target.value })}
-            aria-label="Reason"
-          >
-            <option value="">—</option>
-            {PRODUCT_COMMENTS.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
         </label>
       </div>
     </div>

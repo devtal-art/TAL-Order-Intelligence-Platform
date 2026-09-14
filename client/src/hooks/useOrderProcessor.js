@@ -413,6 +413,11 @@ export function useOrderProcessor() {
   // the order.
   const setProductFulfillment = useCallback((lineId, patch) => {
     setFulfillment((prev) => ({ ...prev, [lineId]: { ...prev[lineId], ...patch } }));
+    // Marking a line 'half_delivered' used to auto-upgrade the order status to
+    // 'Order Released but Half'. That status was removed (V5.9), and nothing
+    // replaces the auto-set: the order keeps whatever status the user chose,
+    // and the half-release stays visible per line (Item Status "Half
+    // Released") and in the dashboard's Half Released row.
     if (orderRefRef.current) {
       orderService
         .setFulfillment(orderRefRef.current, { [lineId]: patch })
