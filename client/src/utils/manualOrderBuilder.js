@@ -29,6 +29,11 @@ export function emptyProductRow() {
     emailProductName: '',
     qty: '1',
     unitPrice: '',
+    // Item Status (fulfillment.status) + Reason (product_comments) — same
+    // per-product delivery-tracking fields the Saved Order edit view offers,
+    // optional at creation time like everything else on this row.
+    status: '',
+    comment: '',
     notes: '',
   };
 }

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { DELIVERY_STATUSES, PRODUCT_COMMENTS } from '../utils/order.js';
 
 // One product row for Manual Order Creation (V3.1 — new). Any of the three
 // identity fields (Item Number / Website Product Name / Email Product Name)
@@ -151,6 +152,35 @@ export default function ManualOrderProductRow({ row, index, onChange, onRemove, 
           <span>Total</span>
           <b>{total.toFixed(2)}</b>
         </div>
+
+        <label className="mor-field">
+          <span>Item Status</span>
+          <select
+            className={`ds-select${row.status ? ` is-${row.status}` : ''}`}
+            value={row.status}
+            onChange={(e) => onChange({ status: e.target.value })}
+            aria-label="Item status"
+          >
+            <option value="">—</option>
+            {DELIVERY_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="mor-field">
+          <span>Reason</span>
+          <select
+            className="cm-select"
+            value={row.comment}
+            onChange={(e) => onChange({ comment: e.target.value })}
+            aria-label="Reason"
+          >
+            <option value="">—</option>
+            {PRODUCT_COMMENTS.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
 
         <label className="mor-field mor-notes">
           <span>Notes</span>

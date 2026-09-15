@@ -78,7 +78,7 @@
 
 .mor-grid{
   display:grid;
-  grid-template-columns:1.4fr 1.4fr 1fr .7fr .8fr .8fr 1.2fr;
+  grid-template-columns:1.4fr 1.4fr 1fr .7fr .8fr .8fr .9fr .9fr 1.2fr;
   gap:10px;align-items:end;
 }
 .mor-field{display:flex;flex-direction:column;gap:5px;font-size:11.5px;min-width:0}
@@ -88,6 +88,10 @@
   padding:7px 9px;background:var(--surface);width:100%;color:var(--ink);
 }
 .mor-field input:focus{border-color:var(--accent);box-shadow:var(--ring);outline:none}
+/* Item Status / Reason reuse the platform-wide ds-select/cm-select classes
+   (same look as the Review/Saved-Order screens) — just stretched to fill
+   the grid column like every other field in this row. */
+.mor-field select{width:100%;box-sizing:border-box}
 .mor-total b{font-size:13px;color:var(--accent);padding:7px 0;display:block}
 
 .mor-lookup-wrap{position:relative}

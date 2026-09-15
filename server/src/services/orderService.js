@@ -1294,10 +1294,14 @@ export async function getDashboardSummary({ previewLimit } = {}) {
     orders: (agg[`${key}_orders`] || []).map(toDashboardCardDto),
   });
 
+  // Seeded with the known staff list so they always show (even at 0), but
+  // NOT restricted to it — any real processed_by value in the data counts
+  // (e.g. 'Dev Team'), so the breakdown reflects who actually processed
+  // orders rather than silently dropping anyone outside a fixed allowlist.
   const releasedByProcessor = {};
   for (const user of PROCESSED_BY_USERS) releasedByProcessor[user] = 0;
   for (const row of agg.released_by_processor || []) {
-    if (row._id in releasedByProcessor) releasedByProcessor[row._id] = row.n;
+    if (row._id) releasedByProcessor[row._id] = row.n;
   }
 
   // ── V4 — assemble new dashboard fields ──────────────────────────────
@@ -1362,18 +1366,19 @@ export async function getDashboardSummary({ previewLimit } = {}) {
   // next7DeliveryDates for the dashboard's "Crossed Delivery Dates" card.
   const next7CrossedDeliveryDates = crossedDeliveryDates.slice(0, 7);
 
-  // Today by processor
+  // Today by processor — dynamic (see releasedByProcessor above): seeded
+  // with the known staff, but any real processed_by value counts.
   const todayByProcessor = {};
   for (const user of PROCESSED_BY_USERS) todayByProcessor[user] = 0;
   for (const row of agg.today_by_processor || []) {
-    if (row._id && row._id in todayByProcessor) todayByProcessor[row._id] = row.n;
+    if (row._id) todayByProcessor[row._id] = row.n;
   }
 
-  // All orders by processor (Employee section)
+  // All orders by processor (Employee section) — dynamic, same as above.
   const allByProcessor = {};
   for (const user of PROCESSED_BY_USERS) allByProcessor[user] = 0;
   for (const row of agg.all_by_processor || []) {
-    if (row._id && row._id in allByProcessor) allByProcessor[row._id] = row.n;
+    if (row._id) allByProcessor[row._id] = row.n;
   }
 
   // Last 7 days — fill every day (including zero-order days) so the

@@ -36,7 +36,7 @@ import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import { orderService } from '../services/orderService.js';
-import { deliveryMeta, commentMeta, discountBucketMeta, PROCESSED_BY_USERS } from '../utils/order.js';
+import { deliveryMeta, commentMeta, discountBucketMeta } from '../utils/order.js';
 import { formatDaysUntil, formatDisplayDate } from '../utils/dateFormat.js';
 
 // Dashboard widgets (V5 — MUI + Tailwind redesign). SAME information
@@ -516,7 +516,11 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
           </CardContent>
           <Divider />
           <Box>
-            {PROCESSED_BY_USERS.filter((u) => (summary.todayByProcessor?.[u] ?? 0) > 0).map((user, i) => (
+            {/* Object.keys, not PROCESSED_BY_USERS — dynamic: the server
+                seeds the known staff at 0 but also includes any other real
+                processed_by value (e.g. 'Dev Team'), so whoever actually
+                processed an order shows up here too, not just the fixed list. */}
+            {Object.keys(summary.todayByProcessor || {}).filter((u) => (summary.todayByProcessor?.[u] ?? 0) > 0).map((user, i) => (
               <Box key={user}>
                 {i > 0 && <Divider />}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2.25, py: 1 }}>
@@ -525,7 +529,7 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
                 </Box>
               </Box>
             ))}
-            {PROCESSED_BY_USERS.every((u) => (summary.todayByProcessor?.[u] ?? 0) === 0) && (
+            {Object.keys(summary.todayByProcessor || {}).every((u) => (summary.todayByProcessor?.[u] ?? 0) === 0) && (
               <EmptyState icon={InboxRoundedIcon} title="No orders processed today" compact />
             )}
           </Box>
@@ -585,7 +589,9 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
                 <TableCell sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', fontSize: 11, letterSpacing: '.03em', bgcolor: '#FAFAF8', py: 1.5, whiteSpace: 'nowrap' }}>
                   Employee
                 </TableCell>
-                {PROCESSED_BY_USERS.map((user) => (
+                {/* Object.keys, not PROCESSED_BY_USERS — dynamic, see the
+                    Today's Orders processor list above for why. */}
+                {Object.keys(summary.allByProcessor || {}).map((user) => (
                   <TableCell key={user} align="center" sx={{ bgcolor: '#FAFAF8', py: 1.5 }}>
                     <Box
                       component={Link}
@@ -608,7 +614,7 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
             <TableBody>
               <TableRow sx={{ '&:last-child td': { borderBottom: 0 } }}>
                 <TableCell sx={{ fontWeight: 600, color: 'text.secondary', py: 1.75, whiteSpace: 'nowrap' }}>Orders Processed</TableCell>
-                {PROCESSED_BY_USERS.map((user) => (
+                {Object.keys(summary.allByProcessor || {}).map((user) => (
                   <TableCell key={user} align="center" sx={{ fontFamily: 'Schibsted Grotesk, sans-serif', fontWeight: 700, fontSize: 16, fontVariantNumeric: 'tabular-nums', py: 1.75 }}>
                     {summary.allByProcessor?.[user] ?? 0}
                   </TableCell>

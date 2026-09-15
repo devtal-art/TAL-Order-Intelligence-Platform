@@ -299,6 +299,29 @@ export function useManualOrderForm() {
         if (deliveryDate) {
           orderService.setDeliveryDate(ref, deliveryDate).catch((e) => console.warn('Delivery date flush failed:', e.message));
         }
+        // Per-product Item Status / Reason / Notes — same optional
+        // delivery-tracking fields the Saved Order edit view offers, flushed
+        // best-effort like Delivery Date above so a hiccup here never blocks
+        // "order saved". lineId matches realRows' position (String(i + 1)),
+        // the same contract appendManualProduct used when building line_items.
+        const fulfillmentPayload = {};
+        const commentsPayload = {};
+        const notesPayload = {};
+        realRows.forEach((row, i) => {
+          const lineId = String(i + 1);
+          if (row.status) fulfillmentPayload[lineId] = { status: row.status };
+          if (row.comment) commentsPayload[lineId] = row.comment;
+          if (String(row.notes || '').trim()) notesPayload[lineId] = row.notes.trim();
+        });
+        if (Object.keys(fulfillmentPayload).length) {
+          orderService.setFulfillment(ref, fulfillmentPayload).catch((e) => console.warn('Product fulfillment flush failed:', e.message));
+        }
+        if (Object.keys(commentsPayload).length) {
+          orderService.setComments(ref, commentsPayload).catch((e) => console.warn('Product comment flush failed:', e.message));
+        }
+        if (Object.keys(notesPayload).length) {
+          orderService.setNotes(ref, notesPayload).catch((e) => console.warn('Product note flush failed:', e.message));
+        }
         setSaved(true);
         setSavedRef(ref);
         return true;

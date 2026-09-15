@@ -89,7 +89,10 @@ export function buildDashboardWorkbook(orders) {
         discountType: DISCOUNT_LABELS[o.discount_bucket] || o.discount_bucket,
       });
     }
-    if (o.processed_by && processorCounts[o.processed_by] !== undefined) processorCounts[o.processed_by]++;
+    // Dynamic — any real processed_by value counts, not just the known
+    // staff list PROCESSED_BY_USERS seeds below at 0 (mirrors orderService.js
+    // getDashboardSummary's by-processor breakdowns).
+    if (o.processed_by) processorCounts[o.processed_by] = (processorCounts[o.processed_by] || 0) + 1;
 
     // Item Status / Reason totals: a raw pass over the stored maps
     // themselves (matching getDashboardSummary's own mapEntries-based
@@ -274,7 +277,10 @@ export function buildDashboardWorkbook(orders) {
     { header: 'Employee', key: 'employee', width: 20 },
     { header: 'Orders Processed', key: 'count', width: 18 },
   ];
-  for (const p of PROCESSED_BY_USERS) teamWs.addRow({ employee: p, count: processorCounts[p] });
+  // Object.keys, not PROCESSED_BY_USERS — dynamic (see processorCounts
+  // above): the known staff are always included via the seed loop, but any
+  // real processed_by value (e.g. 'Dev Team') gets its own row too.
+  for (const p of Object.keys(processorCounts)) teamWs.addRow({ employee: p, count: processorCounts[p] });
   styleSheet(teamWs);
 
   return wb;
