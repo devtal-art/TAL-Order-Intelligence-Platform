@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { DELIVERY_STATUSES, PRODUCT_COMMENTS } from '../utils/order.js';
+import { DELIVERY_STATUSES, PRODUCT_COMMENTS, clampPendingQty } from '../utils/order.js';
 
 // One product row for Manual Order Creation (V3.1 — new). Any of the three
 // identity fields (Item Number / Website Product Name / Email Product Name)
@@ -55,6 +55,12 @@ export default function ManualOrderProductRow({ row, index, onChange, onRemove, 
   const q = Number(row.qty) || 0;
   const unit = String(row.unitPrice ?? '').trim() === '' ? 0 : Number(row.unitPrice) || 0;
   const total = Math.round(unit * q * 100) / 100;
+
+  // Pending Qty only makes sense once Reason is 'OS' (out of stock) — mirrors
+  // the Review/Saved-Order screens' delivery tracking, just gated on Reason
+  // instead of always being editable, since a manually-created order has no
+  // "delivery" to track yet until something goes out of stock.
+  const osSelected = row.comment === 'OS';
 
   const hasSuggestions = suggestions.mappings.length > 0 || suggestions.catalogItems.length > 0;
   const showDropdown = openField && (loading || hasSuggestions);
@@ -152,6 +158,23 @@ export default function ManualOrderProductRow({ row, index, onChange, onRemove, 
           <span>Total</span>
           <b>{total.toFixed(2)}</b>
         </div>
+
+        <label className="mor-field mor-narrow">
+          <span>Pending Qty</span>
+          <select
+            className="fl-select"
+            value={row.pendingQty ?? ''}
+            onChange={(e) => onChange({ pendingQty: clampPendingQty(e.target.value, row.qty) })}
+            aria-label="Pending quantity"
+            disabled={!osSelected}
+            title={osSelected ? undefined : 'Select Reason "OS" to set a pending quantity'}
+          >
+            <option value="">—</option>
+            {Array.from({ length: q + 1 }, (_, n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
 
         <label className="mor-field">
           <span>Item Status</span>

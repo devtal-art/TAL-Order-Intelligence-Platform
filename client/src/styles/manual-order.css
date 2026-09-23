@@ -78,7 +78,7 @@
 
 .mor-grid{
   display:grid;
-  grid-template-columns:1.4fr 1.4fr 1fr .7fr .8fr .8fr .9fr .9fr 1.2fr;
+  grid-template-columns:1.4fr 1.4fr 1fr .7fr .8fr .8fr .8fr .9fr .9fr 1.2fr;
   gap:10px;align-items:end;
 }
 .mor-field{display:flex;flex-direction:column;gap:5px;font-size:11.5px;min-width:0}

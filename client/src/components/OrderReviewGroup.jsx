@@ -100,7 +100,7 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
             <table className="rt-table">
               <thead>
                 <tr className="rt-groups">
-                  <th className="rt-grp rt-grp-email" colSpan={5}>Order details · from email</th>
+                  <th className="rt-grp rt-grp-email" colSpan={4}>Order details · from email</th>
                   <th className="rt-grp rt-grp-match" colSpan={4}>Website match · from catalog</th>
                   {onFulfillment && <th className="rt-grp rt-grp-fulfil" colSpan={2}>Delivery</th>}
                   {onComment && <th className="rt-grp rt-grp-comment" rowSpan={2}>Reason</th>}
@@ -112,7 +112,6 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
                   <th className="rt-email">Package</th>
                   <th className="rt-email rt-num rt-highlight">QTY</th>
                   <th className="rt-email rt-num rt-highlight">Unit Price</th>
-                  <th className="rt-email rt-num">Total Price</th>
                   <th className="rt-match">Item No</th>
                   <th className="rt-match">Product Name</th>
                   <th className="rt-match rt-num">Match</th>

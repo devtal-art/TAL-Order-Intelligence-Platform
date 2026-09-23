@@ -34,6 +34,10 @@ export function emptyProductRow() {
     // optional at creation time like everything else on this row.
     status: '',
     comment: '',
+    // Pending Qty (fulfillment.pendingQty) — only meaningful once Reason is
+    // 'OS' (see ManualOrderProductRow), same field the Review/Saved-Order
+    // screens track. Kept '' (unset) otherwise.
+    pendingQty: '',
     notes: '',
   };
 }

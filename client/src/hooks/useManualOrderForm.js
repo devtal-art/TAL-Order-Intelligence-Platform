@@ -309,7 +309,10 @@ export function useManualOrderForm() {
         const notesPayload = {};
         realRows.forEach((row, i) => {
           const lineId = String(i + 1);
-          if (row.status) fulfillmentPayload[lineId] = { status: row.status };
+          const rowFulfillment = {};
+          if (row.status) rowFulfillment.status = row.status;
+          if (row.pendingQty !== '' && row.pendingQty != null) rowFulfillment.pendingQty = Number(row.pendingQty);
+          if (Object.keys(rowFulfillment).length) fulfillmentPayload[lineId] = rowFulfillment;
           if (row.comment) commentsPayload[lineId] = row.comment;
           if (String(row.notes || '').trim()) notesPayload[lineId] = row.notes.trim();
         });

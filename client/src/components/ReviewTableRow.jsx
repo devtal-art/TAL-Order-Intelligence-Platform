@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import SearchProductModal from './SearchProductModal.jsx';
-import { currencySymbol } from '../utils/format.js';
 import { PRODUCT_COMMENTS, DELIVERY_STATUSES, clampPendingQty, isMatchingSkipped } from '../utils/order.js';
 
 // One extracted product rendered as a table row.
@@ -39,10 +38,8 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
   const [error, setError] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const sym = currencySymbol(currency);
-  const money = (n) => `${Number(n) < 0 ? '-' : ''}${sym}${Math.abs(Number(n) || 0).toFixed(2)}`;
-  // Unit Price column deliberately omits the currency symbol (V4.4) — only
-  // this column; Total Price and every order-total calculation keep it.
+  // Unit Price column deliberately omits the currency symbol (V4.4) — every
+  // order-total calculation elsewhere still keeps it.
   const moneyNoSym = (n) => `${Number(n) < 0 ? '-' : ''}${Math.abs(Number(n) || 0).toFixed(2)}`;
 
   // Ordered quantity of this line — the Pending Qty upper bound. When known,
@@ -54,7 +51,6 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
   const matchScore = approved ? 100 : candidate && candidate.matchScore != null ? candidate.matchScore : null;
 
   const isUnitPriceNegative = item && Number(item.unit_price) < 0;
-  const isTotalNegative = item && Number(item.total) < 0;
 
   const doApprove = async () => {
     if (busy || !candidate || skipped) return; // prevent duplicate submissions; no approval while Not Found
@@ -82,7 +78,6 @@ export default function ReviewTableRow({ result, item, currency, onApprove, comm
       <td className="rt-email">{item ? item.package : '—'}</td>
       <td className="rt-email rt-num rt-highlight">{item ? item.qty : '—'}</td>
       <td className={`rt-email rt-num rt-highlight${isUnitPriceNegative ? ' price-negative' : ''}`}>{item ? moneyNoSym(item.unit_price) : '—'}</td>
-      <td className={`rt-email rt-num${isTotalNegative ? ' price-negative' : ''}`}>{item ? money(item.total) : '—'}</td>
 
       {/* ── Match (green) ── */}
       <td className="rt-match rt-itemno">
