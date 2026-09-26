@@ -7,8 +7,10 @@ import { orderRouter } from './order.routes.js';
 import { authRouter } from './auth.routes.js';
 import { productLookupRouter } from './productLookup.routes.js';
 import { helpRouter } from './help.routes.js';
+import { employeeRouter } from './employee.routes.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { blockViewerWrites } from '../../middleware/blockViewerWrites.js';
+import { requireAdmin } from '../../middleware/requireAdmin.js';
 
 // v1 API router, mounted at /api/v1.
 export const v1Router = Router();
@@ -27,4 +29,10 @@ v1Router.use('/resolve', authenticate, blockViewerWrites, resolveRouter);
 v1Router.use('/orders', authenticate, blockViewerWrites, orderRouter);
 v1Router.use('/products', authenticate, blockViewerWrites, productLookupRouter);
 v1Router.use('/help', authenticate, blockViewerWrites, helpRouter);
+
+// Admin Portal (employee management) — its own chain, deliberately NOT
+// blockViewerWrites: an admin's effective role is 'viewer' (see
+// authenticate.js), so that middleware would otherwise block the admin's
+// own writes here. requireAdmin is the real gate for this router.
+v1Router.use('/admin/employees', authenticate, requireAdmin, employeeRouter);
 

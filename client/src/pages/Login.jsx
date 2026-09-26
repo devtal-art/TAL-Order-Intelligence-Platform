@@ -3,10 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import logoUrl from '../assets/artlogic-logo.svg';
 
-// The internal users. Matches the seed script — a dropdown avoids
-// username typos and removes the need for a free-text name field.
-const USERS = ['Jasmeet', 'Sahil', 'Shubham', 'Alpa', 'Sehbaz', 'Chat Team', 'Gagandeep', 'Dev Team'];
-
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
 export default function Login() {
@@ -16,6 +12,27 @@ export default function Login() {
 
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  // Login-eligible usernames (Admin Portal — new, additive). Fetched from
+  // the server instead of a hardcoded list, so an employee created (or
+  // deleted) from the Admin Portal shows up here immediately without a code
+  // change. GET /v1/auth/users is public — no auth exists yet at this point.
+  const [users, setUsers] = useState([]);
+  const [usersError, setUsersError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${BASE_URL}/v1/auth/users`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error())))
+      .then((data) => {
+        if (!cancelled) setUsers(Array.isArray(data?.names) ? data.names : []);
+      })
+      .catch(() => {
+        if (!cancelled) setUsersError('Could not load the user list. Please refresh the page.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // 'idle' -> 'loading' (awaiting the API) -> 'success' (plays the Sign In
   // animation below, then navigates away) | back to 'idle' on failure.
   const [phase, setPhase] = useState('idle');
@@ -123,6 +140,16 @@ export default function Login() {
             </div>
           )}
 
+          {/* User-list load failure banner */}
+          {usersError && !error && (
+            <div className="login-banner login-banner--error" role="alert">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              {usersError}
+            </div>
+          )}
+
           {/* Error banner */}
           {error && (
             <div className="login-banner login-banner--error" role="alert">
@@ -143,10 +170,10 @@ export default function Login() {
                   value={name}
                   onChange={(e) => { setName(e.target.value); setError(''); }}
                   required
-                  disabled={loading}
+                  disabled={loading || (users.length === 0 && !usersError)}
                 >
-                  <option value="">Select user…</option>
-                  {USERS.map((u) => (
+                  <option value="">{users.length === 0 && !usersError ? 'Loading users…' : 'Select user…'}</option>
+                  {users.map((u) => (
                     <option key={u} value={u}>{u}</option>
                   ))}
                 </select>

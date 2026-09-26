@@ -27,9 +27,10 @@ export function deriveOrderStatus(results) {
   return 'partially_resolved';
 }
 
-// Team members who can be assigned as an order's processor (V1.9). Order-level
-// identification only — deliberately NOT authentication or user management.
-export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Chat Team', 'Gagandeep'];
+// Team members who can be assigned as an order's processor — dynamic now
+// (Admin Portal — additive): fetch via orderService.processors() instead of
+// a hardcoded list here, so a created/renamed/deleted employee is reflected
+// immediately. See server/src/services/orderService.js's getProcessedByUsers.
 
 // The per-product Reason values selectable going forward (V3.2).
 //   'OS'        — out of stock

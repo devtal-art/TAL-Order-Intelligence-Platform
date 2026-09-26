@@ -6,32 +6,33 @@
 // exist anywhere in this codebase for the guard to work.
 const EXPECTED_MONGO_HOST = 'cluster1.lsl5b06.mongodb.net';
 const EXPECTED_MONGO_DB = 'order_intelligence';
-
+ 
 export function assertExpectedMongoTarget(uri, dbName) {
   if (!uri) {
     throw new Error(
       'MONGODB_URI is not set. Refusing to connect: no fallback database target is allowed.'
     );
   }
-
+ 
   let host;
   try {
     host = new URL(uri).host;
   } catch {
     throw new Error('MONGODB_URI is not a valid connection string.');
   }
-
+ 
   if (host !== EXPECTED_MONGO_HOST) {
     throw new Error(
       `Refusing to connect: MongoDB host "${host}" does not match the expected cluster "${EXPECTED_MONGO_HOST}".`
     );
   }
-
+ 
   if (dbName !== EXPECTED_MONGO_DB) {
     throw new Error(
       `Refusing to connect: database name "${dbName}" does not match the expected database "${EXPECTED_MONGO_DB}".`
     );
   }
-
+ 
   return { host, dbName };
 }
+ 

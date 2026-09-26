@@ -62,7 +62,9 @@ export default function DashboardList() {
                     ? { label: 'All Orders', tone: 'released', title: 'All orders' }
                     : type === 'processor'
                       ? { label: `Processor: ${value}`, tone: 'released', title: `Orders processed by ${value}` }
-                      : null;
+                      : type === 'processorOriginal'
+                        ? { label: `Originally: ${value}`, tone: 'cancelled', title: `Orders originally processed by ${value}, now reassigned to Chat Team` }
+                        : null;
   const badgeClass =
     type === 'status' ? `ds-badge ds-${meta?.tone}` : type === 'comment' ? `cm-badge cm-${meta?.tone}` : `os-badge os-${meta?.tone || 'released'}`;
 

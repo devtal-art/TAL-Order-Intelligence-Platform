@@ -3,7 +3,7 @@
 // sheet is derived purely from that dataset — nothing here queries the DB
 // or writes anything.
 import ExcelJS from 'exceljs';
-import { PROCESSED_BY_USERS, DELIVERY_STATUSES, PRODUCT_COMMENTS, ORDER_STATUSES, DISCOUNT_BUCKETS } from '../services/orderService.js';
+import { DELIVERY_STATUSES, PRODUCT_COMMENTS, ORDER_STATUSES, DISCOUNT_BUCKETS } from '../services/orderService.js';
 
 // Mirrors client/src/utils/order.js's deliveryMeta/discountBucketMeta labels
 // exactly, so the workbook reads identically to what's on screen.
@@ -54,7 +54,7 @@ function addOrderListSheet(wb, title, orders) {
   return ws;
 }
 
-export function buildDashboardWorkbook(orders) {
+export function buildDashboardWorkbook(orders, processedByUsers = []) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Order Intelligence Platform';
   wb.created = new Date();
@@ -71,7 +71,7 @@ export function buildDashboardWorkbook(orders) {
   const discountCounts = {};
   for (const d of DISCOUNT_BUCKETS) discountCounts[d] = 0;
   const processorCounts = {};
-  for (const p of PROCESSED_BY_USERS) processorCounts[p] = 0;
+  for (const p of processedByUsers) processorCounts[p] = 0;
 
   const allItemsRows = [];
   const discountOrderRows = [];
@@ -89,8 +89,8 @@ export function buildDashboardWorkbook(orders) {
         discountType: DISCOUNT_LABELS[o.discount_bucket] || o.discount_bucket,
       });
     }
-    // Dynamic — any real processed_by value counts, not just the known
-    // staff list PROCESSED_BY_USERS seeds below at 0 (mirrors orderService.js
+    // Dynamic — any real processed_by value counts, not just the
+    // processedByUsers list seeds below at 0 (mirrors orderService.js
     // getDashboardSummary's by-processor breakdowns).
     if (o.processed_by) processorCounts[o.processed_by] = (processorCounts[o.processed_by] || 0) + 1;
 
@@ -277,7 +277,7 @@ export function buildDashboardWorkbook(orders) {
     { header: 'Employee', key: 'employee', width: 20 },
     { header: 'Orders Processed', key: 'count', width: 18 },
   ];
-  // Object.keys, not PROCESSED_BY_USERS — dynamic (see processorCounts
+  // Object.keys, not the seeded processedByUsers list — dynamic (see processorCounts
   // above): the known staff are always included via the seed loop, but any
   // real processed_by value (e.g. 'Dev Team') gets its own row too.
   for (const p of Object.keys(processorCounts)) teamWs.addRow({ employee: p, count: processorCounts[p] });

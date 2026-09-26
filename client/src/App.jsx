@@ -11,6 +11,8 @@ import ActivityLogList from './pages/ActivityLogList.jsx';
 import Search from './pages/Search.jsx';
 import ProductSearchResults from './pages/ProductSearchResults.jsx';
 import CreateManualOrder from './pages/CreateManualOrder.jsx';
+import AdminEmployees from './pages/AdminEmployees.jsx';
+import OsPendingList from './pages/OsPendingList.jsx';
 
 // Route map:
 //   /login                    — public, no auth required
@@ -19,9 +21,11 @@ import CreateManualOrder from './pages/CreateManualOrder.jsx';
 //   /dashboard/orders         — bucket list "View All" (protected)
 //   /dashboard/delivery-dates — all upcoming delivery dates "View All" (protected)
 //   /dashboard/activity       — full cross-order Activity Log "View All" (protected)
+//   /dashboard/os-pending     — OS Pending by Item "View All" (protected, new, additive)
 //   /search                   — saved-order search (protected)
 //   /search/products          — product search results (protected, V5.1 — new, additive)
 //   /orders/manual            — Create Manual Order (protected, V3.1 — new, additive)
+//   /admin/employees          — Admin Portal: Manage Employees (protected, admin-only)
 export default function App() {
   return (
     <AuthProvider>
@@ -72,6 +76,14 @@ export default function App() {
           }
         />
         <Route
+          path="/dashboard/os-pending"
+          element={
+            <ProtectedRoute>
+              <OsPendingList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/search"
           element={
             <ProtectedRoute>
@@ -92,6 +104,14 @@ export default function App() {
           element={
             <ProtectedRoute viewerBlocked>
               <CreateManualOrder />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/employees"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminEmployees />
             </ProtectedRoute>
           }
         />

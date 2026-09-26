@@ -45,6 +45,15 @@ const orderSchema = new mongoose.Schema(
     // deliberately NOT authentication/user management. '' = Not Assigned
     // (all orders saved before V1.9).
     processed_by: { type: String, default: '', trim: true },
+
+    // Original processed_by value, preserved when Delete Employee reassigns
+    // this order to 'Chat Team' (additive). '' = never reassigned this way.
+    // Set exactly once, by employeeService.deleteEmployee, right before it
+    // overwrites processed_by — never touched anywhere else — so the order
+    // still shows who actually processed it even after that employee's
+    // account is gone. (Orders reassigned by an older build, before this
+    // field existed, simply have '' here — nothing to recover for those.)
+    processed_by_original: { type: String, default: '', trim: true },
     order_date: { type: String, default: '' },
     upload_timestamp: { type: Date, default: Date.now },
     total_products: { type: Number, default: 0 },

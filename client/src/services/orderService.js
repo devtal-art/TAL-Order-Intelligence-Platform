@@ -44,9 +44,14 @@ export const orderService = {
   setNotes: (portalOrderRef, notes) =>
     apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/notes`, { notes }),
 
-  // processedBy: one of PROCESSED_BY_USERS, or '' to clear (V1.9)
+  // processedBy: one of processors() below, or '' to clear (V1.9)
   setProcessedBy: (portalOrderRef, processedBy) =>
     apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/processed-by`, { processedBy }),
+
+  // The current "Processed By" allowlist (Admin Portal — additive), dynamic:
+  // reflects newly created/renamed/deleted employees immediately with no
+  // hardcoded list to keep in sync. Resolves to { names: string[] }.
+  processors: () => apiClient.get('/v1/orders/processors'),
 
   // orderStatus: one of ORDER_STATUSES; orderComment: optional free text (V3.2)
   setOrderStatus: (portalOrderRef, { orderStatus, orderComment }) =>
@@ -76,6 +81,19 @@ export const orderService = {
 
   // Full multi-sheet dashboard workbook download (V4.8, read-only).
   exportDashboard: () => apiClient.download('/v1/orders/dashboard/export', 'Dashboard Export.xlsx'),
+
+  // OS Pending by Item (Dashboard "Item" card — new, additive): one row per
+  // item number with an 'OS' line, its total pending quantity, and the
+  // individual orders/customers contributing to it. Resolves to
+  // { data: [{ itemNo, productName, totalPendingQty, orders: [{ portalOrderRef, customerName, pendingQty }] }] }.
+  // from/to (optional, 'YYYY-MM-DD'): restrict to orders whose Order Date
+  // falls in that range.
+  osPendingByItem: ({ from, to } = {}) => {
+    let qs = '';
+    if (from) qs += `${qs ? '&' : '?'}from=${encodeURIComponent(from)}`;
+    if (to) qs += `${qs ? '&' : '?'}to=${encodeURIComponent(to)}`;
+    return apiClient.get(`/v1/orders/dashboard/os-pending${qs}`);
+  },
 
   // Order Activity Log — one order's history, paginated, newest first.
   logs: (portalOrderRef, { page = 1, limit = 25 } = {}) =>

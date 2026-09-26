@@ -19,6 +19,8 @@ import {
   createManualOrder,
   getOrderLogs,
   getRecentActivity,
+  getProcessors,
+  getOsPendingItems,
 } from '../../controllers/orderController.js';
 
 // Mounted at /api/v1/orders (V1.2 — new, additive).
@@ -32,7 +34,9 @@ orderRouter.get('/', listOrders);
 orderRouter.get('/dashboard', getDashboard);
 orderRouter.get('/dashboard/orders', listDashboardOrders);
 orderRouter.get('/dashboard/export', exportDashboard);
+orderRouter.get('/dashboard/os-pending', getOsPendingItems);
 orderRouter.get('/companies/autocomplete', autocompleteCompanies);
+orderRouter.get('/processors', getProcessors);
 orderRouter.get('/manual/next-ref', nextManualOrderRef);
 orderRouter.post('/manual', createManualOrder);
 // Order Activity Log — 'logs/recent' MUST be registered before GET /:ref for

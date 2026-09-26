@@ -37,10 +37,17 @@ export async function login(req, res, next) {
       throw new AppError('UNAUTHORIZED', 'Invalid credentials.', { status: 401 });
     }
 
+    // Mirrors authenticate.js's effectiveRole computation — a disabled
+    // account or an 'admin' account both start out as an effective 'viewer'.
+    // This is a display baseline only; every subsequent request re-derives
+    // it fresh from Mongo (authenticate.js), so a later Disable/Delete takes
+    // effect immediately rather than waiting for this token to expire.
+    const isAdmin = user.role === 'admin';
     const payload = {
       id: String(user._id),
       name: user.name,
-      role: user.role,
+      role: user.disabled || isAdmin ? 'viewer' : user.role,
+      isAdmin,
     };
 
     const token = jwt.sign(payload, env.jwtSecret, {
@@ -54,5 +61,22 @@ export async function login(req, res, next) {
     });
   } catch (err) {
     return next(err);
+  }
+}
+
+// GET /api/v1/auth/users
+// Returns: { names: string[] }
+//
+// Public (no auth — needed before login exists) and deliberately minimal:
+// just the login-eligible names, nothing else about the account. Powers the
+// Login page's "User" dropdown (client/src/pages/Login.jsx), which used to
+// hardcode this list — now it stays in sync automatically as the Admin
+// Portal creates/deletes employees, with no separate list to hand-edit.
+export async function listLoginNames(req, res, next) {
+  try {
+    const users = await User.find({ active: true }).select('name').sort({ name: 1 }).lean();
+    res.status(200).json({ names: users.map((u) => u.name) });
+  } catch (err) {
+    next(err);
   }
 }

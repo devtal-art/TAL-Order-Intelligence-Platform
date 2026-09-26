@@ -1,5 +1,6 @@
 import { Order } from '../models/order.model.js';
 import { Product } from '../models/product.model.js';
+import { User } from '../models/user.model.js';
 import { productDisplayName } from '../utils/displayName.js';
 import { AppError } from '../utils/AppError.js';
 import { parseFlexibleDate, daysBetween } from '../utils/dateUtil.js';
@@ -36,13 +37,26 @@ function deliveryPostcode(doc) {
   return doc.parsed_data?.delivery_address?.post_code || '';
 }
 
-// The team members who can be assigned as an order's processor (V1.9). Kept
-// in sync with client/src/utils/order.js's PROCESSED_BY_USERS — both lists
-// must contain the same names, or the Dashboard's "Released Orders by
-// Processor" widget silently drops a real processor's count back to 0 (only
-// names in THIS list get a key in getDashboardSummary's releasedByProcessor
-// map below).
-export const PROCESSED_BY_USERS = ['Jasmeet', 'Shubham', 'Alpa', 'Sahil', 'Sehbaz', 'Chat Team', 'Gagandeep'];
+// The team members who can be assigned as an order's processor — dynamic
+// (Admin Portal — additive), replacing what used to be a hardcoded list
+// duplicated here and in client/src/utils/order.js. Sourced live from the
+// User collection so a newly created employee, a rename, or a delete is
+// reflected immediately with no list to hand-edit. 'viewer'/'admin' roles
+// are excluded (they can't process orders), and excludeFromProcessorList
+// keeps legacy exceptions (the 'Dev Team' account) out without needing a
+// name-based check that a rename could break. GET /v1/orders/processors
+// exposes this same list to the client (orderController.getProcessors).
+export async function getProcessedByUsers() {
+  const docs = await User.find({
+    active: true,
+    role: { $nin: ['viewer', 'admin'] },
+    excludeFromProcessorList: { $ne: true },
+  })
+    .select('name')
+    .sort({ name: 1 })
+    .lean();
+  return docs.map((d) => d.name);
+}
 
 // Map the stored (snake_case) document to the API DTO (camelCase).
 export function toDto(doc) {
@@ -53,6 +67,11 @@ export function toDto(doc) {
     customerName: doc.customer_name,
     // '' for orders saved before V1.9 — the client renders "Not Assigned".
     processedBy: doc.processed_by || '',
+    // Set only when Delete Employee reassigned this order to Chat Team —
+    // the employee's name at the time of delete. '' otherwise (never
+    // reassigned, or reassigned by an older build before this field
+    // existed). The client shows this struck through next to processedBy.
+    processedByOriginal: doc.processed_by_original || '',
     deliveryPostcode: deliveryPostcode(doc),
     orderDate: doc.order_date,
     uploadTimestamp:
@@ -96,6 +115,7 @@ export function toSummaryDto(doc) {
     filename: doc.filename,
     customerName: doc.customer_name,
     processedBy: doc.processed_by || '',
+    processedByOriginal: doc.processed_by_original || '',
     deliveryPostcode: deliveryPostcode(doc),
     orderDate: doc.order_date,
     uploadTimestamp:
@@ -318,8 +338,9 @@ export async function createManualOrder({
 // idempotent no-op.
 export async function setProcessedBy(portalOrderRef, processedBy, { actor, actorRole } = {}) {
   const value = processedBy === null || processedBy === undefined ? '' : String(processedBy).trim();
-  if (!value || !PROCESSED_BY_USERS.includes(value)) {
-    throw new AppError('VALIDATION_ERROR', `Processed By must be one of: ${PROCESSED_BY_USERS.join(', ')}.`, {
+  const processedByUsers = await getProcessedByUsers();
+  if (!value || !processedByUsers.includes(value)) {
+    throw new AppError('VALIDATION_ERROR', `Processed By must be one of: ${processedByUsers.join(', ')}.`, {
       status: 400,
       details: [{ field: 'processedBy', issue: 'invalid value' }],
     });
@@ -1049,6 +1070,7 @@ const DASHBOARD_FIELDS_STAGE = {
     portal_order_ref: 1,
     customer_name: 1,
     processed_by: 1,
+    processed_by_original: 1,
     order_date: 1,
     upload_timestamp: 1,
     total_products: 1,
@@ -1133,6 +1155,7 @@ function toDashboardCardDto(doc) {
     portalOrderRef: doc.portal_order_ref,
     customerName: doc.customer_name || '',
     processedBy: doc.processed_by || '',
+    processedByOriginal: doc.processed_by_original || '',
     orderDate: doc.order_date || '',
     uploadTimestamp:
       doc.upload_timestamp instanceof Date ? doc.upload_timestamp.toISOString() : doc.upload_timestamp,
@@ -1161,6 +1184,7 @@ const clampInt = (raw, def, min, max) => {
 // indexes, not raw values ('N/A' contains '/', 'Not Found' a space).
 export async function getDashboardSummary({ previewLimit } = {}) {
   const limit = clampInt(previewLimit, 5, 1, 20);
+  const processedByUsers = await getProcessedByUsers();
 
   const facets = {};
   const bucket = (key, matchField, value) => {
@@ -1299,7 +1323,7 @@ export async function getDashboardSummary({ previewLimit } = {}) {
   // (e.g. 'Dev Team'), so the breakdown reflects who actually processed
   // orders rather than silently dropping anyone outside a fixed allowlist.
   const releasedByProcessor = {};
-  for (const user of PROCESSED_BY_USERS) releasedByProcessor[user] = 0;
+  for (const user of processedByUsers) releasedByProcessor[user] = 0;
   for (const row of agg.released_by_processor || []) {
     if (row._id) releasedByProcessor[row._id] = row.n;
   }
@@ -1369,14 +1393,14 @@ export async function getDashboardSummary({ previewLimit } = {}) {
   // Today by processor — dynamic (see releasedByProcessor above): seeded
   // with the known staff, but any real processed_by value counts.
   const todayByProcessor = {};
-  for (const user of PROCESSED_BY_USERS) todayByProcessor[user] = 0;
+  for (const user of processedByUsers) todayByProcessor[user] = 0;
   for (const row of agg.today_by_processor || []) {
     if (row._id) todayByProcessor[row._id] = row.n;
   }
 
   // All orders by processor (Employee section) — dynamic, same as above.
   const allByProcessor = {};
-  for (const user of PROCESSED_BY_USERS) allByProcessor[user] = 0;
+  for (const user of processedByUsers) allByProcessor[user] = 0;
   for (const row of agg.all_by_processor || []) {
     if (row._id) allByProcessor[row._id] = row.n;
   }
@@ -1486,6 +1510,90 @@ export async function getDashboardExportOrders() {
   return docs;
 }
 
+// OS Pending by Item (Dashboard "Item" card — new, additive). For every
+// order line whose Reason is 'OS' (out of stock), attributes its pending
+// quantity to the line's resolved item number and sums across every order.
+// Reuses getDashboardExportOrders()'s single unfiltered fetch (same fields
+// dashboardWorkbook.js's "Unique Items" sheet already reduces the same way)
+// rather than a second query — this app's order volume is small enough that
+// one extra JS pass over already-fetched data is cheaper than a second
+// round trip to Mongo.
+//
+// Pending quantity per line: the user-entered product_fulfillment.pendingQty
+// ONLY when it's a real positive number; otherwise (never entered, blank, or
+// explicitly 0) the FULL originally-ordered quantity (parsed_data.line_items[].qty).
+// Reason ('OS') and Item Status/Pending Qty are independent fields elsewhere
+// in this app, so a line can be flagged OS while Pending Qty was left blank
+// or zeroed out without anyone actually tracking delivery against it — since
+// the product is out of stock, the whole line is still effectively
+// outstanding unless a smaller pending amount was deliberately entered.
+//
+// A line only counts if it resolved to a real item number (match.itemNo, or
+// suggestedProduct.itemNo for a still-unapproved line) — an OS line with no
+// resolved product at all can't be attributed to any item and is skipped.
+//
+// `dateFrom`/`dateTo` (both optional, 'YYYY-MM-DD' from a plain <input
+// type="date">) restrict this to orders whose Order Date falls in that
+// range (inclusive). Order Date is a free-text field (see order.model.js),
+// parsed with the same parseFlexibleDate() every other date filter in this
+// file already uses — an order whose date can't be confidently parsed is
+// excluded when a range is active, same as the Delivery Date sections do.
+export async function getOsPendingByItem({ dateFrom, dateTo } = {}) {
+  const orders = await getDashboardExportOrders();
+
+  const fromDate = dateFrom ? parseFlexibleDate(dateFrom) : null;
+  const toDate = dateTo ? parseFlexibleDate(dateTo) : null;
+
+  const itemMap = new Map(); // itemNo -> { itemNo, productName, totalPendingQty, orders: [] }
+
+  for (const order of orders) {
+    if (fromDate || toDate) {
+      const orderDate = parseFlexibleDate(order.order_date);
+      if (!orderDate) continue;
+      if (fromDate && orderDate < fromDate) continue;
+      if (toDate && orderDate > toDate) continue;
+    }
+
+    const comments = order.product_comments || {};
+    const fulfillment = order.product_fulfillment || {};
+    const items = order.line_items || [];
+
+    for (const result of order.resolution_results || []) {
+      const lineId = result.lineId;
+      if (comments[lineId] !== 'OS') continue;
+
+      const matched = result.match || result.suggestedProduct;
+      const itemNo = matched?.itemNo;
+      if (!itemNo) continue;
+
+      const lineIndex = Number(String(lineId).split('-').pop()) - 1;
+      const item = items[lineIndex];
+
+      const enteredPendingQty = Number(fulfillment[lineId]?.pendingQty);
+      const pendingQty = Number.isFinite(enteredPendingQty) && enteredPendingQty > 0
+        ? enteredPendingQty
+        : Number(item?.qty) || 0;
+      if (pendingQty <= 0) continue;
+
+      const productName = matched?.websiteProductName || item?.description || '';
+
+      let entry = itemMap.get(itemNo);
+      if (!entry) {
+        entry = { itemNo, productName, totalPendingQty: 0, orders: [] };
+        itemMap.set(itemNo, entry);
+      }
+      entry.totalPendingQty += pendingQty;
+      entry.orders.push({
+        portalOrderRef: order.portal_order_ref,
+        customerName: order.customer_name || '',
+        pendingQty,
+      });
+    }
+  }
+
+  return Array.from(itemMap.values()).sort((a, b) => b.totalPendingQty - a.totalPendingQty);
+}
+
 // Full filtered list for a single dashboard bucket ("View All"), paginated.
 // `type` = 'status' | 'comment' | 'orderStatus' | 'orderComment' |
 // 'deliveryDate' | 'today' | 'todayProcessor' | 'allOrders' | 'processor'
@@ -1587,6 +1695,17 @@ export async function listDashboardOrders({ type, value, page, limit, sortBy, so
       });
     }
     matchStage = { processed_by: value };
+  } else if (type === 'processorOriginal') {
+    // Admin Portal's Deleted Employees section — orders this (now-deleted)
+    // employee originally processed, before Delete reassigned them to Chat
+    // Team (see Order.processed_by_original's schema comment).
+    if (!value) {
+      throw new AppError('VALIDATION_ERROR', 'value (processor name) is required.', {
+        status: 400,
+        details: [{ field: 'value', issue: 'required' }],
+      });
+    }
+    matchStage = { processed_by_original: value };
   } else {
     const known = {
       status: DELIVERY_STATUSES,
@@ -1597,7 +1716,7 @@ export async function listDashboardOrders({ type, value, page, limit, sortBy, so
     };
     const allowed = known[type];
     if (!allowed) {
-      throw new AppError('VALIDATION_ERROR', "type must be 'status', 'comment', 'orderStatus', 'orderComment', 'orderIssue', 'discount', 'channel', 'deliveryDate', 'today', 'todayProcessor', 'allOrders', or 'processor'.", {
+      throw new AppError('VALIDATION_ERROR', "type must be 'status', 'comment', 'orderStatus', 'orderComment', 'orderIssue', 'discount', 'channel', 'deliveryDate', 'today', 'todayProcessor', 'allOrders', 'processor', or 'processorOriginal'.", {
         status: 400,
         details: [{ field: 'type', issue: 'invalid value' }],
       });

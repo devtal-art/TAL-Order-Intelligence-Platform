@@ -33,6 +33,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     role: { type: String, default: 'staff', trim: true },
     active: { type: Boolean, default: true },
+    excludeFromProcessorList: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
   },
   { versionKey: false }
@@ -53,17 +54,26 @@ const USERS_TO_SEED = [
   { name: 'Sehbaz',    password: process.env.SEED_PASSWORD_SEHBAZ,    role: 'staff' },
   { name: 'Chat Team', password: process.env.SEED_PASSWORD_CHAT_TEAM, role: 'staff' },
   // Promoted from the read-only 'viewer' role to full 'staff' access — full
-  // edit rights, and counted in PROCESSED_BY_USERS on both client and
-  // server so orders processed under this name show up on the dashboard
-  // (Team Performance, Released by Processor, Today by Processor).
+  // edit rights, so orders processed under this name show up on the
+  // dashboard (Team Performance, Released by Processor, Today by
+  // Processor) via the dynamic getProcessedByUsers() query.
   { name: 'Gagandeep', password: process.env.SEED_PASSWORD_GAGANDEEP, role: 'staff' },
-  // Internal development/support login. Deliberately NOT part of
-  // PROCESSED_BY_USERS (client/src/utils/order.js and
-  // server/src/services/orderService.js), so it can sign in and use the app
-  // without appearing as a processor in Team Performance or the
-  // Processed By dropdowns.
-  { name: 'Dev Team',  password: process.env.SEED_PASSWORD_DEV_TEAM,  role: 'staff' },
+  // Internal development/support login. excludeFromProcessorList keeps it
+  // out of the "Processed By" allowlist (reassignment dropdown + dashboard
+  // processor breakdown) even though it can sign in and process orders like
+  // any other staff account.
+  { name: 'Dev Team',  password: process.env.SEED_PASSWORD_DEV_TEAM,  role: 'staff', excludeFromProcessorList: true },
+  // Admin Portal (new, additive) — manages employees (create/enable/
+  // disable/delete); view-only for order processing everywhere else.
+  { name: 'Admin', password: process.env.SEED_PASSWORD_ADMIN, role: 'admin' },
 ];
+
+// NOTE: this script only CREATES missing users, never updates an existing
+// one (see the loop below) — so if you rename a seeded account through the
+// Admin Portal, either remove/update its entry above or unset its
+// SEED_PASSWORD_* env var before re-running this script. Otherwise a
+// re-run won't find the (now renamed) user by their old name here and will
+// silently create a stale duplicate account under that old name instead.
 
 const BCRYPT_ROUNDS = 12; // OWASP minimum recommendation for 2024
 
@@ -104,10 +114,21 @@ async function main() {
     }
 
     const passwordHash = await bcrypt.hash(user.password, BCRYPT_ROUNDS);
-    await User.create({ name: user.name, passwordHash, role: user.role, active: true });
+    await User.create({
+      name: user.name,
+      passwordHash,
+      role: user.role,
+      active: true,
+      excludeFromProcessorList: Boolean(user.excludeFromProcessorList),
+    });
     console.log(`   ✅ ${user.name} — created.`);
     created++;
   }
+
+  // Backfill: 'Dev Team' may already exist from before excludeFromProcessorList
+  // existed (the creation loop above only runs for users not yet created).
+  // Idempotent — a no-op once the flag is already set.
+  await User.updateOne({ name: 'Dev Team' }, { $set: { excludeFromProcessorList: true } });
 
   console.log(`\n📊 Summary: ${created} created, ${skipped} skipped.\n`);
   await mongoose.disconnect();

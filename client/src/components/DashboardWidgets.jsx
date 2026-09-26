@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { keyframes } from '@emotion/react';
 import {
   Alert,
   Avatar,
@@ -102,6 +103,22 @@ const RED = TONE.cancelled;
 // fit before the list scrolls for the rest. Shared by both cards so they
 // stay visually identical.
 const DELIVERY_LIST_MAX_HEIGHT = 168;
+
+// "Collision" hover animation for the OS Pending by Item button — two small
+// circles start off the button's left/right edges and grow toward the
+// center, meeting in the middle. Sized in vmax (not a fixed px) so they
+// fully cover the button regardless of its own (responsive, card-driven)
+// width — same effect, no dependency on knowing the button's exact size.
+const collisionLeft = keyframes`
+  0% { left: -20px; width: 20px; height: 20px; }
+  50% { left: 50%; width: 20px; height: 20px; }
+  100% { left: 50%; width: 250vmax; height: 250vmax; }
+`;
+const collisionRight = keyframes`
+  0% { right: -20px; width: 20px; height: 20px; }
+  50% { right: 50%; width: 20px; height: 20px; }
+  100% { right: 50%; width: 250vmax; height: 250vmax; }
+`;
 
 const cardSx = {
   // 1 × theme.shape.borderRadius (12px) — a clean rectangular card with
@@ -397,6 +414,59 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
                   onToggle={() => setOpenComment((cur) => (cur === bucket.value ? null : bucket.value))}
                 />
               ))}
+            </BucketGroup>
+            {/* OS Pending by Item (new, additive) — per-item-number totals for
+                the 'OS' Reason above, with per-order/customer breakdown on
+                click. Its own page rather than another BucketRow: the report
+                is grouped by item number, not by order, so it doesn't fit
+                BucketRow's order-list shape. Given its own labeled section
+                (like Item Status / Reason above it) with a prominent button
+                rather than a plain link row, so it reads as its own
+                destination, not just another bucket. */}
+            <BucketGroup title="OS Pending by Item">
+              <Box
+                component={Link}
+                to="/dashboard/os-pending"
+                sx={{
+                  position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75,
+                  py: 1.35, borderRadius: 1.5, bgcolor: 'primary.light', border: '1px solid', borderColor: 'primary.main',
+                  color: 'primary.main', textDecoration: 'none', fontSize: 13, fontWeight: 700,
+                  overflow: 'hidden', zIndex: 1,
+                  // Resting state is the light/outlined tint (not the solid
+                  // fill) so the hover sweep has somewhere to sweep FROM —
+                  // primary.main vs primary.dark were too close in tone for
+                  // the circles to read against a solid primary.main button.
+                  //
+                  // The text/icon color transition lives INSIDE '&:hover' (not
+                  // on the base rule) so it only applies going INTO hover —
+                  // CSS transitions use the target state's own transition
+                  // timing. Delay (0.4s) + duration (0.35s) line up with the
+                  // circles' own growth phase (the 50%→100% half of the 0.8s
+                  // keyframes, where they actually expand over the text)
+                  // instead of flipping white the instant the circles are
+                  // still small and haven't covered anything yet.
+                  '&:hover': { color: 'primary.contrastText', transition: 'color 0.35s ease 0.4s' },
+                  // Two circles pinned just off the left/right edges, ready
+                  // to grow inward on hover (see collisionLeft/Right above).
+                  // z-index: -1 needs the button's own zIndex:1 above to
+                  // form a stacking context — otherwise the circles would
+                  // stack against a distant ancestor instead of this button
+                  // and could paint behind neighboring cards.
+                  '&::before, &::after': {
+                    content: '""', position: 'absolute', top: '50%',
+                    width: 20, height: 20, borderRadius: '50%',
+                    bgcolor: 'primary.main', zIndex: -1,
+                  },
+                  '&::before': { left: -20, transform: 'translate(-50%, -50%)' },
+                  '&::after': { right: -20, transform: 'translate(50%, -50%)' },
+                  '&:hover::before': { animation: `${collisionLeft} 0.8s both alternate` },
+                  '&:hover::after': { animation: `${collisionRight} 0.8s both alternate` },
+                }}
+              >
+                <Inventory2RoundedIcon sx={{ fontSize: 17 }} />
+                Click Here
+                <ChevronRightRoundedIcon sx={{ fontSize: 17 }} />
+              </Box>
             </BucketGroup>
           </CardContent>
         </Card>

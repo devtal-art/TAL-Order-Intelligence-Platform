@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem(TOKEN_KEY);
       return null;
     }
-    return { id: payload.id, name: payload.name, role: payload.role };
+    return { id: payload.id, name: payload.name, role: payload.role, isAdmin: Boolean(payload.isAdmin) };
   });
 
   // Persist token and decode user on login.
@@ -56,7 +56,7 @@ export function AuthProvider({ children }) {
     if (!payload || isExpired(payload)) return;
     localStorage.setItem(TOKEN_KEY, newToken);
     setToken(newToken);
-    setUser({ id: payload.id, name: payload.name, role: payload.role });
+    setUser({ id: payload.id, name: payload.name, role: payload.role, isAdmin: Boolean(payload.isAdmin) });
   }, []);
 
   // Clear token and user on logout.

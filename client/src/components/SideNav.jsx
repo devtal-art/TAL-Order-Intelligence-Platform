@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 export default function SideNav() {
   const { user } = useAuth();
   const isViewer = user?.role === 'viewer';
+  const isAdmin = Boolean(user?.isAdmin);
   const item = ({ isActive }) => `sn-item${isActive ? ' active' : ''}`;
   return (
     <aside className="sidenav" aria-label="Primary navigation">
@@ -55,6 +56,23 @@ export default function SideNav() {
           <small>Find saved orders</small>
         </span>
       </NavLink>
+      {/* Admin Portal — employee management, admin accounts only. */}
+      {isAdmin && (
+        <NavLink to="/admin/employees" className={item}>
+          <span className="sn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </span>
+          <span className="sn-text">
+            Manage Employees
+            <small>Admin portal</small>
+          </span>
+        </NavLink>
+      )}
     </aside>
   );
 }

@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { orderService } from '../services/orderService.js';
 import { buildXLSX } from '../excel/buildXLSX.js';
-import { statusMeta, commentMeta, deliveryMeta, orderStatusMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, ORDER_STATUSES, PROCESSED_BY_USERS, clampPendingQty, clampDeliveredQty } from '../utils/order.js';
+import { statusMeta, commentMeta, deliveryMeta, orderStatusMeta, DELIVERY_STATUSES, PRODUCT_COMMENTS, ORDER_STATUSES, clampPendingQty, clampDeliveredQty } from '../utils/order.js';
 import { approvedItemNos, appendManualProduct, removeManualProduct, remapAfterRemoval, recomputeManualSubtotal } from '../utils/manualProduct.js';
 import { currencySymbol } from '../utils/format.js';
 import { toDateInputValue, fromDateInputValue } from '../utils/dateFormat.js';
@@ -651,8 +651,25 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           <span className="sol-pb">
             <b>Processed By:</b>
             {order.processedBy ? (
-              // Assigned — immutable. Display as locked pill.
-              <span className="pb-locked" title="Processed By is fixed at order creation and cannot be changed">
+              // Assigned — immutable. Display as locked pill. When the
+              // original processor's account has since been deleted (Admin
+              // Portal), processedByOriginal carries their name — shown
+              // struck through ahead of the Chat Team reassignment so the
+              // order still tells you who actually processed it.
+              <span
+                className="pb-locked"
+                title={
+                  order.processedByOriginal
+                    ? `Originally processed by ${order.processedByOriginal}; reassigned to ${order.processedBy} after that employee was deleted`
+                    : 'Processed By is fixed at order creation and cannot be changed'
+                }
+              >
+                {order.processedByOriginal && (
+                  <>
+                    <s className="pb-original-name">{order.processedByOriginal}</s>
+                    <span className="pb-arrow" aria-hidden="true">→</span>
+                  </>
+                )}
                 {order.processedBy}
                 <svg
                   className="pb-lock-icon"

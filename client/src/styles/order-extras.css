@@ -137,6 +137,10 @@
   fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
   opacity:.7;
 }
+/* Original processor name, shown ahead of a Chat Team reassignment after
+   that employee was deleted (Admin Portal) — see pb-locked above. */
+.pb-original-name{color:var(--muted);font-weight:500;text-decoration:line-through}
+.pb-arrow{color:var(--muted);font-weight:400}
 
 /* ── Duplicate upload screen (V1.9) ── */
 .dup-card{

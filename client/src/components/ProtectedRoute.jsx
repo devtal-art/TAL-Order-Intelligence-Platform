@@ -10,7 +10,11 @@ import { useAuth } from '../context/AuthContext.jsx';
 // accounts) is redirected to /dashboard instead of rendering the route — used
 // on the order-creation routes (Upload & Save, Create Manual Order), which
 // are mutation-only screens with nothing sensible to view.
-export default function ProtectedRoute({ children, viewerBlocked = false }) {
+//
+// `adminOnly` (optional): when true, only accounts with the `isAdmin` claim
+// may render the route — everyone else is redirected to /dashboard. Used on
+// the Admin Portal's employee-management screen.
+export default function ProtectedRoute({ children, viewerBlocked = false, adminOnly = false }) {
   const { isAuthenticated, user } = useAuth();
 
   if (!isAuthenticated) {
@@ -18,6 +22,10 @@ export default function ProtectedRoute({ children, viewerBlocked = false }) {
   }
 
   if (viewerBlocked && user?.role === 'viewer') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (adminOnly && !user?.isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 

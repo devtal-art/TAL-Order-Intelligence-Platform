@@ -130,6 +130,37 @@ export async function autocompleteCompanies(req, res, next) {
   }
 }
 
+// GET /api/v1/orders/processors — the current "Processed By" allowlist
+// (Admin Portal — additive), read-only. Powers the client's Processed By
+// dropdown (SavedOrderLookup.jsx) and the Activity Log's "Done By" filter
+// (ActivityLogList.jsx) — dynamic, so a renamed/created/deleted employee is
+// reflected immediately with no hardcoded list to keep in sync.
+export async function getProcessors(req, res, next) {
+  try {
+    ensureDb();
+    const names = await orderService.getProcessedByUsers();
+    res.status(200).json({ names });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/orders/dashboard/os-pending — OS Pending by Item (Dashboard
+// "Item" card — new, additive), read-only. One row per item number that has
+// at least one 'OS' (out of stock) line somewhere, with its total pending
+// quantity and the individual orders/customers contributing to that total.
+// ?from= / ?to= (both optional, 'YYYY-MM-DD') restrict this to orders whose
+// Order Date falls in that range.
+export async function getOsPendingItems(req, res, next) {
+  try {
+    ensureDb();
+    const items = await orderService.getOsPendingByItem({ dateFrom: req.query.from, dateTo: req.query.to });
+    res.status(200).json({ data: items });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // GET /api/v1/orders/dashboard — dashboard summary (V2.2, read-only).
 // ?limit= caps the preview cards per bucket (default 5, max 20). Derived live
 // from the Orders collection — no dashboard collections, nothing duplicated.
@@ -165,7 +196,8 @@ export async function exportDashboard(req, res, next) {
   try {
     ensureDb();
     const orders = await orderService.getDashboardExportOrders();
-    const workbook = buildDashboardWorkbook(orders);
+    const processedByUsers = await orderService.getProcessedByUsers();
+    const workbook = buildDashboardWorkbook(orders, processedByUsers);
     const filename = `Dashboard Export ${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -320,7 +352,7 @@ export async function setOrderDiscountProvided(req, res, next) {
 }
 
 // PATCH /api/v1/orders/:ref/processed-by — assign/clear the order's processor.
-// Body: { processedBy: <one of orderService.PROCESSED_BY_USERS> | '' | null } (V1.9)
+// Body: { processedBy: <one of orderService.getProcessedByUsers()> | '' | null } (V1.9)
 export async function setOrderProcessedBy(req, res, next) {
   try {
     ensureDb();

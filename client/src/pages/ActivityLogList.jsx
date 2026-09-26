@@ -4,7 +4,6 @@ import Layout from '../components/Layout.jsx';
 import { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
 import SortTh from '../components/SortableHeader.jsx';
 import { orderService } from '../services/orderService.js';
-import { PROCESSED_BY_USERS } from '../utils/order.js';
 
 const PAGE_SIZE = 25;
 
@@ -33,6 +32,25 @@ export default function ActivityLogList() {
 
   const [viewOrder, setViewOrder] = useState(null);
   const [viewBusyRef, setViewBusyRef] = useState('');
+
+  // "Done By" filter options — dynamic (Admin Portal — additive), replacing
+  // the old hardcoded PROCESSED_BY_USERS import so a renamed/created/deleted
+  // employee is reflected here immediately.
+  const [processors, setProcessors] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    orderService
+      .processors()
+      .then((r) => {
+        if (!cancelled) setProcessors(Array.isArray(r?.names) ? r.names : []);
+      })
+      .catch(() => {
+        // Non-fatal — the filter dropdown just stays empty (only "All").
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -177,7 +195,7 @@ export default function ActivityLogList() {
               onChange={(e) => setActor(e.target.value)}
             >
               <option value="">All</option>
-              {PROCESSED_BY_USERS.map((u) => (
+              {processors.map((u) => (
                 <option key={u} value={u}>{u}</option>
               ))}
             </select>

@@ -1,0 +1,30 @@
+/* Admin Portal — Manage Employees (new, additive). Reuses the dl-, sol-,
+   apm- and modal- classes from dash-widgets.css, saved-order.css,
+   add-product.css and review-screen.css for everything else — only the
+   bits unique to this screen live here. */
+
+.ae-notice{
+  font-size:12.5px;color:var(--success-strong);
+  background:var(--success-soft);border:1px solid var(--success-border);
+  border-radius:9px;padding:9px 12px;margin-bottom:12px;
+}
+
+.ae-delete-btn{
+  background:var(--surface);border:1px solid var(--danger-border);border-radius:8px;
+  padding:6px 12px;font-size:11.5px;font-weight:600;font-family:var(--font-ui);
+  color:var(--danger-strong);cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.ae-delete-btn:hover{background:var(--danger-soft,rgba(220,38,38,.08))}
+.ae-delete-btn:disabled{opacity:.6;cursor:not-allowed}
+.ae-delete-btn--confirm{
+  background:var(--danger-strong);color:#fff;border-color:var(--danger-strong);
+}
+.ae-delete-btn--confirm:hover{opacity:.92;background:var(--danger-strong)}
+
+.ae-radio-group{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+.ae-radio{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;
+}
+.ae-radio input{cursor:pointer}
