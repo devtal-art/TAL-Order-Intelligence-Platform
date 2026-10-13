@@ -350,6 +350,7 @@ export function SavedOrderDetailModal({ order, onClose, onDownload, onSaved }) {
 function SavedOrderDetail({ order, onDownload, onSaved }) {
   const { user } = useAuth();
   const isViewer = user?.role === 'viewer';
+  const [openAddr, setOpenAddr] = useState(null); // 'delivery' | 'billing' | null
   const parsed = order.parsedData || {};
   const items = parsed.line_items || [];
   const results = order.resolutionData?.results || [];
@@ -703,17 +704,39 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           stored parsed_data snapshot, so every past and future order has
           both automatically; nothing to backfill. Placed above the action
           buttons. */}
-      <div className="addr-boxes">
-        <div className="addr-box addr-box--delivery" aria-label="Delivery address">
-          <div className="addr-box-title">Delivery Address</div>
-          <div className="addr-box-row"><b>Customer:</b> {parsed.delivery_address?.company_name || '—'}</div>
-          <div className="addr-box-row"><b>Postcode:</b> {parsed.delivery_address?.post_code || '—'}</div>
-        </div>
-        <div className="addr-box addr-box--billing" aria-label="Billing address">
-          <div className="addr-box-title">Billing Address</div>
-          <div className="addr-box-row"><b>Customer:</b> {parsed.billing_address?.company_name || '—'}</div>
-          <div className="addr-box-row"><b>Postcode:</b> {parsed.billing_address?.post_code || '—'}</div>
-        </div>
+      <div className="addr-boxes addr-boxes--dd">
+        {[
+          { key: 'delivery', title: 'Delivery Address', addr: parsed.delivery_address },
+          { key: 'billing', title: 'Billing Address', addr: parsed.billing_address },
+        ].map(({ key, title, addr }) => (
+          <div
+            key={key}
+            className={`addr-box addr-box--${key} addr-dd${openAddr === key ? ' is-open' : ''}`}
+            aria-label={title}
+          >
+            <button
+              type="button"
+              className="addr-dd-trigger"
+              onClick={() => setOpenAddr(openAddr === key ? null : key)}
+              aria-expanded={openAddr === key}
+            >
+              <svg className="addr-dd-pin" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <span className="addr-box-title">{title}</span>
+              <svg className="addr-dd-chevron" viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {openAddr === key && (
+              <div className="addr-dd-panel">
+                <div className="addr-box-row"><b>Customer:</b> {addr?.company_name || '—'}</div>
+                <div className="addr-box-row"><b>Postcode:</b> {addr?.post_code || '—'}</div>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       <div className="sol-detail-actions">

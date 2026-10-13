@@ -172,6 +172,68 @@
    background styling is untouched — only the scroll mechanics change. */
 .sol-modal .rt-scroll{overflow:visible}
 
+/* ── Compact modal layout (view + edit order) ──
+   Taller dialog, address dropdowns + order-level fields on single rows, and a
+   fixed-layout product table that always fits the modal width (no horizontal
+   scroll) while keeping at least ~4 product rows in view. Scoped to
+   .sol-modal so no other screen is affected. */
+.sol-modal{max-height:94vh}
+.sol-modal .modal-head{padding:12px 20px 8px}
+.sol-modal .sol-detail{padding:10px 15px;overflow-y:auto;overflow-x:hidden}
+.sol-modal .sol-detail-top{margin-bottom:8px}
+.sol-modal .sol-detail-meta{gap:6px 16px}
+.sol-modal .oc-note{padding:8px 14px;margin-bottom:8px}
+.sol-modal .sol-status-summary{margin-bottom:8px}
+.sol-modal .sol-detail-actions{margin-bottom:8px;flex-shrink:0}
+
+/* Address dropdowns: two side by side, panel opens over the content below */
+.sol-modal .addr-boxes--dd{flex-wrap:nowrap;gap:12px;margin-bottom:8px;flex-shrink:0}
+.sol-modal .addr-dd{position:relative;flex:1 1 0;min-width:0;padding:0;border-left-width:1px;border-width:1px}
+.sol-modal .addr-dd-trigger{
+  display:flex;align-items:center;gap:8px;width:100%;padding:9px 14px;
+  background:none;border:0;cursor:pointer;font-family:inherit;text-align:left;
+}
+.sol-modal .addr-dd-trigger .addr-box-title{margin:0;flex:1}
+.sol-modal .addr-dd-pin{width:14px;height:14px;fill:none;stroke-width:2.2;flex-shrink:0}
+.sol-modal .addr-dd-chevron{width:16px;height:16px;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform .15s}
+.sol-modal .addr-dd.is-open .addr-dd-chevron{transform:rotate(180deg)}
+.sol-modal .addr-box--delivery .addr-dd-pin,.sol-modal .addr-box--delivery .addr-dd-chevron{stroke:var(--success-strong)}
+.sol-modal .addr-box--billing .addr-dd-pin,.sol-modal .addr-box--billing .addr-dd-chevron{stroke:var(--danger-strong)}
+.sol-modal .addr-dd-panel{
+  position:absolute;left:-1px;right:-1px;top:calc(100% + 4px);z-index:20;
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;
+  padding:10px 14px;box-shadow:var(--shadow-lg);
+}
+
+/* Order Status / Delivery Date / Order Comment: one row, label beside control */
+.sol-modal .os-edit-block{flex-wrap:nowrap;align-items:center;gap:14px;padding:8px 14px;margin-bottom:8px;flex-shrink:0}
+.sol-modal .os-edit-field{flex-direction:row;align-items:center;gap:8px;min-width:0;flex:0 0 auto}
+.sol-modal .os-edit-field--wide{flex:1 1 0;min-width:0}
+.sol-modal .os-edit-label{white-space:nowrap}
+.sol-modal .os-comment-input{resize:none;height:36px;min-height:0}
+
+/* Product table: fits the modal width, no horizontal scroll */
+.sol-modal .sol-scroll-area{min-height:250px;overflow-x:hidden}
+.sol-modal .sol-table{min-width:0;width:100%;table-layout:fixed;font-size:12px}
+.sol-modal .sol-table th,.sol-modal .sol-table td{padding:6px 8px;overflow-wrap:anywhere}
+.sol-modal .sol-table .rt-name{max-width:none}
+.sol-modal .sol-table th:nth-child(1){width:15%}
+.sol-modal .sol-table th:nth-child(2){width:4%}
+.sol-modal .sol-table th:nth-child(3){width:6%}
+.sol-modal .sol-table th:nth-child(4){width:7%}
+.sol-modal .sol-table th:nth-child(5){width:15%}
+.sol-modal .sol-table th:nth-child(6){width:8%}
+.sol-modal .sol-table th:nth-child(7){width:8%}
+.sol-modal .sol-table th:nth-child(8){width:9%}
+.sol-modal .sol-table th:nth-child(9){width:9%}
+.sol-modal .sol-table th:nth-child(10){width:9%}
+.sol-modal .sol-table th:nth-child(11){width:10%}
+.sol-modal .sol-table th:nth-child(12){width:3%}
+.sol-modal .sol-table .rt-badge,.sol-modal .sol-table .ds-badge,.sol-modal .sol-table .cm-badge{white-space:normal}
+.sol-modal .sol-table .fl-select,.sol-modal .sol-table .fl-input,
+.sol-modal .sol-table .ds-select,.sol-modal .sol-table .cm-select,
+.sol-modal .sol-table .note-input{width:100%;min-width:0;box-sizing:border-box}
+
 /* Discount Provided badge (read-only) — small message in the order detail
    header, shown only when the order actually has a discount. Toggling
    happens only from the discount dashboard's "View All" list pages. */
