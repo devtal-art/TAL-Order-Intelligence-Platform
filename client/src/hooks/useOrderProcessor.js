@@ -7,6 +7,7 @@ import { orderService } from '../services/orderService.js';
 import { portalOrderRef, ORDER_STATUSES } from '../utils/order.js';
 import { appendManualProduct, removeManualProduct, remapAfterRemoval } from '../utils/manualProduct.js';
 import { sleep } from '../utils/timing.js';
+import { useCustomerDeliveryDays } from './useCustomerDeliveryDays.js';
 
 // Orchestrates the flow: upload → parse → resolve → review → (generate) Excel.
 // The parser and Excel builder are used unchanged; resolution is inserted
@@ -25,11 +26,16 @@ export function useOrderProcessor() {
   const [orderStatus, setOrderStatus] = useState(''); // '' = not yet chosen — required before Save (V3.2)
   const [orderComment, setOrderComment] = useState(''); // optional order-level comment (V3.2)
   const [deliveryDate, setDeliveryDate] = useState(''); // optional, always-editable (V4.2)
+  const [litInvoice, setLitInvoice] = useState(false); // relabels/recolours the Updated totals card
   const [saveError, setSaveError] = useState(''); // surfaced by ReviewView when Save fails (V3.2)
   const [pending, setPending] = useState(null); // duplicate upload awaiting a decision: { data, resolved, prev, ref }
   const [saved, setSaved] = useState(false); // true once the order has been explicitly saved to the DB (V2.0)
   const orderRefRef = useRef(null); // Portal Order Ref of the PERSISTED order (set only after the first save)
   const plannedRefRef = useRef(null); // Portal Order Ref of the order being reviewed (before its first save)
+
+  // Customer delivery days — a customer with none assigned yet must have at
+  // least one picked before the order can be saved (see ReviewView).
+  const customerDays = useCustomerDeliveryDays(parsed?.delivery_address?.company_name || '');
 
   const setStepStatus = (i, status) =>
     setSteps((prev) => {
@@ -56,9 +62,13 @@ export function useOrderProcessor() {
     // Order Status is required (V3.2) — ReviewView already gates the Save
     // button on this; guard here too so saveOrder is never called without it.
     if (!orderStatus) return;
+    if (customerDays.missing) return;
     orderRefRef.current = ref;
     setSaveError('');
     try {
+      // New customer → store the chosen delivery days first (no-op for a
+      // customer that already has days).
+      await customerDays.persist();
       await orderService.save({
         portalOrderRef: ref,
         filename: file?.name || '',
@@ -105,11 +115,14 @@ export function useOrderProcessor() {
       if (deliveryDate) {
         orderService.setDeliveryDate(ref, deliveryDate).catch((e) => console.warn('Delivery date flush failed:', e.message));
       }
+      if (litInvoice) {
+        orderService.setLitInvoice(ref, true).catch((e) => console.warn('Lit invoice flush failed:', e.message));
+      }
     } catch (e) {
       console.warn('Order save failed:', e.message);
       setSaveError(e.message || 'Could not save the order. Please try again.');
     }
-  }, [file, parsed, resolution, comments, fulfillment, notes, orderStatus, orderComment, deliveryDate]);
+  }, [file, parsed, resolution, comments, fulfillment, notes, orderStatus, orderComment, deliveryDate, litInvoice, customerDays]);
 
   // Show the Review screen for a parsed + resolved order (V2.0). Carries over
   // manual lines from the previously saved order (`prev`, re-upload path).
@@ -162,6 +175,7 @@ export function useOrderProcessor() {
       // Comment, but has no "required real value" gate since it was never
       // required in the first place.
       setDeliveryDate(prev?.deliveryDate || '');
+      setLitInvoice(Boolean(prev?.litInvoice));
 
       setScreen('review');
     },
@@ -178,6 +192,7 @@ export function useOrderProcessor() {
     setOrderStatus('');
     setOrderComment('');
     setDeliveryDate('');
+    setLitInvoice(false);
     setSaveError('');
     setSaved(false); // reset saved flag for the new upload (V2.0)
     setPending(null);
@@ -449,6 +464,7 @@ export function useOrderProcessor() {
     setOrderStatus('');
     setOrderComment('');
     setDeliveryDate('');
+    setLitInvoice(false);
     setSaveError('');
     setSaved(false); // V2.0
     setPending(null);
@@ -458,5 +474,5 @@ export function useOrderProcessor() {
     setScreen('upload');
   }, []);
 
-  return { screen, file, steps, parsed, resolution, result, error, comments, fulfillment, notes, orderStatus, setOrderStatus, orderComment, setOrderComment, deliveryDate, setDeliveryDate, saveError, saved, pending, pickFile, run, approveProduct, addProduct, removeProduct, setProductComment, setProductFulfillment, setProductNote, chooseProcessedBy, saveOrder, continueDuplicate, updateDuplicateOrder, generateExcel, reset };
+  return { customerDays, screen, file, steps, parsed, resolution, result, error, comments, fulfillment, notes, orderStatus, setOrderStatus, orderComment, setOrderComment, deliveryDate, setDeliveryDate, litInvoice, setLitInvoice, saveError, saved, pending, pickFile, run, approveProduct, addProduct, removeProduct, setProductComment, setProductFulfillment, setProductNote, chooseProcessedBy, saveOrder, continueDuplicate, updateDuplicateOrder, generateExcel, reset };
 }

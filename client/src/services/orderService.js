@@ -65,6 +65,10 @@ export const orderService = {
   setDiscountProvided: (portalOrderRef, discountProvided) =>
     apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/discount-provided`, { discountProvided }),
 
+  // litInvoice: boolean — relabels/recolours the Updated totals card.
+  setLitInvoice: (portalOrderRef, litInvoice) =>
+    apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/lit-invoice`, { litInvoice }),
+
   // Dashboard summary (V2.2, read-only): per delivery status / comment bucket,
   // the total count plus the latest `limit` orders. Derived live server-side
   // from the Orders collection — never from a duplicated summary store.
@@ -94,6 +98,14 @@ export const orderService = {
     if (to) qs += `${qs ? '&' : '?'}to=${encodeURIComponent(to)}`;
     return apiClient.get(`/v1/orders/dashboard/os-pending${qs}`);
   },
+
+  // Customer delivery days (new, additive) — weekday names, keyed by customer
+  // name. get resolves to { exists, deliveryDays }; exists=false → none
+  // assigned yet. set replaces the customer's days (at least one required).
+  getCustomerDeliveryDays: (name) =>
+    apiClient.get(`/v1/orders/customers/delivery-days?name=${encodeURIComponent(name)}`),
+  setCustomerDeliveryDays: (name, deliveryDays) =>
+    apiClient.put('/v1/orders/customers/delivery-days', { name, deliveryDays }),
 
   // Order Activity Log — one order's history, paginated, newest first.
   logs: (portalOrderRef, { page = 1, limit = 25 } = {}) =>

@@ -131,6 +131,11 @@ const orderSchema = new mongoose.Schema(
     // from parsed_data, never stored). Defaults false — every order starts
     // "not provided" until explicitly toggled from the discount list pages.
     discount_provided: { type: Boolean, default: false },
+
+    // Lit Invoice (new, additive) — when true the "Updated (with manual
+    // additions)" totals card is shown as "Lit Invoice amount". Display-only
+    // label/colour switch; never affects any calculation. Default false.
+    lit_invoice: { type: Boolean, default: false },
   },
   { versionKey: false, minimize: false }
 );

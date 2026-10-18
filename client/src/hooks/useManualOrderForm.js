@@ -3,6 +3,7 @@ import { resolveService } from '../services/resolveService.js';
 import { mappingService } from '../services/mappingService.js';
 import { catalogService } from '../services/catalogService.js';
 import { orderService } from '../services/orderService.js';
+import { useCustomerDeliveryDays } from './useCustomerDeliveryDays.js';
 import { appendManualProduct } from '../utils/manualProduct.js';
 import { ORDER_STATUSES } from '../utils/order.js';
 import {
@@ -40,6 +41,7 @@ export function useManualOrderForm() {
   const [orderNumberError, setOrderNumberError] = useState('');
   const [orderDate, setOrderDate] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
+  const [litInvoice, setLitInvoice] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -52,6 +54,9 @@ export function useManualOrderForm() {
   const [orderComment, setOrderComment] = useState('');
 
   const [companySuggestions, setCompanySuggestions] = useState([]);
+
+  // Delivery days for this customer — required when the customer is new.
+  const customerDays = useCustomerDeliveryDays(companyName);
 
   const [validationError, setValidationError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -196,6 +201,14 @@ export function useManualOrderForm() {
         setValidationError('Order Status must be selected before saving.');
         return false;
       }
+      if (customerDays.missing) {
+        setValidationError(
+          customerDays.loading
+            ? 'Checking this customer’s delivery days — please try again in a moment.'
+            : 'Select at least one delivery day for this new customer before saving.'
+        );
+        return false;
+      }
       setValidationError('');
 
       const billingAddr = { ...billing, company_name: companyName };
@@ -280,6 +293,8 @@ export function useManualOrderForm() {
       setSaving(true);
       setSaveError('');
       try {
+        // New customer → store the chosen delivery days first (no-op otherwise).
+        await customerDays.persist();
         const created = await orderService.createManualOrder({
           customerName: companyName,
           orderDate,
@@ -298,6 +313,9 @@ export function useManualOrderForm() {
         // upsertOrder above fully replaces.
         if (deliveryDate) {
           orderService.setDeliveryDate(ref, deliveryDate).catch((e) => console.warn('Delivery date flush failed:', e.message));
+        }
+        if (litInvoice) {
+          orderService.setLitInvoice(ref, true).catch((e) => console.warn('Lit invoice flush failed:', e.message));
         }
         // Per-product Item Status / Reason / Notes — same optional
         // delivery-tracking fields the Saved Order edit view offers, flushed
@@ -335,7 +353,7 @@ export function useManualOrderForm() {
         setSaving(false);
       }
     },
-    [companyName, orderNumberPreview, orderDate, deliveryDate, referenceNumber, notes, billing, delivery, sameAsBilling, productRows, masterTotalRows, orderStatus, orderComment, productsSubtotal]
+    [companyName, orderNumberPreview, orderDate, deliveryDate, referenceNumber, notes, billing, delivery, sameAsBilling, productRows, masterTotalRows, orderStatus, orderComment, litInvoice, productsSubtotal, customerDays]
   );
 
   const reset = useCallback(() => {
@@ -345,6 +363,7 @@ export function useManualOrderForm() {
     setSameAsBilling(true);
     setOrderDate('');
     setDeliveryDate('');
+    setLitInvoice(false);
     setReferenceNumber('');
     setNotes('');
     setProductRows([emptyProductRow()]);
@@ -368,6 +387,7 @@ export function useManualOrderForm() {
     orderNumberPreview, orderNumberLoading, orderNumberError, refreshOrderNumberPreview,
     orderDate, setOrderDate,
     deliveryDate, setDeliveryDate,
+    litInvoice, setLitInvoice,
     referenceNumber, setReferenceNumber,
     notes, setNotes,
     productRows, addProductRow, removeProductRow, updateProductRow,
@@ -376,6 +396,7 @@ export function useManualOrderForm() {
     productsSubtotal, grandTotal,
     companySuggestions, searchCompanies, pickCompanySuggestion,
     lookupProduct,
+    customerDays,
     validationError,
     saving, saveError, saved, savedRef,
     save: buildAndSave,

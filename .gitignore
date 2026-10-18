@@ -31,9 +31,6 @@ tmp/
 .cache/
 .parcel-cache/
 
-# ── Database backups (contain live customer/order data) ───────
-backups/
-
 # ── Generated / local artifacts ───────────────────────────────
 *.zip
 *.xlsx

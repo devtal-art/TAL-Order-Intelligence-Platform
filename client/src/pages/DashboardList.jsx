@@ -47,7 +47,7 @@ export default function DashboardList() {
           : type === 'discount'
             ? (discMeta ? { ...discMeta, title: `Orders with ${discMeta.label}` } : null)
             : type === 'channel'
-              ? { label: value, tone: value === 'Orders - Email' ? 'problem' : 'cancelled', title: `${value} orders` }
+              ? { label: value === 'Order - Kumkum' ? 'Manual Orders' : value, tone: value === 'Orders - Email' ? 'problem' : 'cancelled', title: `${value === 'Order - Kumkum' ? 'Manual Orders' : value} orders` }
               : type === 'orderComment' && value === 'has'
             ? { label: 'Order Comments', tone: 'comments', title: 'Orders with an Order Comment' }
             : type === 'orderIssue' && value === 'has'
@@ -206,6 +206,7 @@ export default function DashboardList() {
                   <SortTh column="customer" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Customer</SortTh>
                   {type === 'orderComment' ? <th>Order Comment</th> : null}
                   <SortTh column="processedBy" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Processed By</SortTh>
+                  <SortTh column="orderStatus" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order Status</SortTh>
                   <SortTh column="orderDate" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order Date</SortTh>
                   {type === 'orderComment' ? null : (
                     <SortTh column="products" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} numeric>Products</SortTh>
@@ -225,6 +226,12 @@ export default function DashboardList() {
                       </td>
                     ) : null}
                     <td>{o.processedBy || <span className="dl-muted">Not Assigned</span>}</td>
+                    <td>
+                      {(() => {
+                        const sm = orderStatusMeta(o.orderStatus);
+                        return sm ? <span className={`os-badge os-${sm.tone}`}>{sm.label}</span> : <span className="dl-muted">—</span>;
+                      })()}
+                    </td>
                     <td>{o.orderDate || '—'}</td>
                     {type === 'orderComment' ? null : <td className="dl-num">{o.totalProducts}</td>}
                     {type === 'discount' && !isViewer ? (

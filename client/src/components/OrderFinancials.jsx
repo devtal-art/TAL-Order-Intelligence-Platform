@@ -1,5 +1,15 @@
 import { currencySymbol } from '../utils/format.js';
 
+// Quantity of an OS line that is out of stock: the entered Pending Qty
+// (clamped to 0…ordered), or the whole ordered quantity when none is entered.
+function osPendingQty(raw, orderedQty) {
+  const ordered = Number(orderedQty) || 0;
+  if (raw === null || raw === undefined || raw === '') return ordered;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return ordered;
+  return Math.min(Math.max(n, 0), ordered);
+}
+
 // Order financial breakdown (V1.8, display-only). Mirrors the totals section
 // at the bottom of the order email — Sub Total, Discount (with the email's own
 // label text), Transportation Charges, Total — read straight from the parsed
@@ -7,7 +17,7 @@ import { currencySymbol } from '../utils/format.js';
 // didn't carry are omitted, and when there is no totals data at all (older /
 // edge orders) the whole card is hidden. Shared by the Review screen and the
 // Saved Order modal so both display identically.
-export default function OrderFinancials({ financials, results = [], lineItems = [], comments = {}, fulfillment = {}, orderSource }) {
+export default function OrderFinancials({ financials, results = [], lineItems = [], comments = {}, fulfillment = {}, orderSource, litInvoice = false }) {
   const f = financials || {};
   const sym = currencySymbol(f.currency);
   const money = (n) => `${Number(n) < 0 ? '-' : ''}${sym}${Math.abs(Number(n) || 0).toFixed(2)}`;
@@ -15,11 +25,11 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
   // Manual orders (V3.1) have no "original email" to compare against — every
   // product row is built via the same manual_addition source HTML orders use
   // for the "+ Add Product" feature, which would otherwise make the
-  // Updated/Original comparison below fire for the WHOLE order. Skipping the
-  // adjustment scan entirely for manual orders is what keeps hasAdjustments
-  // false, so only a single card renders (see the title/updatedCard logic
-  // further down). HTML orders (orderSource undefined/'HTML') are completely
-  // unaffected — this guard is the only thing that changed for them.
+  // Updated/Original comparison below fire for the WHOLE order. So for manual
+  // orders only Not Found / OS lines count as adjustments (they come off the
+  // Sub Total); with none of those, hasAdjustments stays false and a single
+  // card renders (see the title/updatedCard logic further down). HTML orders
+  // (orderSource undefined/'HTML') behave exactly as before.
   const isManualOrder = orderSource === 'MANUAL';
 
   const subTotal = Number(f.sub_total) || 0;
@@ -30,35 +40,43 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
   let totalAdjustment = 0;
   let hasAdjustments = false;
 
-  if (!isManualOrder) {
-    results.forEach((r) => {
-      const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
-      const item = (Number.isInteger(lineIndex) && lineIndex >= 0 && lineItems[lineIndex]) || null;
-      if (!item) return;
+  results.forEach((r) => {
+    const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
+    const item = (Number.isInteger(lineIndex) && lineIndex >= 0 && lineItems[lineIndex]) || null;
+    if (!item) return;
 
-      const qty = Number(item.qty) || 0;
-      const unitPrice = Number(item.unit_price) || 0;
-      const itemTotal = qty * Math.abs(unitPrice);
-      const comment = comments[r.lineId] || '';
-      const isNotFound = comment === 'Not Found';
-      const isManual = r.source === 'manual_addition';
-      const isNegative = unitPrice < 0;
+    const qty = Number(item.qty) || 0;
+    const unitPrice = Number(item.unit_price) || 0;
+    const itemTotal = qty * Math.abs(unitPrice);
+    const comment = comments[r.lineId] || '';
+    const isNotFound = comment === 'Not Found';
+    // On a manual order every line carries the manual_addition source and is
+    // already inside its Sub Total, so "manual additions" and negative-price
+    // lines only count as adjustments for email orders.
+    const isManual = !isManualOrder && r.source === 'manual_addition';
+    const isNegative = !isManualOrder && unitPrice < 0;
 
-      if (isManual || isNotFound || isNegative) {
-        hasAdjustments = true;
-      }
+    // OS lines: the pending quantity is out of stock, so its value comes
+    // off the total — unit price × Pending Qty. With no Pending Qty
+    // entered the whole ordered quantity counts as pending. Same amount
+    // convention as Not Found above (absolute unit price).
+    const osValue = comment === 'OS' ? osPendingQty(fulfillment[r.lineId]?.pendingQty, qty) * Math.abs(unitPrice) : 0;
 
-      if (isNotFound) {
+    if (isManual || isNotFound || isNegative || osValue > 0) {
+      hasAdjustments = true;
+    }
+
+    if (isNotFound) {
+      totalAdjustment -= itemTotal;
+    } else if (isManual) {
+      if (isNegative) {
         totalAdjustment -= itemTotal;
-      } else if (isManual) {
-        if (isNegative) {
-          totalAdjustment -= itemTotal;
-        } else {
-          totalAdjustment += itemTotal;
-        }
+      } else {
+        totalAdjustment += itemTotal;
       }
-    });
-  }
+    }
+    totalAdjustment -= osValue;
+  });
 
   // Actually Delivered (V6.0) — the third card. Computed as a DELTA off the
   // Updated card rather than re-summing every line from scratch, for the
@@ -92,7 +110,14 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
     hasDelivered = true;
 
     const unitPrice = Number(item.unit_price) || 0;
-    const assumedQty = comments[r.lineId] === 'Not Found' ? 0 : (Number(item.qty) || 0);
+    // Matches what the Updated card counted for the line: nothing for Not
+    // Found, ordered minus pending for OS, the full ordered quantity otherwise.
+    const orderedQty = Number(item.qty) || 0;
+    let assumedQty = orderedQty;
+    if (comments[r.lineId] === 'Not Found') assumedQty = 0;
+    else if (comments[r.lineId] === 'OS') {
+      assumedQty = orderedQty - osPendingQty(fulfillment[r.lineId]?.pendingQty, orderedQty);
+    }
     deliveredAdjustment += (deliveredQty - assumedQty) * unitPrice;
   });
 
@@ -166,8 +191,8 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
     upRows.push({ key: 'total', label: 'Total', value: money(updatedTot), strong: true });
     
     updatedCard = (
-      <div className="fin-card is-updated" key="updated" aria-label="Updated order totals">
-        <div className="fin-title">Updated (with manual additions)</div>
+      <div className={`fin-card is-updated${litInvoice ? ' is-lit' : ''}`} key="updated" aria-label={litInvoice ? 'Lit invoice totals' : 'Updated order totals'}>
+        <div className="fin-title">{litInvoice ? 'Lit Invoice amount' : 'Updated (with manual additions)'}</div>
         {upRows.map((r) => (
           <div key={r.key} className={`fin-row${r.strong ? ' fin-total' : ''}`}>
             <span className="fin-label">{r.label}</span>
@@ -178,8 +203,8 @@ export default function OrderFinancials({ financials, results = [], lineItems = 
     );
   } else if (hasAdjustments && !rows.length) {
     updatedCard = (
-      <div className="fin-card is-updated" key="updated" aria-label="Updated order totals">
-        <div className="fin-title">Updated (with manual additions)</div>
+      <div className={`fin-card is-updated${litInvoice ? ' is-lit' : ''}`} key="updated" aria-label={litInvoice ? 'Lit invoice totals' : 'Updated order totals'}>
+        <div className="fin-title">{litInvoice ? 'Lit Invoice amount' : 'Updated (with manual additions)'}</div>
         <div className="fin-row">
           <span className="fin-label">Manual Additions Subtotal</span>
           <span className="fin-value">{money(totalAdjustment)}</span>

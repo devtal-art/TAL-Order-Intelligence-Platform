@@ -10,6 +10,8 @@ import { currencySymbol } from '../utils/format.js';
 import { toDateInputValue, fromDateInputValue } from '../utils/dateFormat.js';
 import AddProductModal from './AddProductModal.jsx';
 import OrderFinancials from './OrderFinancials.jsx';
+import DeliveryDaysPicker from './DeliveryDaysPicker.jsx';
+import OrderCommentField from './OrderCommentField.jsx';
 
 // Build and download the Excel workbook for a saved order DTO. Exported so
 // the duplicate-upload flow (V1.9) can reuse it outside this component.
@@ -377,6 +379,27 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
   // Delivery Date (V4.2) — separate field, always editable (no requirement,
   // unlike Order Status), so it's saved via its own PATCH call in saveEdit.
   const [deliveryDateDraft, setDeliveryDateDraft] = useState('');
+  const [litInvoiceDraft, setLitInvoiceDraft] = useState(false);
+  // Customer delivery days (new, additive) — looked up by customer name so
+  // they show on every order of that customer (old orders included) and stay
+  // correct however the order DTO gets refreshed after an edit.
+  const [customerDays, setCustomerDays] = useState([]);
+  const [deliveryDaysDraft, setDeliveryDaysDraft] = useState([]);
+  useEffect(() => {
+    const name = String(order.customerName || '').trim();
+    setCustomerDays([]);
+    if (!name) return undefined;
+    let cancelled = false;
+    orderService
+      .getCustomerDeliveryDays(name)
+      .then((r) => {
+        if (!cancelled) setCustomerDays(r.deliveryDays || []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [order.customerName]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
@@ -581,6 +604,8 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
     setOrderStatusDraft(ORDER_STATUSES.includes(order.orderStatus) ? order.orderStatus : '');
     setOrderCommentDraft(order.orderComment || '');
     setDeliveryDateDraft(order.deliveryDate || '');
+    setLitInvoiceDraft(Boolean(order.litInvoice));
+    setDeliveryDaysDraft(customerDays);
     setSaveError('');
     setEditing(true);
   };
@@ -619,7 +644,20 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
         orderStatus: orderStatusDraft,
         orderComment: orderCommentDraft,
       });
+      // Lit Invoice — only written when changed. Done before the delivery-date
+      // call so `updated` below stays the order's latest DTO.
+      if (litInvoiceDraft !== Boolean(order.litInvoice)) {
+        await orderService.setLitInvoice(order.portalOrderRef, litInvoiceDraft);
+      }
       updated = await orderService.setDeliveryDate(order.portalOrderRef, deliveryDateDraft);
+      // Customer delivery days — only written when changed and non-empty
+      // (an order with no customer name has nothing to attach them to).
+      const customerName = String(order.customerName || '').trim();
+      const daysChanged = deliveryDaysDraft.join() !== customerDays.join();
+      if (customerName && daysChanged && deliveryDaysDraft.length) {
+        const r = await orderService.setCustomerDeliveryDays(customerName, deliveryDaysDraft);
+        setCustomerDays(r.deliveryDays || deliveryDaysDraft);
+      }
       onSaved(updated);
       invalidateLogs();
       setEditing(false);
@@ -638,6 +676,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           <span><b>Postcode:</b> {order.deliveryPostcode || parsed.delivery_address?.post_code || '—'}</span>
           <span><b>Order date:</b> {order.orderDate || '—'}</span>
           <span><b>Delivery Date:</b> {order.deliveryDate || '—'}</span>
+          <span><b>Delivery Days:</b> {customerDays.length ? customerDays.join(', ') : 'Not set'}</span>
           <span><b>File:</b> {order.filename || '—'}</span>
           {orderTotal && <span><b>Order Total:</b> {orderTotal}</span>}
           <span>
@@ -648,6 +687,10 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
               // landed yet shows a plain dash, not a fake status badge.
               return meta ? <span className={`os-badge os-${meta.tone}`}>{meta.label}</span> : <span className="rt-empty">—</span>;
             })()}
+          </span>
+          <span>
+            <b>Order Comment:</b>{' '}
+            {order.orderComment ? order.orderComment : <span className="oc-view-empty">No comment added</span>}
           </span>
           <span className="sol-pb">
             <b>Processed By:</b>
@@ -811,17 +854,21 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
               aria-label="Delivery Date"
             />
           </div>
+          {String(order.customerName || '').trim() && (
+            <div className="os-edit-field">
+              <label className="os-edit-label">Delivery Days</label>
+              <DeliveryDaysPicker value={deliveryDaysDraft} onChange={setDeliveryDaysDraft} />
+            </div>
+          )}
+          <div className="os-edit-field os-edit-field--lit">
+            <label className="lit-toggle" htmlFor="order-lit-invoice">
+              <input id="order-lit-invoice" type="checkbox" checked={litInvoiceDraft} onChange={(e) => setLitInvoiceDraft(e.target.checked)} />
+              Lit Invoice
+            </label>
+          </div>
           <div className="os-edit-field os-edit-field--wide">
             <label className="os-edit-label" htmlFor="order-comment-input">Order Comment</label>
-            <textarea
-              id="order-comment-input"
-              className="os-comment-input"
-              rows={2}
-              placeholder="Optional order-level comment…"
-              value={orderCommentDraft}
-              onChange={(e) => setOrderCommentDraft(e.target.value)}
-              aria-label="Order Comment"
-            />
+            <OrderCommentField id="order-comment-input" value={orderCommentDraft} onChange={setOrderCommentDraft} />
           </div>
         </div>
       )}
@@ -1057,6 +1104,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
         comments={comments}
         fulfillment={effectiveFulfillment}
         orderSource={order.orderSource}
+        litInvoice={editing ? litInvoiceDraft : Boolean(order.litInvoice)}
       />
 
       <div className="sol-log-section">

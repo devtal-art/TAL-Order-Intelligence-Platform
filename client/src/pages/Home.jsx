@@ -44,6 +44,8 @@ export default function Home() {
     setOrderComment,
     deliveryDate,
     setDeliveryDate,
+    litInvoice,
+    setLitInvoice,
     saveError,
     saved,
     pending,
@@ -60,6 +62,7 @@ export default function Home() {
     updateDuplicateOrder,
     generateExcel,
     reset: resetSingle,
+    customerDays,
   } = useOrderProcessor();
 
   // V1.1 batch hook (new)
@@ -276,7 +279,10 @@ export default function Home() {
           onOrderComment={setOrderComment}
           deliveryDate={deliveryDate}
           onDeliveryDate={setDeliveryDate}
+          litInvoice={litInvoice}
+          onLitInvoice={setLitInvoice}
           saveError={saveError}
+          customerDays={customerDays}
           onGenerate={generateExcel}
           onReset={handleResetAll}
         />

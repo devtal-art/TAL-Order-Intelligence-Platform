@@ -1,5 +1,6 @@
 import * as orderService from '../services/orderService.js';
 import * as orderLogService from '../services/orderLogService.js';
+import * as customerService from '../services/customerService.js';
 import { ensureDb } from '../utils/ensureDb.js';
 import { AppError } from '../utils/AppError.js';
 import { buildDashboardWorkbook } from '../utils/dashboardWorkbook.js';
@@ -125,6 +126,28 @@ export async function autocompleteCompanies(req, res, next) {
     ensureDb();
     const result = await orderService.autocompleteCompanies(req.query.query);
     res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/orders/customers/delivery-days?name= — the weekday(s) assigned
+// to a customer. exists=false → no days assigned yet (new customer).
+export async function getCustomerDeliveryDays(req, res, next) {
+  try {
+    ensureDb();
+    res.status(200).json(await customerService.getDeliveryDays(req.query.name));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PUT /api/v1/orders/customers/delivery-days — { name, deliveryDays: string[] }
+export async function setCustomerDeliveryDays(req, res, next) {
+  try {
+    ensureDb();
+    const { name, deliveryDays } = req.body || {};
+    res.status(200).json(await customerService.setDeliveryDays(name, deliveryDays));
   } catch (err) {
     next(err);
   }
@@ -342,6 +365,27 @@ export async function setOrderDiscountProvided(req, res, next) {
       });
     }
     const order = await orderService.setDiscountProvided(req.params.ref, discountProvided, {
+      actor: req.user.name,
+      actorRole: req.user.role,
+    });
+    res.status(200).json(order);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/v1/orders/:ref/lit-invoice — Body: { litInvoice: boolean }
+export async function setOrderLitInvoice(req, res, next) {
+  try {
+    ensureDb();
+    const { litInvoice } = req.body || {};
+    if (typeof litInvoice !== 'boolean') {
+      throw new AppError('VALIDATION_ERROR', 'litInvoice must be a boolean.', {
+        status: 400,
+        details: [{ field: 'litInvoice', issue: 'required boolean' }],
+      });
+    }
+    const order = await orderService.setLitInvoice(req.params.ref, litInvoice, {
       actor: req.user.name,
       actorRole: req.user.role,
     });

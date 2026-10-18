@@ -179,7 +179,7 @@ export function buildDashboardWorkbook(orders, processedByUsers = []) {
   const addSummaryRow = (metric, value) => summaryWs.addRow({ metric, value });
   addSummaryRow('Total Orders', orders.length);
   addSummaryRow('Orders - Email', emailOrders.length);
-  addSummaryRow('Orders - Kumkum', kumkumOrders.length);
+  addSummaryRow('Manual Orders', kumkumOrders.length);
   addSummaryRow('Total Items', totalItems);
   addSummaryRow('Unique Items', uniqueItemMap.size);
   summaryWs.addRow({});
@@ -197,7 +197,7 @@ export function buildDashboardWorkbook(orders, processedByUsers = []) {
   // ── All Orders / Orders - Email / Orders - Kumkum ──
   addOrderListSheet(wb, 'All Orders', orders);
   addOrderListSheet(wb, 'Orders - Email', emailOrders);
-  addOrderListSheet(wb, 'Orders - Kumkum', kumkumOrders);
+  addOrderListSheet(wb, 'Manual Orders', kumkumOrders);
 
   // ── All Items — one row per line item across every order ──
   const itemsWs = wb.addWorksheet('All Items');

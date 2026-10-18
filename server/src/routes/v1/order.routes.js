@@ -10,6 +10,7 @@ import {
   setOrderStatus,
   setOrderDeliveryDate,
   setOrderDiscountProvided,
+  setOrderLitInvoice,
   setOrderProcessedBy,
   getDashboard,
   listDashboardOrders,
@@ -21,6 +22,8 @@ import {
   getRecentActivity,
   getProcessors,
   getOsPendingItems,
+  getCustomerDeliveryDays,
+  setCustomerDeliveryDays,
 } from '../../controllers/orderController.js';
 
 // Mounted at /api/v1/orders (V1.2 — new, additive).
@@ -37,6 +40,9 @@ orderRouter.get('/dashboard/export', exportDashboard);
 orderRouter.get('/dashboard/os-pending', getOsPendingItems);
 orderRouter.get('/companies/autocomplete', autocompleteCompanies);
 orderRouter.get('/processors', getProcessors);
+// Customer delivery days — registered before GET /:ref like the routes above.
+orderRouter.get('/customers/delivery-days', getCustomerDeliveryDays);
+orderRouter.put('/customers/delivery-days', setCustomerDeliveryDays);
 orderRouter.get('/manual/next-ref', nextManualOrderRef);
 orderRouter.post('/manual', createManualOrder);
 // Order Activity Log — 'logs/recent' MUST be registered before GET /:ref for
@@ -51,5 +57,6 @@ orderRouter.patch('/:ref/notes', setOrderNotes);
 orderRouter.patch('/:ref/status', setOrderStatus);
 orderRouter.patch('/:ref/delivery-date', setOrderDeliveryDate);
 orderRouter.patch('/:ref/discount-provided', setOrderDiscountProvided);
+orderRouter.patch('/:ref/lit-invoice', setOrderLitInvoice);
 orderRouter.patch('/:ref/processed-by', setOrderProcessedBy);
 orderRouter.patch('/:ref', updateOrder);

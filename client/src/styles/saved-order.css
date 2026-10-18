@@ -275,3 +275,8 @@
   .sol-search{flex-direction:column}
   .sol-btn{width:100%}
 }
+
+/* Lit Invoice checkbox in the saved-order edit row; let the row wrap instead of crushing Order Comment */
+.sol-modal .os-edit-block{flex-wrap:wrap}
+.sol-modal .os-edit-field--wide{flex:1 1 220px;min-width:220px}
+.sol-modal .os-edit-field--lit{align-self:center;padding-bottom:0}

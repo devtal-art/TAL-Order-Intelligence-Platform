@@ -104,6 +104,7 @@ export function toDto(doc) {
     // discount at all, so the client knows not to show the small message.
     discountProvided: Boolean(doc.discount_provided),
     discountBucket: classifyDiscountBucket(doc.parsed_data) || '',
+    litInvoice: Boolean(doc.lit_invoice),
   };
 }
 
@@ -532,6 +533,41 @@ export async function setDiscountProvided(portalOrderRef, discountProvided, { ac
         actorRole,
         action: 'discount_provided_set',
         message: value ? 'Discount marked as provided' : 'Discount marked as not provided',
+        details: { from: fromValue, to: value },
+      });
+    }
+  }
+
+  return toDto(doc);
+}
+
+// Lit Invoice toggle — order-level flag that relabels/recolours the Updated
+// totals card on the client. Pure display state, no effect on any amount.
+export async function setLitInvoice(portalOrderRef, litInvoice, { actor, actorRole } = {}) {
+  const value = Boolean(litInvoice);
+
+  const before = await Order.findOne({ portal_order_ref: portalOrderRef }, { lit_invoice: 1 }).lean();
+  if (!before) {
+    throw new AppError('NOT_FOUND', `No order found with Portal Order Ref "${portalOrderRef}".`, {
+      status: 404,
+    });
+  }
+
+  const doc = await Order.findOneAndUpdate(
+    { portal_order_ref: portalOrderRef },
+    { $set: { lit_invoice: value } },
+    { new: true }
+  );
+
+  if (actor) {
+    const fromValue = Boolean(before.lit_invoice);
+    if (fromValue !== value) {
+      await recordLog({
+        portalOrderRef,
+        actor,
+        actorRole,
+        action: 'lit_invoice_set',
+        message: value ? 'Marked as Lit Invoice' : 'Lit Invoice unmarked',
         details: { from: fromValue, to: value },
       });
     }
@@ -1169,6 +1205,9 @@ function toDashboardCardDto(doc) {
     // Discount Provided toggle — only rendered on the discount list pages,
     // but harmless to include on every card.
     discountProvided: Boolean(doc.discount_provided),
+    // Overall Order Status — shown as a column on the View-All list pages.
+    // '' when not set yet (client renders a dash).
+    orderStatus: doc.order_status || '',
   };
 }
 
@@ -1625,6 +1664,7 @@ const SORT_KEY_EXPR = {
   ref: { $convert: { input: '$portal_order_ref', to: 'int', onError: 0, onNull: 0 } },
   customer: { $toLower: { $ifNull: ['$customer_name', ''] } },
   processedBy: { $toLower: { $ifNull: ['$processed_by', ''] } },
+  orderStatus: { $toLower: { $ifNull: ['$order_status', ''] } },
   orderDate: ORDER_DATE_SORT_KEY,
   products: { $ifNull: ['$total_products', 0] },
 };

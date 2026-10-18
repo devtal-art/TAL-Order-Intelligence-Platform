@@ -4,6 +4,8 @@ import ManualOrderAddressSection from '../components/ManualOrderAddressSection.j
 import ManualOrderProductRow from '../components/ManualOrderProductRow.jsx';
 import MasterTotalsEditor from '../components/MasterTotalsEditor.jsx';
 import { useManualOrderForm } from '../hooks/useManualOrderForm.js';
+import DeliveryDaysPicker from '../components/DeliveryDaysPicker.jsx';
+import OrderCommentField from '../components/OrderCommentField.jsx';
 import { ORDER_STATUSES } from '../utils/order.js';
 import { toDateInputValue, fromDateInputValue } from '../utils/dateFormat.js';
 
@@ -133,6 +135,21 @@ export default function CreateManualOrder() {
                 />
               </label>
             </div>
+            {form.customerDays.known && (
+              <div className="dd-block">
+                <div className="dd-block-title">Delivery Days</div>
+                <div>{form.customerDays.saved.join(', ')}</div>
+              </div>
+            )}
+            {form.customerDays.needsDays && (
+              <div className="dd-block">
+                <div className="dd-block-title">Delivery Days<em> *</em></div>
+                <div style={{ fontSize: 12, opacity: 0.75 }}>
+                  New customer — select the weekday(s) this customer is delivered on.
+                </div>
+                <DeliveryDaysPicker value={form.customerDays.days} onChange={form.customerDays.setDays} />
+              </div>
+            )}
             <label className="mo-field mo-notes-field">
               <span>Notes</span>
               <textarea
@@ -193,17 +210,15 @@ export default function CreateManualOrder() {
                 ))}
               </select>
             </div>
+            <div className="os-edit-field os-edit-field--lit">
+              <label className="lit-toggle" htmlFor="mo-lit-invoice">
+                <input id="mo-lit-invoice" type="checkbox" checked={form.litInvoice} onChange={(e) => form.setLitInvoice(e.target.checked)} />
+                Lit Invoice
+              </label>
+            </div>
             <div className="os-edit-field os-edit-field--wide">
               <label className="os-edit-label" htmlFor="mo-order-comment">Order Comment</label>
-              <textarea
-                id="mo-order-comment"
-                className="os-comment-input"
-                rows={2}
-                placeholder="Optional order-level comment…"
-                value={form.orderComment}
-                onChange={(e) => form.setOrderComment(e.target.value)}
-                aria-label="Order Comment"
-              />
+              <OrderCommentField id="mo-order-comment" value={form.orderComment} onChange={form.setOrderComment} />
             </div>
           </div>
           {form.validationError && <div className="mo-error">{form.validationError}</div>}

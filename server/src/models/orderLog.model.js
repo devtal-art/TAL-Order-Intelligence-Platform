@@ -34,6 +34,7 @@ const orderLogSchema = new mongoose.Schema(
         'product_note_set',
         'product_resolution_updated',
         'discount_provided_set',
+        'lit_invoice_set',
       ],
     },
 

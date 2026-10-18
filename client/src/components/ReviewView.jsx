@@ -8,6 +8,8 @@ import { approvedItemNos } from '../utils/manualProduct.js';
 import { currencySymbol } from '../utils/format.js';
 import { toDateInputValue, fromDateInputValue } from '../utils/dateFormat.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import DeliveryDaysPicker from './DeliveryDaysPicker.jsx';
+import OrderCommentField from './OrderCommentField.jsx';
 
 // Review screen (single-file). Order-centric (V1.2): the products are wrapped in
 // one Order group keyed by its Portal Order Ref No, with an instant ref search.
@@ -35,7 +37,10 @@ export default function ReviewView({
   onOrderComment,          // V3.2
   deliveryDate = '',       // V4.2 — optional, always editable (even after Save)
   onDeliveryDate,          // V4.2
+  litInvoice = false,      // Updated totals card shown as "Lit Invoice amount"
+  onLitInvoice,
   saveError = '',          // V3.2 — surfaced when Save fails
+  customerDays = null,     // useCustomerDeliveryDays() — delivery days for this order's customer
   onGenerate,
   onReset,
 }) {
@@ -70,7 +75,10 @@ export default function ReviewView({
   // via 'Not Found') AND an Order Status has been selected (V3.2, required).
   // Processed By is now automatic (JWT user) — no gate needed.
   // Generate is enabled only after the order has been explicitly saved (V2.0).
-  const canSave = !saved && blockingReview === 0 && !!orderStatus;
+  // A new customer (no delivery days assigned yet) also needs at least one
+  // delivery day picked.
+  const daysMissing = Boolean(customerDays?.missing);
+  const canSave = !saved && blockingReview === 0 && !!orderStatus && !daysMissing;
   const canGenerate = saved && blockingReview === 0;
 
   // A single upload is exactly one order. Resolve results carry lineId =
@@ -168,7 +176,26 @@ export default function ReviewView({
         results={results}
         lineItems={lineItems}
         comments={comments}
+        fulfillment={fulfillment}
+        litInvoice={litInvoice}
       />
+
+      {customerDays && customerDays.known && (
+        <div className="dd-block">
+          <div className="dd-block-title">Delivery Days</div>
+          <div>{customerDays.saved.join(', ')}</div>
+        </div>
+      )}
+      {customerDays && customerDays.needsDays && !saved && (
+        <div className="dd-block">
+          <div className="dd-block-title">Delivery Days<em> *</em></div>
+          <div className="dd-note" style={{ color: 'inherit', opacity: 0.75 }}>
+            New customer — select the weekday(s) this customer is delivered on.
+          </div>
+          <DeliveryDaysPicker value={customerDays.days} onChange={customerDays.setDays} />
+          {customerDays.days.length === 0 && <div className="dd-note">Select at least one delivery day before saving.</div>}
+        </div>
+      )}
 
       {!saved && (
         <div className="os-edit-block" aria-label="Overall order status and comment">
@@ -199,17 +226,15 @@ export default function ReviewView({
               aria-label="Delivery Date"
             />
           </div>
+          <div className="os-edit-field os-edit-field--lit">
+            <label className="lit-toggle" htmlFor="review-lit-invoice">
+              <input id="review-lit-invoice" type="checkbox" checked={litInvoice} onChange={(e) => onLitInvoice(e.target.checked)} />
+              Lit Invoice
+            </label>
+          </div>
           <div className="os-edit-field os-edit-field--wide">
             <label className="os-edit-label" htmlFor="review-order-comment">Order Comment</label>
-            <textarea
-              id="review-order-comment"
-              className="os-comment-input"
-              rows={2}
-              placeholder="Optional order-level comment…"
-              value={orderComment}
-              onChange={(e) => onOrderComment(e.target.value)}
-              aria-label="Order Comment"
-            />
+            <OrderCommentField id="review-order-comment" value={orderComment} onChange={onOrderComment} />
           </div>
         </div>
       )}

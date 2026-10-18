@@ -185,3 +185,30 @@
 }
 .dup-cancel:hover{color:var(--danger-strong)}
 @media (max-width:560px){.dup-grid{grid-template-columns:1fr}}
+
+/* Customer delivery days — weekday chips (new, additive) */
+.dd-picker{display:flex;flex-wrap:wrap;gap:6px}
+.dd-chip{padding:5px 11px;border:1px solid #cfd3dc;border-radius:999px;background:#fff;color:#444;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+.dd-chip:hover:not(:disabled){border-color:#2F4FA2}
+.dd-chip.is-on{background:#2F4FA2;border-color:#2F4FA2;color:#fff}
+.dd-chip:disabled{opacity:.6;cursor:not-allowed}
+.dd-note{font-size:12px;color:#B54708;margin-top:4px}
+.dd-block{display:flex;flex-direction:column;gap:6px;padding:10px 14px;margin:0 0 12px;border:1px solid #e3e5ea;border-radius:10px;background:#fafaf8}
+.dd-block-title{font-size:13px;font-weight:700}
+.dd-block-title em{color:#D92D20;font-style:normal}
+
+/* Lit Invoice — Updated card relabelled + recoloured (new, additive) */
+.fin-card.is-updated.is-lit{background:#70B853;border-color:#5a9a40}
+.fin-card.is-updated.is-lit .fin-title{color:#fff;border-bottom-color:rgba(255,255,255,.55)}
+.fin-card.is-updated.is-lit .fin-row,.fin-card.is-updated.is-lit .fin-label,.fin-card.is-updated.is-lit .fin-value{color:#fff}
+.lit-toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer}
+
+.os-edit-field--lit{min-width:0;flex:0 0 auto;align-self:flex-end;padding-bottom:7px}
+.lit-toggle{white-space:nowrap}
+.lit-toggle input{width:16px;height:16px;margin:0;padding:0;flex:none;cursor:pointer}
+
+/* Order Comment dropdown (+ 'Other' text box) */
+.oc-field{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.oc-field .os-select{max-width:100%}
+.oc-field .oc-other-input{flex:1 1 180px;width:auto;min-width:0}
+.oc-view-empty{color:var(--muted);font-style:italic}

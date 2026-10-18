@@ -8,6 +8,15 @@ import { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOr
 import { buildOsPendingXLSX } from '../excel/buildOsPendingXLSX.js';
 import { orderService } from '../services/orderService.js';
 
+// Brand = the text before the first " - " in the product name
+// ("Humza - Frozen Meat Samosa 650g (BOX10)" → "Humza").
+const OTHER_BRAND = 'Other';
+const brandOf = (it) => {
+  const name = it.productName || '';
+  const i = name.indexOf(' - ');
+  return i > 0 ? name.slice(0, i).trim() : OTHER_BRAND;
+};
+
 const SORTERS = {
   itemNo: (it) => Number(it.itemNo) || 0,
   product: (it) => (it.productName || '').toLowerCase(),
@@ -33,6 +42,8 @@ const SORTERS = {
 export default function OsPendingList() {
   const [params, setParams] = useSearchParams();
   const q = params.get('q') || '';
+  const brandFilter = params.get('brand') || '';
+  const groupByBrand = params.get('group') === 'brand';
   const from = params.get('from') || '';
   const to = params.get('to') || '';
   const sortBy = params.get('sortBy') || 'pendingQty';
@@ -94,7 +105,7 @@ export default function OsPendingList() {
   };
 
   const clearFilters = () => setParams({});
-  const hasFilters = Boolean(q || from || to);
+  const hasFilters = Boolean(q || from || to || brandFilter);
 
   // Clicking a header sorts by it (ascending first); clicking the same
   // header again flips direction — same behavior as DashboardList.jsx.
@@ -108,24 +119,50 @@ export default function OsPendingList() {
     });
   };
 
+  const brands = useMemo(() => [...new Set(items.map(brandOf))].sort((a, b) => a.localeCompare(b)), [items]);
+
   const visibleItems = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const filtered = needle
+    let filtered = needle
       ? items.filter(
           (it) => it.itemNo.toLowerCase().includes(needle) || (it.productName || '').toLowerCase().includes(needle)
         )
       : items;
+    if (brandFilter) filtered = filtered.filter((it) => brandOf(it) === brandFilter);
 
     const key = SORTERS[sortBy] || SORTERS.pendingQty;
     const dir = sortDir === 'asc' ? 1 : -1;
     return [...filtered].sort((a, b) => {
+      if (groupByBrand) {
+        const bc = brandOf(a).localeCompare(brandOf(b));
+        if (bc !== 0) return bc;
+      }
       const av = key(a);
       const bv = key(b);
       if (av < bv) return -1 * dir;
       if (av > bv) return 1 * dir;
       return 0;
     });
-  }, [items, q, sortBy, sortDir]);
+  }, [items, q, brandFilter, groupByBrand, sortBy, sortDir]);
+
+  // Rows for the table: with grouping on, a brand header row (item count +
+  // total pending qty) precedes each brand's items.
+  const rows = useMemo(() => {
+    if (!groupByBrand) return visibleItems.map((it) => ({ type: 'item', it }));
+    const out = [];
+    let current = null;
+    for (const it of visibleItems) {
+      const b = brandOf(it);
+      if (!current || current.brand !== b) {
+        current = { type: 'brand', brand: b, count: 0, qty: 0 };
+        out.push(current);
+      }
+      current.count += 1;
+      current.qty += it.totalPendingQty;
+      out.push({ type: 'item', it });
+    }
+    return out;
+  }, [visibleItems, groupByBrand]);
 
   // Export — builds the workbook from `visibleItems`, i.e. exactly what's
   // currently on screen, so Search/Order Date/sort are all already baked
@@ -199,6 +236,32 @@ export default function OsPendingList() {
               onChange={(e) => setFilter('to', e.target.value)}
             />
           </div>
+          <div className="al-filter-field">
+            <label htmlFor="op-brand" className="al-filter-label">Brand</label>
+            <select
+              id="op-brand"
+              className="sol-input"
+              value={brandFilter}
+              onChange={(e) => setFilter('brand', e.target.value)}
+            >
+              <option value="">All brands</option>
+              {brands.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+          </div>
+          <div className="al-filter-field">
+            <label className="al-filter-label">&nbsp;</label>
+            <button
+              className={groupByBrand ? 'sol-dl-btn' : 'sol-edit-btn'}
+              type="button"
+              aria-pressed={groupByBrand}
+              onClick={() => setFilter('group', groupByBrand ? '' : 'brand')}
+              style={{ height: 40, whiteSpace: 'nowrap' }}
+            >
+              Group by Brand
+            </button>
+          </div>
           {hasFilters && (
             <button className="sol-edit-btn" type="button" onClick={clearFilters}>Clear</button>
           )}
@@ -225,14 +288,22 @@ export default function OsPendingList() {
                 </tr>
               </thead>
               <tbody>
-                {visibleItems.map((it) => (
-                  <tr key={it.itemNo}>
-                    <td className="dl-ref">{it.itemNo}</td>
-                    <td>{it.productName || '—'}</td>
-                    <td className="dl-num">{it.totalPendingQty}</td>
-                    <td className="dl-num">{it.orders.length}</td>
+                {rows.map((row) => row.type === 'brand' ? (
+                  <tr key={`brand-${row.brand}`} style={{ background: 'rgba(47,79,162,0.08)' }}>
+                    <td colSpan={2} style={{ fontWeight: 800 }}>
+                      {row.brand} <span style={{ fontWeight: 500, opacity: 0.7 }}>· {row.count} item{row.count === 1 ? '' : 's'}</span>
+                    </td>
+                    <td className="dl-num" style={{ fontWeight: 800 }}>{row.qty}</td>
+                    <td colSpan={2} />
+                  </tr>
+                ) : (
+                  <tr key={row.it.itemNo}>
+                    <td className="dl-ref">{row.it.itemNo}</td>
+                    <td>{row.it.productName || '—'}</td>
+                    <td className="dl-num">{row.it.totalPendingQty}</td>
+                    <td className="dl-num">{row.it.orders.length}</td>
                     <td className="dl-act">
-                      <button className="dw-view" type="button" onClick={() => setDetailItem(it)}>
+                      <button className="dw-view" type="button" onClick={() => setDetailItem(row.it)}>
                         View
                       </button>
                     </td>

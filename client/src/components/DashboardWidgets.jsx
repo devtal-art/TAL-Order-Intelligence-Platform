@@ -214,9 +214,9 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
                 to="/dashboard/orders?type=channel&value=Orders%20-%20Email"
               />
               <SourcePill
-                letter="K"
+                letter="M"
                 bg="#D92D20"
-                label="Orders - Kumkum"
+                label="Manual Orders"
                 count={summary.channelCounts?.['Order - Kumkum'] ?? 0}
                 to="/dashboard/orders?type=channel&value=Order%20-%20Kumkum"
               />
