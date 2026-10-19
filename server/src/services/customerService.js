@@ -29,7 +29,7 @@ export async function setDeliveryDays(name, days) {
     throw new AppError('VALIDATION_ERROR', 'Customer name is required.', { status: 400 });
   }
   if (Array.isArray(days) && days.some((d) => !WEEKDAYS.includes(d))) {
-    throw new AppError('VALIDATION_ERROR', 'Delivery days must be weekday names (Monday–Sunday).', { status: 400 });
+    throw new AppError('VALIDATION_ERROR', 'Delivery days must be weekday names (Monday–Sunday) or "3rd Party".', { status: 400 });
   }
   const deliveryDays = normalizeDays(days);
   if (!deliveryDays.length) {

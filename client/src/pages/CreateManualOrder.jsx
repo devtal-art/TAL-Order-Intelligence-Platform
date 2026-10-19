@@ -143,9 +143,9 @@ export default function CreateManualOrder() {
             )}
             {form.customerDays.needsDays && (
               <div className="dd-block">
-                <div className="dd-block-title">Delivery Days<em> *</em></div>
+                <div className="dd-block-title">Delivery Days</div>
                 <div style={{ fontSize: 12, opacity: 0.75 }}>
-                  New customer — select the weekday(s) this customer is delivered on.
+                  New customer — select the weekday(s) this customer is delivered on (optional).
                 </div>
                 <DeliveryDaysPicker value={form.customerDays.days} onChange={form.customerDays.setDays} />
               </div>

@@ -188,17 +188,27 @@ export default function ReviewView({
       )}
       {customerDays && customerDays.needsDays && !saved && (
         <div className="dd-block">
-          <div className="dd-block-title">Delivery Days<em> *</em></div>
+          <div className="dd-block-title">Delivery Days</div>
           <div className="dd-note" style={{ color: 'inherit', opacity: 0.75 }}>
-            New customer — select the weekday(s) this customer is delivered on.
+            New customer — select the weekday(s) this customer is delivered on (optional).
           </div>
           <DeliveryDaysPicker value={customerDays.days} onChange={customerDays.setDays} />
-          {customerDays.days.length === 0 && <div className="dd-note">Select at least one delivery day before saving.</div>}
         </div>
       )}
 
       {!saved && (
         <div className="os-edit-block" aria-label="Overall order status and comment">
+          <div className="os-edit-field">
+            <label className="os-edit-label" htmlFor="review-delivery-date">Delivery Date</label>
+            <input
+              id="review-delivery-date"
+              type="date"
+              className="os-select"
+              value={toDateInputValue(deliveryDate)}
+              onChange={(e) => onDeliveryDate(fromDateInputValue(e.target.value))}
+              aria-label="Delivery Date"
+            />
+          </div>
           <div className="os-edit-field">
             <label className="os-edit-label" htmlFor="review-order-status">Order Status</label>
             <select
@@ -215,26 +225,15 @@ export default function ReviewView({
               ))}
             </select>
           </div>
-          <div className="os-edit-field">
-            <label className="os-edit-label" htmlFor="review-delivery-date">Delivery Date</label>
-            <input
-              id="review-delivery-date"
-              type="date"
-              className="os-select"
-              value={toDateInputValue(deliveryDate)}
-              onChange={(e) => onDeliveryDate(fromDateInputValue(e.target.value))}
-              aria-label="Delivery Date"
-            />
+          <div className="os-edit-field os-edit-field--wide">
+            <label className="os-edit-label" htmlFor="review-order-comment">Order Comment</label>
+            <OrderCommentField id="review-order-comment" value={orderComment} onChange={onOrderComment} />
           </div>
           <div className="os-edit-field os-edit-field--lit">
             <label className="lit-toggle" htmlFor="review-lit-invoice">
               <input id="review-lit-invoice" type="checkbox" checked={litInvoice} onChange={(e) => onLitInvoice(e.target.checked)} />
               Lit Invoice
             </label>
-          </div>
-          <div className="os-edit-field os-edit-field--wide">
-            <label className="os-edit-label" htmlFor="review-order-comment">Order Comment</label>
-            <OrderCommentField id="review-order-comment" value={orderComment} onChange={onOrderComment} />
           </div>
         </div>
       )}

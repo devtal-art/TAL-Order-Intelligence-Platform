@@ -1,6 +1,7 @@
-export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+export const THIRD_PARTY = '3rd Party';
+export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', THIRD_PARTY];
 
-// Weekday toggle chips — pick one or more delivery days.
+// Weekday toggle chips (plus a "3rd Party" option) — pick one or more.
 export default function DeliveryDaysPicker({ value = [], onChange, disabled = false }) {
   const toggle = (day) => {
     const next = value.includes(day) ? value.filter((d) => d !== day) : [...value, day];
@@ -17,7 +18,7 @@ export default function DeliveryDaysPicker({ value = [], onChange, disabled = fa
           disabled={disabled}
           onClick={() => toggle(day)}
         >
-          {day.slice(0, 3)}
+          {day === THIRD_PARTY ? day : day.slice(0, 3)}
         </button>
       ))}
     </div>

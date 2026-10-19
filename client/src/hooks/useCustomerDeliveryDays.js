@@ -7,7 +7,8 @@ import { orderService } from '../services/orderService.js';
 //             assigned, false if this is a new customer (days required).
 //   saved   — the days already assigned (when known).
 //   days    — the draft selection (only meaningful when needsDays).
-//   needsDays — true once we've confirmed this customer has no days yet.
+//   needsDays — true once we've confirmed this customer has no days yet
+//             (picking is optional; saving without a pick is allowed).
 //   persist() — saves the draft for a new customer (no-op otherwise).
 // A failed lookup never blocks anything (known stays null).
 export function useCustomerDeliveryDays(customerName) {
@@ -41,7 +42,9 @@ export function useCustomerDeliveryDays(customerName) {
   }, [name]);
 
   const needsDays = Boolean(name) && state.known === false;
-  const missing = state.loading || (needsDays && days.length === 0);
+  // Picking a delivery day is optional — only the in-flight lookup blocks a
+  // save, so persist() never races a customer record that is still loading.
+  const missing = state.loading;
 
   const persist = useCallback(async () => {
     if (!needsDays || days.length === 0) return;
