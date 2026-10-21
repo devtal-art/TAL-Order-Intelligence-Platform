@@ -77,9 +77,13 @@ export const orderService = {
   // Full filtered bucket list for "View All" (V2.2, paginated).
   // type: 'status' | 'comment' | 'orderStatus' | 'orderComment'; value: bucket
   // value (e.g. 'delivered', 'N/A', or 'has' for orderComment).
-  dashboardOrders: ({ type, value, page = 1, limit = 25, sortBy, sortDir }) => {
+  // from/to (optional, 'YYYY-MM-DD'): restrict to orders whose Order Date
+  // falls in that range.
+  dashboardOrders: ({ type, value, page = 1, limit = 25, sortBy, sortDir, from, to }) => {
     let qs = `type=${encodeURIComponent(type)}&value=${encodeURIComponent(value)}&page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`;
     if (sortBy) qs += `&sortBy=${encodeURIComponent(sortBy)}&sortDir=${encodeURIComponent(sortDir || 'asc')}`;
+    if (from) qs += `&from=${encodeURIComponent(from)}`;
+    if (to) qs += `&to=${encodeURIComponent(to)}`;
     return apiClient.get(`/v1/orders/dashboard/orders?${qs}`);
   },
 

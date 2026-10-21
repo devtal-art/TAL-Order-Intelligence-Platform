@@ -202,8 +202,8 @@ export async function getDashboard(req, res, next) {
 export async function listDashboardOrders(req, res, next) {
   try {
     ensureDb();
-    const { type, value, page, limit, sortBy, sortDir } = req.query;
-    const result = await orderService.listDashboardOrders({ type, value, page, limit, sortBy, sortDir });
+    const { type, value, page, limit, sortBy, sortDir, from, to } = req.query;
+    const result = await orderService.listDashboardOrders({ type, value, page, limit, sortBy, sortDir, dateFrom: from, dateTo: to });
     res.status(200).json(result);
   } catch (err) {
     next(err);

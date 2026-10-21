@@ -23,6 +23,17 @@ export default function DashboardList() {
   const page = Math.max(1, Math.floor(Number(params.get('page'))) || 1);
   const sortBy = params.get('sortBy') || '';
   const sortDir = params.get('sortDir') === 'desc' ? 'desc' : 'asc';
+  // Order Date range (optional, 'YYYY-MM-DD') — only offered on the All Orders
+  // and channel (Email / Manual) lists; ignored for every other list type.
+  const hasDateFilter = type === 'allOrders' || type === 'channel';
+  const from = hasDateFilter ? params.get('from') || '' : '';
+  const to = hasDateFilter ? params.get('to') || '' : '';
+  const dateParams = () => {
+    const d = {};
+    if (from) d.from = from;
+    if (to) d.to = to;
+    return d;
+  };
 
   // Clicking a header sorts by it (ascending first); clicking the same
   // header again flips direction. Changing the sort resets to page 1 so the
@@ -30,7 +41,20 @@ export default function DashboardList() {
   // order changes.
   const toggleSort = (column) => {
     const nextDir = sortBy === column && sortDir === 'asc' ? 'desc' : 'asc';
-    setParams({ type, value, page: '1', sortBy: column, sortDir: nextDir });
+    setParams({ type, value, page: '1', sortBy: column, sortDir: nextDir, ...dateParams() });
+  };
+
+  // Changing the date range resets to page 1 (the result set changed) and
+  // keeps the current sort.
+  const setDateFilter = (key, v) => {
+    const next = { type, value, page: '1', ...dateParams() };
+    if (sortBy) {
+      next.sortBy = sortBy;
+      next.sortDir = sortDir;
+    }
+    if (v) next[key] = v;
+    else delete next[key];
+    setParams(next);
   };
 
   // Discount (V4.7): title needs the bucket's own label baked in (unlike
@@ -83,7 +107,7 @@ export default function DashboardList() {
     setLoading(true);
     setError('');
     orderService
-      .dashboardOrders({ type, value, page, limit: PAGE_SIZE, sortBy: sortBy || undefined, sortDir })
+      .dashboardOrders({ type, value, page, limit: PAGE_SIZE, sortBy: sortBy || undefined, sortDir, from: from || undefined, to: to || undefined })
       .then((r) => {
         if (!cancelled) setResult(r);
       })
@@ -97,7 +121,7 @@ export default function DashboardList() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- meta derives from type/value
-  }, [type, value, page, sortBy, sortDir, refreshToken]);
+  }, [type, value, page, sortBy, sortDir, from, to, refreshToken]);
 
   // Discount Provided toggle (only rendered when type === 'discount') — its
   // own busy ref so toggling one row doesn't disable the whole table, and an
@@ -137,7 +161,7 @@ export default function DashboardList() {
   );
 
   const gotoPage = (p) => {
-    const next = { type, value, page: String(p) };
+    const next = { type, value, page: String(p), ...dateParams() };
     if (sortBy) {
       next.sortBy = sortBy;
       next.sortDir = sortDir;
@@ -184,6 +208,43 @@ export default function DashboardList() {
             </span>
           )}
         </div>
+
+        {hasDateFilter && (
+          <div className="al-filters">
+            <div className="al-filter-field">
+              <label htmlFor="dl-from" className="al-filter-label">Order Date from</label>
+              <input
+                id="dl-from"
+                type="date"
+                className="sol-input"
+                value={from}
+                onChange={(e) => setDateFilter('from', e.target.value)}
+              />
+            </div>
+            <div className="al-filter-field">
+              <label htmlFor="dl-to" className="al-filter-label">Order Date to</label>
+              <input
+                id="dl-to"
+                type="date"
+                className="sol-input"
+                value={to}
+                onChange={(e) => setDateFilter('to', e.target.value)}
+              />
+            </div>
+            {(from || to) && (
+              <div className="al-filter-field">
+                <label className="al-filter-label">&nbsp;</label>
+                <button
+                  className="sol-edit-btn"
+                  type="button"
+                  onClick={() => setParams({ type, value, page: '1', ...(sortBy ? { sortBy, sortDir } : {}) })}
+                >
+                  Clear dates
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {error && <div className="sol-error">{error}</div>}
 

@@ -1669,7 +1669,14 @@ const SORT_KEY_EXPR = {
   products: { $ifNull: ['$total_products', 0] },
 };
 
-export async function listDashboardOrders({ type, value, page, limit, sortBy, sortDir } = {}) {
+// `dateFrom`/`dateTo` (both optional, 'YYYY-MM-DD' from a plain <input
+// type="date">) restrict the list to orders whose Order Date falls in that
+// range (inclusive) — same semantics as getOsPendingByItem: order_date is
+// free text, parsed with parseFlexibleDate(), and an order whose date can't
+// be parsed is excluded while a range is active. Applied as an extra _id
+// condition on top of the bucket's own match, so sorting/paging/totals are
+// untouched.
+export async function listDashboardOrders({ type, value, page, limit, sortBy, sortDir, dateFrom, dateTo } = {}) {
   // Security: `type`/`value` come straight from req.query, and Express's
   // default query parser turns bracket-notation like `?value[$ne]=` into a
   // nested OBJECT ({ $ne: '' }), not a string. Every branch below either
@@ -1778,6 +1785,24 @@ export async function listDashboardOrders({ type, value, page, limit, sortBy, so
               ? 'order_channel'
               : 'order_status';
     matchStage = { [matchField]: value };
+  }
+
+  // Query values may arrive as non-strings (see the injection note above),
+  // so only plain strings are considered for the date range.
+  const fromDate = typeof dateFrom === 'string' && dateFrom ? parseFlexibleDate(dateFrom) : null;
+  const toDate = typeof dateTo === 'string' && dateTo ? parseFlexibleDate(dateTo) : null;
+  if (fromDate || toDate) {
+    const dated = await Order.find({}, { order_date: 1 }).lean();
+    const ids = dated
+      .filter((o) => {
+        const d = parseFlexibleDate(o.order_date);
+        if (!d) return false;
+        if (fromDate && d < fromDate) return false;
+        if (toDate && d > toDate) return false;
+        return true;
+      })
+      .map((o) => o._id);
+    matchStage = { $and: [matchStage, { _id: { $in: ids } }] };
   }
 
   const pipeline = [DASHBOARD_FIELDS_STAGE, { $match: matchStage }];
