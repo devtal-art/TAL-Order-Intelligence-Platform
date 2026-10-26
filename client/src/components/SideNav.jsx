@@ -73,6 +73,22 @@ export default function SideNav() {
           </span>
         </NavLink>
       )}
+      {/* Admin Portal — database backup download, admin accounts only. */}
+      {isAdmin && (
+        <NavLink to="/admin/backup" className={item}>
+          <span className="sn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <ellipse cx="12" cy="5" rx="9" ry="3" />
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+            </svg>
+          </span>
+          <span className="sn-text">
+            Backup
+            <small>Download database</small>
+          </span>
+        </NavLink>
+      )}
     </aside>
   );
 }

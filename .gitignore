@@ -39,3 +39,9 @@ tmp/
 *.old
 *.orig
 *.pid
+
+# ── Database backups (contain user data) ──────────────────────
+db-backup-*/
+backups/
+backup-*/
+staging_backup_*/

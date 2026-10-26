@@ -12,6 +12,7 @@ import Search from './pages/Search.jsx';
 import ProductSearchResults from './pages/ProductSearchResults.jsx';
 import CreateManualOrder from './pages/CreateManualOrder.jsx';
 import AdminEmployees from './pages/AdminEmployees.jsx';
+import AdminBackup from './pages/AdminBackup.jsx';
 import OsPendingList from './pages/OsPendingList.jsx';
 
 // Route map:
@@ -26,6 +27,7 @@ import OsPendingList from './pages/OsPendingList.jsx';
 //   /search/products          — product search results (protected, V5.1 — new, additive)
 //   /orders/manual            — Create Manual Order (protected, V3.1 — new, additive)
 //   /admin/employees          — Admin Portal: Manage Employees (protected, admin-only)
+//   /admin/backup             — Admin Portal: Database Backup (protected, admin-only)
 export default function App() {
   return (
     <AuthProvider>
@@ -112,6 +114,14 @@ export default function App() {
           element={
             <ProtectedRoute adminOnly>
               <AdminEmployees />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/backup"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminBackup />
             </ProtectedRoute>
           }
         />

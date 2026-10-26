@@ -8,6 +8,7 @@ import { authRouter } from './auth.routes.js';
 import { productLookupRouter } from './productLookup.routes.js';
 import { helpRouter } from './help.routes.js';
 import { employeeRouter } from './employee.routes.js';
+import { backupRouter } from './backup.routes.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { blockViewerWrites } from '../../middleware/blockViewerWrites.js';
 import { requireAdmin } from '../../middleware/requireAdmin.js';
@@ -36,3 +37,6 @@ v1Router.use('/help', authenticate, blockViewerWrites, helpRouter);
 // own writes here. requireAdmin is the real gate for this router.
 v1Router.use('/admin/employees', authenticate, requireAdmin, employeeRouter);
 
+
+// Admin Portal — database backup (read-only GETs, admin only).
+v1Router.use('/admin/backup', authenticate, requireAdmin, backupRouter);
