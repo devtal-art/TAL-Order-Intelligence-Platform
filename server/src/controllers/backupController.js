@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import * as backupService from '../services/backupService.js';
 import { ensureDb } from '../utils/ensureDb.js';
 
@@ -10,7 +9,7 @@ export async function downloadBackup(req, res, next) {
     // Resolved before any response bytes are sent, so a DB problem still
     // returns the normal JSON error envelope.
     const collections = await backupService.listBackupCollections();
-    const filename = backupService.backupFilename(mongoose.connection.db.databaseName);
+    const filename = backupService.backupFilename();
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

@@ -27,11 +27,9 @@ const { EJSON } = mongoose.mongo.BSON;
 
 const pad = (n) => String(n).padStart(2, '0');
 
-// <db>-backup-YYYY-MM-DD_HH-mm.zip (server local time).
-export function backupFilename(dbName, now = new Date()) {
-  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const time = `${pad(now.getHours())}-${pad(now.getMinutes())}`;
-  return `${dbName}-backup-${date}_${time}.zip`;
+// Backup_DD-MM-YYYY.zip (server local time).
+export function backupFilename(now = new Date()) {
+  return `Backup_${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}.zip`;
 }
 
 // Lazily yields a JSON array of a collection's documents, one doc at a time,
