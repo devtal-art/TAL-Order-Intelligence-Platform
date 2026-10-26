@@ -918,7 +918,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
           </thead>
           <tbody>
             {rows.map((row) => {
-              const released = draft[row.lineId]?.comment === 'Released';
               return (
                 <tr key={row.lineId} className="rt-row">
                   <td className="rt-name">{row.product}</td>
@@ -947,8 +946,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                             editLine(row.lineId, { pendingQty: e.target.value === '' ? '' : Number(e.target.value) })
                           }
                           aria-label="Pending quantity"
-                          disabled={released}
-                          title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
                         >
                           <option value="">—</option>
                           {Array.from({ length: row.orderedQty + 1 }, (_, n) => (
@@ -968,8 +965,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                             editLine(row.lineId, { pendingQty: clampPendingQty(e.target.value, row.orderedQty) })
                           }
                           aria-label="Pending quantity"
-                          disabled={released}
-                          title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
                         />
                       )
                     ) : row.pendingQty != null ? (
@@ -982,9 +977,7 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                       this line. A free numeric input, NOT a 0..ordered-qty
                       dropdown like Pending Qty next to it: a delivery is
                       usually short but can also come in over, and both have
-                      to be recordable. Stays editable on legacy
-                      Reason='Released' lines (unlike Pending Qty / Item
-                      Status) — it is a new field and applies to them too. */}
+                      to be recordable. */}
                   <td className="rt-num">
                     {editing ? (
                       <input
@@ -1021,8 +1014,6 @@ function SavedOrderDetail({ order, onDownload, onSaved }) {
                         value={draft[row.lineId]?.status || ''}
                         onChange={(e) => editLine(row.lineId, { status: e.target.value })}
                         aria-label="Item status"
-                        disabled={released}
-                        title={released ? 'Not applicable for this legacy order (Reason is Released)' : undefined}
                       >
                         <option value="">—</option>
                         {DELIVERY_STATUSES.map((s) => (
