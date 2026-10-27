@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import Layout from '../components/Layout.jsx';
 import SortTh from '../components/SortableHeader.jsx';
+import LitInvoiceDot from '../components/LitInvoiceDot.jsx';
 import { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
 import { buildOsPendingXLSX } from '../excel/buildOsPendingXLSX.js';
 import { orderService } from '../services/orderService.js';
@@ -365,6 +366,7 @@ function OsPendingDetailModal({ item, onClose, onView, viewBusyRef }) {
           <table className="dl-table">
             <thead>
               <tr>
+                <th className="dl-lit" aria-label="Lit Invoice" />
                 <th>Order #</th>
                 <th>Customer</th>
                 <th style={{ textAlign: 'right' }}>Pending Qty</th>
@@ -374,6 +376,7 @@ function OsPendingDetailModal({ item, onClose, onView, viewBusyRef }) {
             <tbody>
               {item.orders.map((o, i) => (
                 <tr key={`${o.portalOrderRef}-${i}`}>
+                  <td className="dl-lit"><LitInvoiceDot on={o.litInvoice} /></td>
                   <td className="dl-ref">{o.portalOrderRef}</td>
                   <td>{o.customerName || '—'}</td>
                   <td className="dl-num">{o.pendingQty}</td>

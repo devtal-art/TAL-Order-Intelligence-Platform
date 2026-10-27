@@ -125,6 +125,8 @@ export function toSummaryDto(doc) {
     resolutionStatus: doc.resolution_status,
     orderSource: doc.order_source || 'HTML',
     orderChannel: doc.order_channel || '',
+    // Lit Invoice checkbox — drives the green/red dot on order list tables.
+    litInvoice: Boolean(doc.lit_invoice),
   };
 }
 
@@ -1130,6 +1132,9 @@ const DASHBOARD_FIELDS_STAGE = {
     discount_bucket: DISCOUNT_BUCKET_EXPR,
     // Discount Provided toggle — plain stored field, not derived.
     discount_provided: 1,
+    // Lit Invoice checkbox — plain stored field; feeds the dashboard's Lit
+    // Invoice card and its "View All" list.
+    lit_invoice: 1,
     // Delivery date (V4 dashboard). Prefers the top-level field (V4.2,
     // directly editable) when it's actually set; falls back to the legacy
     // Manual Order Creation location for orders saved before that field
@@ -1180,6 +1185,10 @@ const HAS_ORDER_COMMENT_MATCH = { order_comment: { $exists: true, $ne: '' } };
 // document either matches the array predicate or it doesn't.
 const HAS_ITEM_ISSUE_MATCH = { comment_values: { $in: PRODUCT_COMMENTS } };
 
+// Presence check for the Lit Invoice dashboard card — orders whose Lit
+// Invoice checkbox is ticked (Order.lit_invoice === true).
+const HAS_LIT_INVOICE_MATCH = { lit_invoice: true };
+
 // Order Status dashboard buckets (V3.2; 'Unknown' bucket removed V3.3).
 const DASHBOARD_ORDER_STATUSES = ORDER_STATUSES;
 
@@ -1208,6 +1217,8 @@ function toDashboardCardDto(doc) {
     // Overall Order Status — shown as a column on the View-All list pages.
     // '' when not set yet (client renders a dash).
     orderStatus: doc.order_status || '',
+    // Lit Invoice checkbox — drives the green/red dot on the View-All list.
+    litInvoice: Boolean(doc.lit_invoice),
   };
 }
 
@@ -1249,6 +1260,10 @@ export async function getDashboardSummary({ previewLimit } = {}) {
   // Order Comments section above, keyed on HAS_ITEM_ISSUE_MATCH.
   facets.iss_orders = [{ $match: HAS_ITEM_ISSUE_MATCH }, { $sort: { upload_timestamp: -1 } }, { $limit: limit }];
   facets.iss_count = [{ $match: HAS_ITEM_ISSUE_MATCH }, { $count: 'n' }];
+
+  // Lit Invoice card — count only (the card shows a number + View All; the
+  // list itself comes from listDashboardOrders type 'litInvoice').
+  facets.lit_count = [{ $match: HAS_LIT_INVOICE_MATCH }, { $count: 'n' }];
 
   // Overview stats — total orders, orders uploaded today, and Released orders
   // broken down by processor — power the three summary cards atop the page.
@@ -1472,6 +1487,8 @@ export async function getDashboardSummary({ previewLimit } = {}) {
     // ORDER and de-duplicated — see HAS_ITEM_ISSUE_MATCH. Same single-bucket
     // shape as orderComments above.
     orderIssues: readBucket('iss', 'has'),
+    // Number of orders with the Lit Invoice checkbox ticked.
+    litInvoiceCount: agg.lit_count?.[0]?.n ?? 0,
     // V4 dashboard additions
     channelCounts,
     totalItems: agg.total_items?.[0]?.n ?? 0,
@@ -1531,6 +1548,9 @@ export async function getDashboardExportOrders() {
         product_fulfillment: { $ifNull: ['$product_fulfillment', {}] },
         product_notes: { $ifNull: ['$product_notes', {}] },
         resolution_results: { $ifNull: ['$resolution_data.results', []] },
+        // Read by getOsPendingByItem only (green/red Lit Invoice dot); the
+        // workbook builds its columns explicitly and ignores this field.
+        lit_invoice: 1,
       },
     },
   ]);
@@ -1626,6 +1646,7 @@ export async function getOsPendingByItem({ dateFrom, dateTo } = {}) {
         portalOrderRef: order.portal_order_ref,
         customerName: order.customer_name || '',
         pendingQty,
+        litInvoice: Boolean(order.lit_invoice),
       });
     }
   }
@@ -1711,6 +1732,14 @@ export async function listDashboardOrders({ type, value, page, limit, sortBy, so
       });
     }
     matchStage = HAS_ITEM_ISSUE_MATCH;
+  } else if (type === 'litInvoice') {
+    if (value !== 'has') {
+      throw new AppError('VALIDATION_ERROR', "value must be 'has'.", {
+        status: 400,
+        details: [{ field: 'value', issue: 'invalid value' }],
+      });
+    }
+    matchStage = HAS_LIT_INVOICE_MATCH;
   } else if (type === 'deliveryDate') {
     // Filter by a specific delivery date string.
     if (!value) {
@@ -1763,7 +1792,7 @@ export async function listDashboardOrders({ type, value, page, limit, sortBy, so
     };
     const allowed = known[type];
     if (!allowed) {
-      throw new AppError('VALIDATION_ERROR', "type must be 'status', 'comment', 'orderStatus', 'orderComment', 'orderIssue', 'discount', 'channel', 'deliveryDate', 'today', 'todayProcessor', 'allOrders', 'processor', or 'processorOriginal'.", {
+      throw new AppError('VALIDATION_ERROR', "type must be 'status', 'comment', 'orderStatus', 'orderComment', 'orderIssue', 'litInvoice', 'discount', 'channel', 'deliveryDate', 'today', 'todayProcessor', 'allOrders', 'processor', or 'processorOriginal'.", {
         status: 400,
         details: [{ field: 'type', issue: 'invalid value' }],
       });

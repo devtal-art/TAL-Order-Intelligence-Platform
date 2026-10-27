@@ -99,6 +99,9 @@
 .os-issues::before{background:var(--warn-icon)}
 .os-comments{background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
 .os-comments::before{background:var(--muted)}
+/* Lit Invoice — dedicated green (#70B853), matching the dashboard card. */
+.os-litinvoice{background:#F1F8ED;color:#4F8A37;border:1px solid #C6E3B9}
+.os-litinvoice::before{background:#70B853}
 
 .os-edit-block{
   display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;

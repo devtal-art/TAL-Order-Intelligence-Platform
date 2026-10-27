@@ -36,6 +36,7 @@ import InboxRoundedIcon from '@mui/icons-material/InboxRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
 import { orderService } from '../services/orderService.js';
 import { deliveryMeta, commentMeta, discountBucketMeta } from '../utils/order.js';
 import { formatDaysUntil, formatDisplayDate } from '../utils/dateFormat.js';
@@ -96,6 +97,10 @@ const osIconFor = (status) => {
 // same red already used elsewhere on the dashboard (Order Cancelled / Not
 // Released), so "overdue delivery" reads as the same severity of alert.
 const RED = TONE.cancelled;
+
+// Dedicated green for the Lit Invoice card (#70B853, as requested), with a
+// light border tint derived from it.
+const LIT = { main: '#70B853', border: '#C6E3B9' };
 
 // Order Delivery Date / Crossed Delivery Dates cards (V5.5) — a fixed cap on
 // the scrollable date list so the card's own size stays constant (matching
@@ -485,6 +490,10 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
             legible at a glance. Styling only applies when there's actually
             something to flag — an empty card (nothing overdue) stays fully
             neutral rather than reading as a false alarm. */}
+        {/* Third column wrapper — stacks the Lit Invoice card directly under
+            Crossed Delivery Dates (filling the space beside the taller Item
+            card) without changing the row's 3-column grid. */}
+        <div className="flex flex-col gap-4">
         <Card
           variant="outlined"
           sx={{
@@ -540,6 +549,33 @@ export default function DashboardWidgets({ refreshToken = 0, onView, viewBusyRef
             )}
           </CardContent>
         </Card>
+
+        {/* Lit Invoice — number of orders with the Lit Invoice checkbox
+            ticked, in its own dedicated green (LIT). Same compact header +
+            footer "View All" pattern as the Crossed Delivery Dates card
+            above; the count itself stays normal ink like every other card. */}
+        <Card variant="outlined" sx={{ ...cardSx, borderColor: LIT.border }}>
+          <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+            <StatLabel icon={ReceiptLongRoundedIcon} color={LIT.main}>
+              Lit Invoice
+            </StatLabel>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 1 }}>
+              <Avatar sx={{ bgcolor: LIT.main, width: 40, height: 40, flexShrink: 0 }}>
+                <ReceiptLongRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+                  {fmt(summary.litInvoiceCount)}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                  Orders marked as Lit Invoice · {pct(summary.litInvoiceCount || 0)}% of total
+                </Typography>
+              </Box>
+            </Box>
+            <ViewAllLink to="/dashboard/orders?type=litInvoice&value=has" />
+          </CardContent>
+        </Card>
+        </div>
       </div>
 
       {/* ═══ Row 3.5 — Discount (portrait, V5.4) | Today's Orders ═══ */}

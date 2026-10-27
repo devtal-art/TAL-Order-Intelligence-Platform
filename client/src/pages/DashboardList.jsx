@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
 import SortTh from '../components/SortableHeader.jsx';
+import LitInvoiceDot from '../components/LitInvoiceDot.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { orderService } from '../services/orderService.js';
 import { deliveryMeta, commentMeta, orderStatusMeta, discountBucketMeta } from '../utils/order.js';
@@ -76,6 +77,8 @@ export default function DashboardList() {
             ? { label: 'Order Comments', tone: 'comments', title: 'Orders with an Order Comment' }
             : type === 'orderIssue' && value === 'has'
             ? { label: 'Half Released', tone: 'issues', title: 'Half Released — orders with at least one OS or Not Found item' }
+            : type === 'litInvoice' && value === 'has'
+            ? { label: 'Lit Invoice', tone: 'litinvoice', title: 'Orders marked as Lit Invoice' }
             : type === 'deliveryDate'
               ? { label: `Delivery: ${formatDisplayDate(value)}`, tone: 'released', title: `Orders for delivery date ${formatDisplayDate(value)}` }
               : type === 'today'
@@ -263,6 +266,7 @@ export default function DashboardList() {
             <table className="dl-table">
               <thead>
                 <tr>
+                  <th className="dl-lit" aria-label="Lit Invoice" />
                   <SortTh column="ref" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order #</SortTh>
                   <SortTh column="customer" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Customer</SortTh>
                   {type === 'orderComment' ? <th>Order Comment</th> : null}
@@ -279,6 +283,7 @@ export default function DashboardList() {
               <tbody>
                 {rows.map((o) => (
                   <tr key={o.id}>
+                    <td className="dl-lit"><LitInvoiceDot on={o.litInvoice} /></td>
                     <td className="dl-ref">{o.portalOrderRef}</td>
                     <td>{o.customerName || '—'}</td>
                     {type === 'orderComment' ? (

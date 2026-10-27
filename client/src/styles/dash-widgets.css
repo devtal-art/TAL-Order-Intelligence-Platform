@@ -64,6 +64,12 @@
 .dl-act{text-align:right;white-space:nowrap}
 .dl-muted{color:var(--muted);font-style:italic}
 .dl-comment{max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Lit Invoice dot column (LitInvoiceDot.jsx) — narrow leading column; green
+   (#70B853, the Lit Invoice colour) when ticked, red when not. */
+.dl-table .dl-lit{width:1%;padding-right:0;text-align:center}
+.lit-dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle}
+.lit-dot.is-on{background:#70B853}
+.lit-dot.is-off{background:#D92D20}
 
 /* Activity Log "View All" filter bar (date + Order Number) */
 .al-filters{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:14px 0}

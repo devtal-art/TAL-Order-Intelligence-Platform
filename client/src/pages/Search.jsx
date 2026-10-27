@@ -3,6 +3,7 @@ import Layout from '../components/Layout.jsx';
 import SavedOrderLookup, { SavedOrderDetailModal, downloadOrderExcel } from '../components/SavedOrderLookup.jsx';
 import ProductSearchBox from '../components/ProductSearchBox.jsx';
 import SortTh from '../components/SortableHeader.jsx';
+import LitInvoiceDot from '../components/LitInvoiceDot.jsx';
 import { orderService } from '../services/orderService.js';
 import { statusMeta } from '../utils/order.js';
 
@@ -133,6 +134,7 @@ function RecentOrders({ refreshToken, onChanged }) {
           <table className="dl-table">
             <thead>
               <tr>
+                <th className="dl-lit" aria-label="Lit Invoice" />
                 <SortTh column="ref" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order #</SortTh>
                 <SortTh column="customer" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Customer</SortTh>
                 <SortTh column="processedBy" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Processed By</SortTh>
@@ -147,6 +149,7 @@ function RecentOrders({ refreshToken, onChanged }) {
                 const meta = statusMeta(o.resolutionStatus);
                 return (
                   <tr key={o.id}>
+                    <td className="dl-lit"><LitInvoiceDot on={o.litInvoice} /></td>
                     <td className="dl-ref">{o.portalOrderRef}</td>
                     <td>{o.customerName || '—'}</td>
                     <td>{o.processedBy || <span className="dl-muted">Not Assigned</span>}</td>
