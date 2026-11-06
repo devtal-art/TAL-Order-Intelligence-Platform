@@ -90,6 +90,22 @@ export function parseOrderHTML(htmlText){
       setAddr(R.delivery_address,cells[3],cells[5]||cells[4]||'');return;
     }
 
+    // V1.11 FIX: Additional Comment text must NEVER feed the financial
+    // totals. The keyword checks below (sub total / transport / discount /
+    // total) previously ran on the comment row too, so a comment such as
+    // "send total 11 boxes of family paratha FOC with this order" was read as
+    // the order Total (£11.00). A row in the comments section is treated as
+    // the comment — and skipped by the totals checks — unless it is shaped
+    // like a genuine totals row (label + amount). Genuine totals rows fall
+    // through to the original, unchanged logic.
+    if(mode==='comments'){
+      const v=cells.find(c=>c&&c!==':'&&!/additional comment/i.test(c));
+      if(v&&!looksLikeTotalsRow(cells)){
+        if(!R.order_info.additional_comments) R.order_info.additional_comments=v;
+        return;
+      }
+    }
+
     // ── financial totals (detect before items to avoid false item parse) ──
     if(/sub.?total/i.test(low)&&!/product|description/i.test(low)){
       R.financials.sub_total=Math.abs(parseNum(cells[cells.length-1]));return;
@@ -178,4 +194,21 @@ export function parseOrderHTML(htmlText){
   }
 
   return R;
+}
+
+// V1.11: is this row shaped like a real totals row (Sub Total / Discount /
+// Transportation Charges / Total) rather than free comment text?
+//  • Multi-cell row: the last non-empty cell is an amount (ends with a digit),
+//    or the first cell starts with a totals label (e.g. "Transportation
+//    Charges | FREE").
+//  • Single-cell row: the whole cell is "<totals label>[:] <amount>" and
+//    nothing else (e.g. "Total: £1,777.13"). Free text such as
+//    "send total 11 boxes of family paratha FOC" does not match.
+const TOTALS_LABEL=/^\s*(sub\s*-?\s*total|grand\s+total|order\s+total|total|transport\w*|delivery\s+charges?|carriage|discount|sales\s+rep|vat)\b/i;
+const SINGLE_CELL_TOTAL=/^[^\d]*[:\s]\s*\(?\s*[-+]?\s*[£€$]?\s*[-+]?\s*[\d,]*\.?\d+\s*\)?\s*$/;
+function looksLikeTotalsRow(cells){
+  const ne=cells.filter(c=>c&&c!==':');
+  if(!ne.length) return false;
+  if(ne.length===1) return TOTALS_LABEL.test(ne[0])&&SINGLE_CELL_TOTAL.test(ne[0]);
+  return /\d\s*\)?\s*$/.test(ne[ne.length-1])||TOTALS_LABEL.test(ne[0]);
 }
