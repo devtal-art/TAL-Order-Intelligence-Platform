@@ -239,12 +239,7 @@
 .ci-charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
 @media (max-width:900px){ .ci-charts-grid{grid-template-columns:1fr} }
 
-/* ── Filters panel (Customer List) — Phase 2 ── */
-.ci-filters-panel{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
-  gap:12px;background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;
-}
+/* ── Filter fields (labelled inputs — Reports toolbar) ── */
 .ci-filter-field{display:flex;flex-direction:column;gap:5px}
 .ci-filter-field label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .ci-filter-field input,.ci-filter-field select{
@@ -252,10 +247,6 @@
   background:var(--surface);font-family:var(--font-ui);font-size:13px;color:var(--ink);
 }
 .ci-filter-field input:focus,.ci-filter-field select:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
-/* flex-direction:column is inherited from .ci-filter-field — the button has
-   no label above it, so pushing it to the END of that column (bottom) lines
-   it up with the input boxes, not the labels, of the fields beside it. */
-.ci-filters-actions{display:flex;justify-content:flex-end}
 
 /* ── Filter chips (Customer List) ─────────────────────────────────────── */
 #s-customer-list .ci-searchbar-row{margin-bottom:12px}
@@ -427,7 +418,36 @@
 }
 .ci-report-summary-row dt{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .ci-report-summary-row dd{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}
-.ci-report-type-picker{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.ci-report-type-picker{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+
+/* Report toolbar: what the report is (left) + its inputs and Generate (right). */
+.ci-report-panel{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:14px 24px;flex-wrap:wrap;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow-xs);
+}
+.ci-report-panel-info{flex:1 1 260px;min-width:0;align-self:center}
+.ci-report-panel-title{font-size:14px;font-weight:700;color:var(--ink)}
+.ci-report-panel-desc{font-size:12.5px;color:var(--muted);margin-top:2px}
+.ci-report-panel-controls{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.ci-report-panel-controls .ci-filter-field{width:160px}
+.ci-report-panel-controls .ci-report-customer{width:260px}
+.ci-report-generate{
+  background:var(--btn-brand);color:#fff;border:1px solid var(--btn-brand-border);
+  border-radius:var(--radius-sm);padding:8px 18px;min-height:37px;
+  font-family:var(--font-ui);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;
+  transition:filter .15s;
+}
+.ci-report-generate:hover{background:var(--btn-brand-hover)}
+.ci-report-generate:disabled{background:var(--bg-deep);border-color:var(--bg-deep);color:var(--muted);cursor:not-allowed}
+.ci-report-panel-controls.is-bare .ci-report-generate{background:var(--surface);color:var(--ink-2);border-color:var(--border-strong)}
+.ci-report-panel-controls.is-bare .ci-report-generate:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.ci-report-status{margin-bottom:16px}
+@media (max-width:640px){
+  .ci-report-panel-controls{width:100%}
+  .ci-report-panel-controls .ci-filter-field,.ci-report-panel-controls .ci-report-customer{width:100%}
+  .ci-report-generate{width:100%}
+}
 
 /* Scoped to pages that render a report (body:has(.ci-report)) so printing
    any existing Order Processing screen behaves exactly as before. */
@@ -438,7 +458,9 @@
   body:has(.ci-report) .help-fab,
   .ci-report-actions,
   #s-customer-reports .ci-report-type-picker,
-  #s-customer-reports .ci-filters-panel,
+  #s-customer-reports .ci-report-panel,
+  #s-customer-reports .ci-report-status,
+  #s-customer-reports .sol-error,
   #s-customer-reports .dbp-top{display:none !important}
   body:has(.ci-report) .shell{display:block !important}
   body:has(.ci-report) #app{padding:0 !important;max-width:100% !important}
