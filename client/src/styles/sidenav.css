@@ -44,7 +44,7 @@
   stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
 }
 .sn-text{display:flex;flex-direction:column;min-width:0;font-size:13px;font-weight:600;line-height:1.25}
-.sn-text small{font-size:10.5px;font-weight:500;color:var(--muted);margin-top:1px;white-space:nowrap}
+.sn-text small{font-size:10.5px;font-weight:500;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sn-item.active .sn-text small{color:var(--accent);opacity:.75}
 
 /* Tablet / mobile: the sidebar becomes a horizontal switcher under the bar */

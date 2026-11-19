@@ -276,14 +276,6 @@ export function useOrderProcessor() {
     setPending((p) => (p ? { ...p, prev: updated } : p));
   }, []);
 
-  // Set (or clear, with '') the team member who processed this order.
-  // V3.0 (JWT Auth): This callback is retained for compatibility but is no
-  // longer called from any UI — processedBy is now automatically set server-side.
-  const chooseProcessedBy = useCallback((value) => {
-    // No-op — processedBy is managed server-side via req.user.name.
-    void value;
-  }, []);
-
   // Manual approval for a single product. Creates the mapping, tolerates a
   // duplicate (409) silently, then re-runs Resolve for ONLY that product and
   // updates just that card + the progress summary — no page/HTML refresh.
@@ -474,5 +466,5 @@ export function useOrderProcessor() {
     setScreen('upload');
   }, []);
 
-  return { customerDays, screen, file, steps, parsed, resolution, result, error, comments, fulfillment, notes, orderStatus, setOrderStatus, orderComment, setOrderComment, deliveryDate, setDeliveryDate, litInvoice, setLitInvoice, saveError, saved, pending, pickFile, run, approveProduct, addProduct, removeProduct, setProductComment, setProductFulfillment, setProductNote, chooseProcessedBy, saveOrder, continueDuplicate, updateDuplicateOrder, generateExcel, reset };
+  return { customerDays, screen, file, steps, parsed, resolution, result, error, comments, fulfillment, notes, orderStatus, setOrderStatus, orderComment, setOrderComment, deliveryDate, setDeliveryDate, litInvoice, setLitInvoice, saveError, saved, pending, pickFile, run, approveProduct, addProduct, removeProduct, setProductComment, setProductFulfillment, setProductNote, saveOrder, continueDuplicate, updateDuplicateOrder, generateExcel, reset };
 }

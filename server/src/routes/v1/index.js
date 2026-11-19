@@ -9,6 +9,10 @@ import { productLookupRouter } from './productLookup.routes.js';
 import { helpRouter } from './help.routes.js';
 import { employeeRouter } from './employee.routes.js';
 import { backupRouter } from './backup.routes.js';
+import { customerRouter } from './customer.routes.js';
+import { customerInsightsRouter } from './customerInsights.routes.js';
+import { customerAnalyticsRouter } from './customerAnalytics.routes.js';
+import { customerReportRouter } from './customerReport.routes.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { blockViewerWrites } from '../../middleware/blockViewerWrites.js';
 import { requireAdmin } from '../../middleware/requireAdmin.js';
@@ -30,6 +34,13 @@ v1Router.use('/resolve', authenticate, blockViewerWrites, resolveRouter);
 v1Router.use('/orders', authenticate, blockViewerWrites, orderRouter);
 v1Router.use('/products', authenticate, blockViewerWrites, productLookupRouter);
 v1Router.use('/help', authenticate, blockViewerWrites, helpRouter);
+
+// Customer Intelligence module (new, independent) — strictly read-only
+// aggregations over the Orders collection; no route here writes anything.
+v1Router.use('/customers', authenticate, blockViewerWrites, customerRouter);
+v1Router.use('/customer-insights', authenticate, blockViewerWrites, customerInsightsRouter);
+v1Router.use('/customer-analytics', authenticate, blockViewerWrites, customerAnalyticsRouter);
+v1Router.use('/customer-reports', authenticate, blockViewerWrites, customerReportRouter);
 
 // Admin Portal (employee management) — its own chain, deliberately NOT
 // blockViewerWrites: an admin's effective role is 'viewer' (see

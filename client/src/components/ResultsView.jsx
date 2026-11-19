@@ -20,7 +20,6 @@ export default function ResultsView({ data, workbook, resolution, comments = {},
 
   // Calculate updated totals using the new logic
   const subTotal = Number(fin.sub_total) || 0;
-  const transport = Number(fin.transportation_charges) || 0;
   const total = Number(fin.total) || 0;
 
   let totalAdjustment = 0;

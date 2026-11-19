@@ -44,9 +44,6 @@ export const orderService = {
   setNotes: (portalOrderRef, notes) =>
     apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/notes`, { notes }),
 
-  // processedBy: one of processors() below, or '' to clear (V1.9)
-  setProcessedBy: (portalOrderRef, processedBy) =>
-    apiClient.patch(`/v1/orders/${encodeURIComponent(portalOrderRef)}/processed-by`, { processedBy }),
 
   // The current "Processed By" allowlist (Admin Portal — additive), dynamic:
   // reflects newly created/renamed/deleted employees immediately with no

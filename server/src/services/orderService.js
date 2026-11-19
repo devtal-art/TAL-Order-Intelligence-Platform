@@ -1688,6 +1688,9 @@ const SORT_KEY_EXPR = {
   orderStatus: { $toLower: { $ifNull: ['$order_status', ''] } },
   orderDate: ORDER_DATE_SORT_KEY,
   products: { $ifNull: ['$total_products', 0] },
+  // Lit Invoice dot (new, additive): green (ticked) = 0, red = 1, so the
+  // first click (ascending) puts green first and the second puts red first.
+  litInvoice: { $cond: [{ $eq: ['$lit_invoice', true] }, 0, 1] },
 };
 
 // `dateFrom`/`dateTo` (both optional, 'YYYY-MM-DD' from a plain <input

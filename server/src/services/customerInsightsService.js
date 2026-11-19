@@ -1,0 +1,132 @@
+import { Order } from '../models/order.model.js';
+import { AppError } from '../utils/AppError.js';
+
+// ────────────────────────────────────────────────
+//  CUSTOMER INSIGHTS SERVICE (Phase 2 — new, independent, read-only)
+//
+//  Generates plain-language, data-backed observations about one customer's
+//  ordering behaviour. Every insight is computed directly from that
+//  customer's own Orders — nothing is inferred from data the schema doesn't
+//  carry. In particular, there is no "mostly purchases frozen foods"-style
+//  category insight: neither Product nor Order carries a category field, so
+//  guessing one from keywords would risk a wrong, business-facing claim.
+// ────────────────────────────────────────────────
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function round1(n) {
+  return Math.round((Number(n) + Number.EPSILON) * 10) / 10;
+}
+
+// Platform-wide average lifetime revenue per customer — the yardstick the
+// "high value" insight is measured against. One bounded aggregation,
+// computed on demand rather than cached: acceptable at the platform's
+// current scale. If Orders grows very large this is the first candidate to
+// memoize (e.g. recompute once per hour) rather than per profile view.
+async function getPlatformAverageRevenue() {
+  const [stats] = await Order.aggregate([
+    { $match: { customer_name: { $nin: ['', null] } } },
+    { $group: { _id: '$customer_name', revenue: { $sum: { $ifNull: ['$parsed_data.financials.total', 0] } } } },
+    { $group: { _id: null, avgRevenue: { $avg: '$revenue' } } },
+  ]);
+  return stats?.avgRevenue || 0;
+}
+
+export async function getCustomerInsights(customerName) {
+  const name = String(customerName || '').trim();
+  if (!name) {
+    throw new AppError('VALIDATION_ERROR', 'Customer name is required.', { status: 400 });
+  }
+
+  // Ascending order — the cadence/trend math below reads more naturally
+  // walking forward through time.
+  const orders = await Order.find(
+    { customer_name: name },
+    { portal_order_ref: 1, upload_timestamp: 1, 'parsed_data.financials.total': 1 }
+  )
+    .sort({ upload_timestamp: 1 })
+    .lean();
+
+  if (!orders.length) {
+    throw new AppError('NOT_FOUND', `No customer found with name "${name}".`, { status: 404 });
+  }
+
+  const insights = [];
+  const dates = orders
+    .map((o) => (o.upload_timestamp instanceof Date ? o.upload_timestamp : new Date(o.upload_timestamp)))
+    .filter((d) => !Number.isNaN(d.getTime()));
+
+  // 1. Order cadence — average days between consecutive orders.
+  let avgCadenceDays = null;
+  if (dates.length >= 2) {
+    const gaps = [];
+    for (let i = 1; i < dates.length; i++) gaps.push((dates[i] - dates[i - 1]) / 86400000);
+    avgCadenceDays = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    insights.push({ type: 'cadence', text: `Customer orders approximately every ${round1(avgCadenceDays)} days.` });
+  }
+
+  // 2. Dormancy — days since the most recent order, relative to their usual cadence.
+  const lastOrderDate = dates[dates.length - 1];
+  const daysSinceLastOrder = lastOrderDate ? Math.floor((Date.now() - lastOrderDate.getTime()) / 86400000) : null;
+  const dormancyThreshold = avgCadenceDays ? Math.max(30, avgCadenceDays * 1.5) : 30;
+  if (daysSinceLastOrder !== null && daysSinceLastOrder > dormancyThreshold) {
+    insights.push({
+      type: 'dormancy',
+      text: `Customer has not ordered in ${daysSinceLastOrder} days${
+        avgCadenceDays ? ` — longer than their usual ~${round1(avgCadenceDays)}-day cycle` : ''
+      }.`,
+    });
+  }
+
+  // 3. Spending trend — the last two calendar months with any activity.
+  const monthlyMap = new Map();
+  for (const o of orders) {
+    const d = o.upload_timestamp instanceof Date ? o.upload_timestamp : new Date(o.upload_timestamp);
+    if (Number.isNaN(d.getTime())) continue;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const total = Number(o.parsed_data?.financials?.total) || 0;
+    monthlyMap.set(key, (monthlyMap.get(key) || 0) + total);
+  }
+  const months = [...monthlyMap.entries()].sort(([a], [b]) => a.localeCompare(b));
+  if (months.length >= 2) {
+    const prevRevenue = months[months.length - 2][1];
+    const currRevenue = months[months.length - 1][1];
+    if (prevRevenue > 0) {
+      const pct = Math.round(((currRevenue - prevRevenue) / prevRevenue) * 100);
+      if (Math.abs(pct) >= 5) {
+        insights.push({
+          type: 'trend',
+          text: `Customer spending ${pct >= 0 ? 'increased' : 'decreased'} ${Math.abs(pct)}% month-over-month.`,
+        });
+      }
+    }
+  }
+
+  // 4. High-value flag — lifetime revenue well above the platform average.
+  const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.parsed_data?.financials?.total) || 0), 0);
+  const avgPlatformRevenue = await getPlatformAverageRevenue();
+  if (avgPlatformRevenue > 0 && totalRevenue >= avgPlatformRevenue * 1.5) {
+    insights.push({
+      type: 'high_value',
+      text: `Customer is a high-value account — lifetime revenue is ${round1(totalRevenue / avgPlatformRevenue)}x the platform average.`,
+    });
+  }
+
+  // 5. Preferred order day-of-week — only surfaced once there's enough
+  // history for a genuine pattern (3+ orders, and one day is ≥40% of them).
+  if (dates.length >= 3) {
+    const counts = new Array(7).fill(0);
+    for (const d of dates) counts[d.getDay()]++;
+    const max = Math.max(...counts);
+    if (max / dates.length >= 0.4) {
+      insights.push({ type: 'day_preference', text: `Customer usually places orders on ${DAY_NAMES[counts.indexOf(max)]}s.` });
+    }
+  }
+
+  // 6. Repeat customer.
+  if (orders.length > 1) {
+    insights.push({ type: 'repeat_customer', text: `Repeat customer with ${orders.length} orders placed to date.` });
+  }
+
+  return { customerName: name, insights };
+}

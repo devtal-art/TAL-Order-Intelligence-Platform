@@ -21,7 +21,7 @@ import { PRODUCT_COMMENTS, DELIVERY_STATUSES, clampPendingQty, isMatchingSkipped
 // the order; independent from `comment`. `onRemove` (V1.7, optional): delete
 // button rendered ONLY for manually added products (source 'manual_addition')
 // — HTML-parsed lines never get one.
-export default function ReviewTableRow({ result, item, currency, onApprove, comment = '', onComment, fulfillment, onFulfillment, note = '', onNote, onRemove }) {
+export default function ReviewTableRow({ result, item, onApprove, comment = '', onComment, fulfillment, onFulfillment, note = '', onNote, onRemove }) {
   const approved = result.status === 'approved';
   const isManual = result.source === 'manual_addition';
   // 'Not Found' comment (V2.1): matching is intentionally skipped for THIS

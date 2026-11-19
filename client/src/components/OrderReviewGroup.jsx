@@ -126,7 +126,6 @@ export default function OrderReviewGroup({ order, onApprove, comments, onComment
                     key={key || result.lineId}
                     result={result}
                     item={item}
-                    currency={order.currency}
                     onApprove={onApprove}
                     comment={comments ? comments[result.lineId] || '' : ''}
                     onComment={onComment}

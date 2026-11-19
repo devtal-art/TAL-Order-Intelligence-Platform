@@ -1,0 +1,452 @@
+/* ── Customer Intelligence module (new, independent) ─────────────────────
+   ci-* — prefixed so nothing here can collide with Order Processing class
+   names. Reuses existing platform primitives where the look is identical:
+   .dl-table / .dl-empty / .dl-pager / .dw-view / .dbp-top / .og-status /
+   .sol-error / .sidenav / .sn-item (see dash-widgets.css, review-screen.css,
+   sidenav.css, saved-order.css) rather than re-declaring them. */
+
+/* Outer row (Customer List): the search+sort bar plus the Filters toggle.
+   A distinct class from .ci-searchbar below — that one is CustomerSearchBar's
+   OWN root element; nesting it inside another .ci-searchbar (same class)
+   double-applied margin-bottom and broke the Filters button's alignment. */
+.ci-searchbar-row{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;
+}
+
+/* Search + sort bar (CustomerSearchBar's root) */
+.ci-searchbar{
+  display:flex;gap:12px;flex-wrap:wrap;flex:1;min-width:240px;
+}
+.ci-search-input-wrap{position:relative;flex:1;min-width:240px}
+.ci-search-icon{
+  position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;pointer-events:none;
+}
+.ci-search-input{
+  width:100%;padding:10px 13px 10px 36px;
+  border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);
+  background:var(--surface);font-family:var(--font-ui);font-size:14px;color:var(--ink);
+  transition:border-color .15s,box-shadow .15s;
+}
+.ci-search-input:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
+.ci-search-input::placeholder{color:var(--muted)}
+.ci-sort-select{
+  padding:10px 32px 10px 13px;
+  border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);
+  background:var(--surface);font-family:var(--font-ui);font-size:13.5px;color:var(--ink);
+  cursor:pointer;
+}
+.ci-sort-select:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
+
+/* "Updating…" state while new Customer List results load — old rows dim so
+   they're never mistaken for the answer to the new filter. */
+.ci-updating{
+  display:inline-flex;align-items:center;gap:7px;min-width:92px;
+  font-size:12px;font-weight:600;color:var(--accent);
+  opacity:0;transition:opacity .15s;
+}
+.ci-updating.is-on{opacity:1}
+.ci-updating.is-on::before{
+  content:'';width:12px;height:12px;border-radius:50%;
+  border:2px solid var(--accent-border);border-top-color:var(--accent);
+  animation:ci-spin .7s linear infinite;
+}
+@keyframes ci-spin{to{transform:rotate(360deg)}}
+.ci-table-updating{opacity:.55;transition:opacity .15s;pointer-events:none}
+
+/* ── Table alignment (Customer Intelligence screens only) ──
+   The shared `.dl-table th{text-align:left}` outranks `.dl-num{text-align:right}`,
+   so numeric headers sat left while their values sat right. Scoped to the
+   module's screens (#s-customer-*) so Order Processing tables are unchanged. */
+[id^="s-customer"] .dl-table{font-size:13px}
+[id^="s-customer"] .dl-table th,
+[id^="s-customer"] .dl-table td{padding:12px 18px}
+[id^="s-customer"] .dl-table th.dl-num{text-align:right}
+[id^="s-customer"] .dl-table td.dl-num{font-variant-numeric:tabular-nums;white-space:nowrap}
+[id^="s-customer"] .dl-table td.dl-act{width:1%}
+
+/* Customer List — fixed column proportions; every data column (header AND
+   values) is centered on the same axis, so each header sits exactly over
+   its values regardless of text length. Customer name stays left (it's
+   the row label), the action button stays at the right edge. */
+#s-customer-list .dl-table{table-layout:fixed;min-width:960px}
+#s-customer-list .dl-table th:nth-child(1){width:25%}  /* Customer (link) */
+#s-customer-list .dl-table th:nth-child(2){width:11%}  /* Postcode */
+#s-customer-list .dl-table th:nth-child(3){width:8%}   /* Orders */
+#s-customer-list .dl-table th:nth-child(4){width:15%}  /* Ordered Value */
+#s-customer-list .dl-table th:nth-child(5){width:15%}  /* Invoiced */
+#s-customer-list .dl-table th:nth-child(6){width:14%}  /* Avg Order Value */
+#s-customer-list .dl-table th:nth-child(7){width:12%}  /* Last Ordered */
+#s-customer-list .dl-table th:nth-child(n+2),
+#s-customer-list .dl-table td:nth-child(n+2){text-align:center;white-space:nowrap}
+#s-customer-list .dl-table td:nth-child(1){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#s-customer-list .dl-table td:nth-child(2){font-family:var(--font-mono);font-size:12.5px;letter-spacing:.02em;text-transform:uppercase}
+/* Sortable headers (shared SortTh component) — padding moves from the <th>
+   to its full-width button so the whole header cell is clickable; centered
+   columns center their label + arrow. Scoped to this page only. */
+#s-customer-list .dl-table th.dl-sort-th{padding:0}
+#s-customer-list .dl-table .dl-sort-btn{padding:12px 18px;gap:6px;user-select:none}
+#s-customer-list .dl-table th.dl-sort-th:nth-child(n+2) .dl-sort-btn{justify-content:center}
+#s-customer-list .dl-table th.dl-sort-th:hover{background:var(--surface)}
+#s-customer-list .dl-table .dl-sort-arrow{font-size:10px;width:10px;display:inline-block;text-align:center}
+/* Invoiced — the same Lit Invoice green (#70B853) module 1 uses for its dot. */
+#s-customer-list .dl-table td:nth-child(5){color:#3f8a2b;font-weight:600}
+
+/* Clickable company name → customer profile (replaces the View Profile button). */
+.ci-name-link{
+  font-weight:600;color:var(--ink);text-decoration:none;
+  border-bottom:1px solid transparent;transition:color .15s,border-color .15s;
+}
+.ci-name-link:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.ci-name-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+#s-customer-list .dl-table tbody tr:hover .ci-name-link{color:var(--accent)}
+
+/* Financial summary stat tiles (Customer Profile) */
+.ci-stat-row{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:14px;margin:18px 0 26px;
+}
+.ci-stat-tile{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);
+  padding:16px 18px;
+}
+.ci-stat-label{
+  font-size:11px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;
+}
+.ci-stat-value{font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+.ci-stat-caption{font-size:11px;color:var(--muted);margin-top:6px}
+
+/* Profile detail sections (purchase history / monthly revenue / top products) */
+.ci-profile-grid{display:flex;flex-direction:column;gap:22px}
+.ci-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);
+  padding:16px 16px 18px;
+}
+.ci-card-head{
+  display:flex;align-items:center;gap:10px;
+  padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--border);
+}
+.ci-card-head h3{
+  font-family:var(--font-display);font-size:15px;font-weight:700;
+  color:var(--ink);letter-spacing:-.01em;
+}
+.ci-card-sub{font-size:11.5px;color:var(--muted);margin-left:auto}
+
+/* ── Profile header (avatar + badges) — Phase 2 ── */
+.ci-profile-header{
+  display:flex;align-items:center;gap:18px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);
+  padding:20px 22px;margin-bottom:22px;
+}
+.ci-avatar{
+  width:56px;height:56px;border-radius:16px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-family:var(--font-display);font-size:20px;font-weight:700;
+  letter-spacing:.01em;
+}
+.ci-profile-header-info{min-width:0}
+.ci-profile-name{
+  font-family:var(--font-display);font-size:21px;font-weight:700;
+  color:var(--ink);letter-spacing:-.01em;
+}
+.ci-profile-location{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.ci-profile-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.ci-profile-badge{
+  font-size:11.5px;font-weight:600;color:var(--ink-2);
+  background:var(--surface-2);border:1px solid var(--border);
+  border-radius:999px;padding:4px 11px;
+}
+
+/* ── Insights list — Phase 2 ── */
+.ci-insights-list{list-style:none;display:flex;flex-direction:column;gap:2px}
+.ci-insight-row{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px 4px;border-bottom:1px solid var(--border);
+}
+.ci-insight-row:last-child{border-bottom:none}
+.ci-insight-icon{font-size:16px;flex-shrink:0;line-height:1.4}
+.ci-insight-text{font-size:13px;color:var(--ink);line-height:1.5}
+
+/* ── Order timeline — Phase 2 ── */
+.ci-timeline-year-group{margin-bottom:18px}
+.ci-timeline-year-group:last-child{margin-bottom:0}
+.ci-timeline-year{
+  font-family:var(--font-display);font-size:13px;font-weight:700;
+  color:var(--accent);letter-spacing:.02em;margin-bottom:10px;
+}
+.ci-timeline-list{list-style:none;position:relative;padding-left:20px}
+.ci-timeline-list::before{
+  content:'';position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--border);
+}
+.ci-timeline-item{position:relative;padding-bottom:16px}
+.ci-timeline-item:last-child{padding-bottom:0}
+.ci-timeline-dot{
+  position:absolute;left:-20px;top:4px;width:12px;height:12px;border-radius:50%;
+  border:2px solid var(--surface);background:var(--muted);
+}
+.ci-timeline-dot--resolved{background:var(--success)}
+.ci-timeline-dot--partial,.ci-timeline-dot--needs{background:var(--warn-icon)}
+.ci-timeline-content{
+  background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:10px 14px;
+}
+.ci-timeline-row-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.ci-timeline-ref{font-family:var(--font-mono);font-size:12.5px;font-weight:700;color:var(--ink)}
+.ci-timeline-date{font-size:11.5px;color:var(--muted)}
+.ci-timeline-row-mid{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0}
+.ci-timeline-amount{font-size:12.5px;font-weight:700;color:var(--ink)}
+.ci-timeline-products{font-size:11.5px;color:var(--ink-2)}
+
+/* ── Product analytics tabs — Phase 2 ── */
+.ci-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.ci-tab{
+  background:var(--surface-2);color:var(--ink-2);
+  border:1px solid var(--border-strong);border-radius:999px;
+  padding:6px 14px;font-size:12.5px;font-weight:600;cursor:pointer;
+  transition:background .15s,border-color .15s,color .15s;
+}
+.ci-tab:hover{border-color:var(--accent)}
+.ci-tab.active{background:var(--accent-soft);border-color:var(--accent-border);color:var(--accent)}
+
+/* ── Hand-rolled charts (no charting library) — Phase 2 ── */
+.ci-hbar-chart{display:flex;flex-direction:column;gap:10px}
+.ci-hbar-row{display:grid;grid-template-columns:minmax(90px,220px) 1fr auto;align-items:center;gap:12px}
+.ci-hbar-label{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci-hbar-track{height:10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);overflow:hidden}
+.ci-hbar-fill{height:100%;border-radius:999px;transition:width .3s ease}
+.ci-hbar-value{font-size:12px;font-weight:700;color:var(--ink-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+.ci-linechart{width:100%}
+.ci-linechart-svg{width:100%;height:180px;display:block}
+.ci-linechart-labels{display:flex;justify-content:space-between;margin-top:4px;padding:0 4px}
+.ci-linechart-label{font-size:10.5px;color:var(--muted);white-space:nowrap}
+
+.ci-donut{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.ci-donut-legend{list-style:none;display:flex;flex-direction:column;gap:8px}
+.ci-donut-legend li{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2)}
+.ci-donut-swatch{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* ── Analytics Dashboard cards grid — Phase 2 ── */
+.ci-analytics-cards{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:14px;margin-bottom:24px;
+}
+.ci-charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media (max-width:900px){ .ci-charts-grid{grid-template-columns:1fr} }
+
+/* ── Filters panel (Customer List) — Phase 2 ── */
+.ci-filters-panel{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:12px;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;
+}
+.ci-filter-field{display:flex;flex-direction:column;gap:5px}
+.ci-filter-field label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.ci-filter-field input,.ci-filter-field select{
+  padding:8px 10px;border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);
+  background:var(--surface);font-family:var(--font-ui);font-size:13px;color:var(--ink);
+}
+.ci-filter-field input:focus,.ci-filter-field select:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
+/* flex-direction:column is inherited from .ci-filter-field — the button has
+   no label above it, so pushing it to the END of that column (bottom) lines
+   it up with the input boxes, not the labels, of the fields beside it. */
+.ci-filters-actions{display:flex;justify-content:flex-end}
+
+/* ── Filter chips (Customer List) ─────────────────────────────────────── */
+#s-customer-list .ci-searchbar-row{margin-bottom:12px}
+.ci-chips-row{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.ci-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0}
+/* ── Customer groups as rows in the Customer List table ────────────────── */
+/* Group row: same columns as a customer; a soft tint + bold name mark it. */
+#s-customer-list .dl-table tr.ci-group-row td{background:var(--surface-2);font-weight:600}
+#s-customer-list .dl-table tr.ci-group-row:hover td{background:var(--accent-soft)}
+#s-customer-list .dl-table tr.ci-group-row.is-open td{background:var(--accent-soft);border-bottom-color:var(--accent-border)}
+.ci-group-toggle{
+  all:unset;box-sizing:border-box;cursor:pointer;max-width:100%;
+  display:inline-flex;align-items:center;gap:8px;
+}
+.ci-group-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.ci-group-chevron{
+  width:15px;height:15px;flex-shrink:0;fill:none;stroke:var(--ink-2);stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .18s;
+}
+.ci-group-row.is-open .ci-group-chevron{transform:rotate(90deg);stroke:var(--accent)}
+.ci-group-name{font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-group-toggle:hover .ci-group-name,.ci-group-row.is-open .ci-group-name{color:var(--accent)}
+.ci-group-count{
+  flex-shrink:0;font-size:11px;font-weight:700;color:var(--ink-2);
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:999px;padding:0 7px;line-height:18px;
+}
+/* Member rows under an open group: indented, with an accent rail. */
+#s-customer-list .dl-table tr.ci-member-row td{background:var(--surface)}
+#s-customer-list .dl-table tr.ci-member-row td:first-child{padding-left:44px;position:relative}
+#s-customer-list .dl-table tr.ci-member-row td:first-child::before{
+  content:'';position:absolute;left:24px;top:0;bottom:0;width:2px;background:var(--accent-border);
+}
+#s-customer-list .dl-table tr.ci-member-row .ci-name-link{font-weight:500}
+
+/* Export button (Customer List) — same height/radius as the search + sort controls. */
+.ci-export-btn{
+  display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 18px;
+  background:var(--accent);color:#fff;border:1.5px solid var(--accent);
+  border-radius:var(--radius-sm);font-family:var(--font-ui);font-size:13.5px;font-weight:600;
+  cursor:pointer;white-space:nowrap;transition:filter .15s,opacity .15s;
+}
+.ci-export-btn:hover:not(:disabled){filter:brightness(1.08)}
+.ci-export-btn:focus-visible{outline:none;box-shadow:var(--ring)}
+.ci-export-btn:disabled{opacity:.55;cursor:default}
+.ci-export-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ci-export-spin{
+  width:14px;height:14px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.45);border-top-color:#fff;animation:ci-spin .7s linear infinite;
+}
+
+/* Customer total, right end of the chips row (just above the table). */
+.ci-total-count{
+  margin-left:auto;white-space:nowrap;font-size:13px;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;
+}
+.ci-total-count strong{color:var(--ink);font-weight:700}
+
+.ci-chip-wrap{position:relative}
+.ci-chip{
+  display:inline-flex;align-items:center;height:34px;
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:999px;
+  transition:border-color .15s,background .15s,box-shadow .15s;
+}
+.ci-chip:hover{border-color:var(--accent)}
+.ci-chip.is-open{border-color:var(--accent);box-shadow:var(--ring)}
+.ci-chip.is-active{background:var(--accent-soft);border-color:var(--accent-border)}
+.ci-chip-main{
+  all:unset;box-sizing:border-box;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;height:100%;padding:0 12px 0 14px;
+  font-family:var(--font-ui);font-size:13px;color:var(--ink-2);white-space:nowrap;
+  border-radius:999px;
+}
+.ci-chip-main:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ci-chip-label{font-weight:600}
+.ci-chip.is-active .ci-chip-label{color:var(--accent)}
+.ci-chip.is-active .ci-chip-label::after{content:':'}
+.ci-chip-value{font-weight:700;color:var(--ink)}
+.ci-chip-caret{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.6}
+.ci-chip.is-active .ci-chip-main{padding-right:4px}
+.ci-chip-x{
+  all:unset;box-sizing:border-box;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;margin-right:6px;border-radius:50%;color:var(--accent);
+}
+.ci-chip-x:hover{background:var(--accent-border)}
+.ci-chip-x:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ci-chip-x svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
+.ci-chips-clear{
+  all:unset;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted);
+  padding:6px 8px;border-radius:var(--radius-sm);
+}
+.ci-chips-clear:hover{color:var(--accent);text-decoration:underline}
+.ci-chips-clear:focus-visible{outline:2px solid var(--accent)}
+
+/* Popover */
+.ci-pop{
+  position:absolute;top:calc(100% + 8px);left:0;z-index:40;
+  width:300px;max-width:calc(100vw - 32px);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  box-shadow:0 12px 32px rgba(16,24,40,.14),0 2px 6px rgba(16,24,40,.06);
+  padding:14px;
+}
+.ci-pop--right{left:auto;right:0}
+.ci-pop-title{
+  font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.04em;margin-bottom:8px;
+}
+.ci-pop-presets{display:flex;flex-direction:column;gap:2px;margin:0 -6px 10px}
+.ci-preset{
+  all:unset;box-sizing:border-box;cursor:pointer;
+  display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);
+  font-family:var(--font-ui);font-size:13px;color:var(--ink);
+}
+.ci-preset:hover{background:var(--surface-2)}
+.ci-preset:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ci-preset-dot{
+  width:14px;height:14px;border-radius:50%;flex-shrink:0;
+  border:1.5px solid var(--border-strong);background:var(--surface);
+}
+.ci-preset.is-on{color:var(--accent);font-weight:600}
+.ci-preset.is-on .ci-preset-dot{border-color:var(--accent);box-shadow:inset 0 0 0 3px var(--surface);background:var(--accent)}
+.ci-pop-custom{border-top:1px solid var(--border);padding-top:10px}
+.ci-pop-presets + .ci-pop-custom{margin-top:0}
+.ci-pop-title + .ci-pop-custom{border-top:none;padding-top:0}
+.ci-pop-sub{font-size:11.5px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+.ci-pop-text,
+.ci-pop-num input{
+  width:100%;height:36px;padding:0 10px;box-sizing:border-box;
+  border:1.5px solid var(--border-strong);border-radius:var(--radius-sm);
+  background:var(--surface);font-family:var(--font-ui);font-size:13px;color:var(--ink);
+}
+.ci-pop-text{text-transform:uppercase;font-family:var(--font-mono);letter-spacing:.03em}
+.ci-pop-text::placeholder{text-transform:none;font-family:var(--font-ui);letter-spacing:0}
+.ci-pop-text:focus,.ci-pop-num input:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
+.ci-pop-hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4}
+.ci-pop-range{display:flex;align-items:center;gap:6px}
+.ci-pop-num{position:relative;flex:1;min-width:0}
+.ci-pop-num input.has-pre{padding-left:22px}
+.ci-pop-num input.has-suf{padding-right:40px}
+.ci-pop-adorn{position:absolute;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted);pointer-events:none}
+.ci-pop-adorn--pre{left:10px}
+.ci-pop-adorn--suf{right:10px}
+.ci-pop-num input::-webkit-outer-spin-button,
+.ci-pop-num input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ci-pop-num input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.ci-pop-sep{color:var(--muted);font-size:13px}
+.ci-pop-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.ci-pop-clear,.ci-pop-apply{
+  height:32px;padding:0 14px;border-radius:var(--radius-sm);
+  font-family:var(--font-ui);font-size:12.5px;font-weight:600;cursor:pointer;
+}
+.ci-pop-clear{background:transparent;border:1px solid transparent;color:var(--ink-2)}
+.ci-pop-clear:hover:not(:disabled){color:var(--accent)}
+.ci-pop-clear:disabled{opacity:.4;cursor:default}
+.ci-pop-apply{background:var(--accent);border:1px solid var(--accent);color:#fff}
+.ci-pop-apply:hover{filter:brightness(1.08)}
+.ci-pop-clear:focus-visible,.ci-pop-apply:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ── Reports — Phase 2 ── */
+.ci-report-actions{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.ci-report-title{
+  font-family:var(--font-display);font-size:17px;font-weight:700;
+  color:var(--ink);letter-spacing:-.01em;margin-bottom:14px;
+}
+.ci-report-summary{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:10px 20px;margin-bottom:18px;padding:14px 16px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);
+}
+.ci-report-summary-row dt{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.ci-report-summary-row dd{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}
+.ci-report-type-picker{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+
+/* Scoped to pages that render a report (body:has(.ci-report)) so printing
+   any existing Order Processing screen behaves exactly as before. */
+@media print{
+  body:has(.ci-report) .appbar,
+  body:has(.ci-report) .sidenav,
+  body:has(.ci-report) .dl-head,
+  body:has(.ci-report) .help-fab,
+  .ci-report-actions,
+  #s-customer-reports .ci-report-type-picker,
+  #s-customer-reports .ci-filters-panel,
+  #s-customer-reports .dbp-top{display:none !important}
+  body:has(.ci-report) .shell{display:block !important}
+  body:has(.ci-report) #app{padding:0 !important;max-width:100% !important}
+  .ci-report-printable{box-shadow:none !important}
+}
+
+@media (max-width:640px){
+  .ci-stat-row{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+  .ci-hbar-row{grid-template-columns:1fr;gap:4px}
+  .ci-hbar-value{text-align:right}
+}

@@ -89,6 +89,20 @@ export default function SideNav() {
           </span>
         </NavLink>
       )}
+      {/* Customer Intelligence module (new, additive) — entry point only; the
+          module renders its own sidenav (CustomerSideNav) once inside. */}
+      <NavLink to="/customers" className={item}>
+        <span className="sn-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M3 3v18h18" />
+            <path d="M7 15l3-4 3 3 5-6" />
+          </svg>
+        </span>
+        <span className="sn-text">
+          Customer Intelligence
+          <small>Analytics &amp; reports</small>
+        </span>
+      </NavLink>
     </aside>
   );
 }

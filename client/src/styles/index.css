@@ -30,3 +30,7 @@
 @import './help.css';
 @import './admin-employees.css';
 @import './admin-backup.css';
+
+/* Customer Intelligence module (new) — every rule is ci-* prefixed or scoped,
+   so it cannot restyle any existing screen. */
+@import './customer.css';

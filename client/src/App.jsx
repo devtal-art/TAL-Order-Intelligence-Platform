@@ -14,6 +14,11 @@ import CreateManualOrder from './pages/CreateManualOrder.jsx';
 import AdminEmployees from './pages/AdminEmployees.jsx';
 import AdminBackup from './pages/AdminBackup.jsx';
 import OsPendingList from './pages/OsPendingList.jsx';
+import CustomerList from './pages/customer/CustomerList.jsx';
+import CustomerProfile from './pages/customer/CustomerProfile.jsx';
+import CustomerRankings from './pages/customer/CustomerRankings.jsx';
+import CustomerAnalyticsDashboard from './pages/customer/CustomerAnalyticsDashboard.jsx';
+import CustomerReports from './pages/customer/CustomerReports.jsx';
 
 // Route map:
 //   /login                    — public, no auth required
@@ -28,6 +33,11 @@ import OsPendingList from './pages/OsPendingList.jsx';
 //   /orders/manual            — Create Manual Order (protected, V3.1 — new, additive)
 //   /admin/employees          — Admin Portal: Manage Employees (protected, admin-only)
 //   /admin/backup             — Admin Portal: Database Backup (protected, admin-only)
+//   /customers                — Customer Intelligence: customer list (protected, new module)
+//   /customers/analytics      — Customer Intelligence: analytics dashboard (protected, new module)
+//   /customers/rankings       — Customer Intelligence: rankings/leaderboards (protected, new module)
+//   /customers/reports        — Customer Intelligence: reports/export (protected, new module)
+//   /customers/:name          — Customer Intelligence: customer profile (protected, new module)
 export default function App() {
   return (
     <AuthProvider>
@@ -122,6 +132,48 @@ export default function App() {
           element={
             <ProtectedRoute adminOnly>
               <AdminBackup />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected — Customer Intelligence (new, independent, read-only module) */}
+        <Route
+          path="/customers"
+          element={
+            <ProtectedRoute>
+              <CustomerList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers/analytics"
+          element={
+            <ProtectedRoute>
+              <CustomerAnalyticsDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers/rankings"
+          element={
+            <ProtectedRoute>
+              <CustomerRankings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers/reports"
+          element={
+            <ProtectedRoute>
+              <CustomerReports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers/:name"
+          element={
+            <ProtectedRoute>
+              <CustomerProfile />
             </ProtectedRoute>
           }
         />

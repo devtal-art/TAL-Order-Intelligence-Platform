@@ -11,6 +11,126 @@ import { formatDisplayDate } from '../utils/dateFormat.js';
 
 const PAGE_SIZE = 25;
 
+// Numbered pagination (new): ‹ … 2 3 4 [5] 6 7 8 … ›
+// Shows a window of up to 7 page numbers centred on the current page. Each
+// "…" means more pages exist on that side; clicking it jumps a whole window
+// (7 pages) in that direction. ‹ / › step one page.
+const PAGE_WINDOW = 7;
+
+function NumberedPagination({ page, pages, disabled, onGo }) {
+  const half = Math.floor(PAGE_WINDOW / 2);
+  let start = Math.max(1, page - half);
+  const end = Math.min(pages, start + PAGE_WINDOW - 1);
+  start = Math.max(1, end - PAGE_WINDOW + 1);
+  const nums = [];
+  for (let p = start; p <= end; p += 1) nums.push(p);
+
+  const go = (p) => {
+    if (!disabled && p !== page && p >= 1 && p <= pages) onGo(p);
+  };
+
+  return (
+    <nav className="dl-pg" aria-label="Pagination">
+      <button
+        type="button"
+        className="dl-pg-item dl-pg-arrow"
+        onClick={() => go(page - 1)}
+        disabled={disabled || page <= 1}
+        aria-label="Previous page"
+        title="Previous page"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6" /></svg>
+      </button>
+
+      {start > 1 && (
+        <button
+          type="button"
+          className="dl-pg-item dl-pg-ellipsis"
+          onClick={() => go(Math.max(1, page - PAGE_WINDOW))}
+          disabled={disabled}
+          aria-label={`Jump back to page ${Math.max(1, page - PAGE_WINDOW)}`}
+          title={`Jump back to page ${Math.max(1, page - PAGE_WINDOW)}`}
+        >
+          …
+        </button>
+      )}
+
+      {nums.map((p) => (
+        <button
+          key={p}
+          type="button"
+          className={`dl-pg-item dl-pg-num${p === page ? ' is-current' : ''}`}
+          onClick={() => go(p)}
+          disabled={disabled && p !== page}
+          aria-current={p === page ? 'page' : undefined}
+          aria-label={`Page ${p}`}
+        >
+          {p}
+        </button>
+      ))}
+
+      {end < pages && (
+        <button
+          type="button"
+          className="dl-pg-item dl-pg-ellipsis"
+          onClick={() => go(Math.min(pages, page + PAGE_WINDOW))}
+          disabled={disabled}
+          aria-label={`Jump forward to page ${Math.min(pages, page + PAGE_WINDOW)}`}
+          title={`Jump forward to page ${Math.min(pages, page + PAGE_WINDOW)}`}
+        >
+          …
+        </button>
+      )}
+
+      <button
+        type="button"
+        className="dl-pg-item dl-pg-arrow"
+        onClick={() => go(page + 1)}
+        disabled={disabled || page >= pages}
+        aria-label="Next page"
+        title="Next page"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6" /></svg>
+      </button>
+    </nav>
+  );
+}
+
+// "Go to page" box for the pager (new, additive). Typing a number and pressing
+// Enter (or Go) jumps straight there; out-of-range numbers are clamped to
+// 1…pages, and the box resets to the current page whenever the page changes.
+function PageJump({ page, pages, disabled, onGo }) {
+  const [draft, setDraft] = useState(String(page));
+  useEffect(() => setDraft(String(page)), [page]);
+
+  const target = Math.min(pages, Math.max(1, Math.floor(Number(draft)) || page));
+  const submit = (e) => {
+    e.preventDefault();
+    setDraft(String(target));
+    if (target !== page) onGo(target);
+  };
+
+  return (
+    <form className="dl-page-jump" onSubmit={submit}>
+      <label htmlFor="dl-page-jump-input">Go to page</label>
+      <input
+        id="dl-page-jump-input"
+        type="number"
+        min="1"
+        max={pages}
+        step="1"
+        inputMode="numeric"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        disabled={disabled}
+        aria-label={`Page number, 1 to ${pages}`}
+      />
+      <button type="submit" className="dl-page-btn" disabled={disabled || target === page}>Go</button>
+    </form>
+  );
+}
+
 // "View All" page (V2.2): the complete, paginated list of orders in ONE
 // dashboard bucket — /dashboard/orders?type=status|comment&value=<bucket>.
 // Same data source as the widgets (GET /v1/orders/dashboard/orders), derived
@@ -266,7 +386,32 @@ export default function DashboardList() {
             <table className="dl-table">
               <thead>
                 <tr>
-                  <th className="dl-lit" aria-label="Lit Invoice" />
+                  {/* Lit Invoice dot column — sortable (green first, then red on
+                      the second click). Same sort wiring as SortTh; written out
+                      here only because this narrow column also needs dl-lit. */}
+                  <th className={`dl-lit dl-sort-th dl-lit-sort${sortBy === 'litInvoice' ? ' dl-sort-active' : ''}`}>
+                    <button
+                      type="button"
+                      className="dl-sort-btn"
+                      onClick={() => toggleSort('litInvoice')}
+                      aria-sort={sortBy === 'litInvoice' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-label={
+                        sortBy === 'litInvoice'
+                          ? `Sorted by Lit Invoice: ${sortDir === 'asc' ? 'green first' : 'red first'}. Click to reverse.`
+                          : 'Sort by Lit Invoice (green / red)'
+                      }
+                      title={
+                        sortBy === 'litInvoice'
+                          ? (sortDir === 'asc' ? 'Green first — click for red first' : 'Red first — click for green first')
+                          : 'Sort by Lit Invoice (green / red)'
+                      }
+                    >
+                      <span className="dl-lit-sort-icon" aria-hidden="true" />
+                      <span className="dl-sort-arrow" aria-hidden="true">
+                        {sortBy === 'litInvoice' ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                      </span>
+                    </button>
+                  </th>
                   <SortTh column="ref" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Order #</SortTh>
                   <SortTh column="customer" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Customer</SortTh>
                   {type === 'orderComment' ? <th>Order Comment</th> : null}
@@ -339,15 +484,8 @@ export default function DashboardList() {
 
         {pages > 1 && (
           <div className="dl-pager">
-            <button className="dl-page-btn" type="button" disabled={page <= 1 || loading} onClick={() => gotoPage(page - 1)}>
-              ← Previous
-            </button>
-            <span className="dl-page-info">
-              Page {page} of {pages}
-            </span>
-            <button className="dl-page-btn" type="button" disabled={page >= pages || loading} onClick={() => gotoPage(page + 1)}>
-              Next →
-            </button>
+            <NumberedPagination page={page} pages={pages} disabled={loading} onGo={gotoPage} />
+            <PageJump page={page} pages={pages} disabled={loading} onGo={gotoPage} />
           </div>
         )}
 
