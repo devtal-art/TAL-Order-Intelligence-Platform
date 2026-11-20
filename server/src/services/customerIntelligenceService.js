@@ -1,6 +1,7 @@
 import { Order } from '../models/order.model.js';
 import { AppError } from '../utils/AppError.js';
 import { CUSTOMER_GROUPS, groupForCustomer } from '../config/customerGroups.js';
+import { parseFlexibleDate, daysBetween } from '../utils/dateUtil.js';
 
 // ────────────────────────────────────────────────
 //  CUSTOMER INTELLIGENCE SERVICE (new, independent module)
@@ -45,7 +46,7 @@ function toIso(d) {
 //     manual addition (HTML order) → ± qty × |unit_price| (− when price < 0)
 //     OS comment                   → − pendingQty × |unit_price|
 //                                    (pendingQty clamped 0…qty; whole qty if blank)
-function osPendingQty(raw, orderedQty) {
+export function osPendingQty(raw, orderedQty) {
   const ordered = Number(orderedQty) || 0;
   if (raw === null || raw === undefined || raw === '') return ordered;
   const n = Number(raw);
@@ -53,7 +54,7 @@ function osPendingQty(raw, orderedQty) {
   return Math.min(Math.max(n, 0), ordered);
 }
 
-function litInvoiceTotal(order) {
+export function litInvoiceTotal(order) {
   const f = order.parsed_data?.financials || {};
   const lineItems = order.parsed_data?.line_items || [];
   const results = Array.isArray(order.resolution_data?.results) ? order.resolution_data.results : [];
@@ -128,6 +129,41 @@ async function getInvoicedByCustomer() {
   return map;
 }
 
+// ── Order Date helpers (module 2 dates all come from the Order Date) ──────
+// Every date-based figure in Customer Intelligence uses the date written on
+// the order (order_date, free text), read with the shared parseFlexibleDate()
+// — never the upload/processing time. An order whose Order Date is blank or
+// unreadable can't be placed in time, so it is left out of date-based
+// figures (it still counts in totals like order count / revenue).
+export const orderDateOf = (o) => parseFlexibleDate(o?.order_date ?? o?.od);
+
+// Newest-first comparator by Order Date. Undated orders sort last; same-day
+// (or both undated) orders fall back to upload time so the order is stable.
+export function compareByOrderDateDesc(a, b) {
+  const da = orderDateOf(a);
+  const db = orderDateOf(b);
+  if (da && db && da.getTime() !== db.getTime()) return db - da;
+  if (da && !db) return -1;
+  if (!da && db) return 1;
+  return new Date(b.upload_timestamp ?? b.ts) - new Date(a.upload_timestamp ?? a.ts);
+}
+
+// From a customer's per-order { od, ts, ...fields } entries: earliest and
+// latest Order Date (null when none is readable) and the latest order itself
+// (newest by Order Date — its postcode/currency/ref are what the list shows).
+function summarizeOrderDates(entries = []) {
+  let first = null;
+  let last = null;
+  for (const e of entries) {
+    const d = orderDateOf(e);
+    if (!d) continue;
+    if (!first || d < first) first = d;
+    if (!last || d > last) last = d;
+  }
+  const latest = entries.length ? [...entries].sort(compareByOrderDateDesc)[0] : null;
+  return { first, last, latest };
+}
+
 // One row per customer with every figure the Customer List shows or filters
 // on. Built from TWO queries run in parallel (the customer aggregate + the
 // Lit Invoice amounts); all filtering / sorting / paging then happens in
@@ -148,13 +184,12 @@ async function buildCustomerSummaries() {
             $sum: { $sum: { $map: { input: { $ifNull: ['$parsed_data.line_items', []] }, as: 'li', in: { $ifNull: ['$$li.qty', 0] } } } },
           },
           highestOrderValue: { $max: { $ifNull: ['$parsed_data.financials.total', 0] } },
-          firstOrderDate: { $min: '$upload_timestamp' },
-          lastOrderDate: { $max: '$upload_timestamp' },
-          // Fields taken from the customer's LATEST order. $max over a
-          // document compares field by field, so `ts` (first) decides — this
-          // replaces a whole-collection $sort before the $group.
-          latest: {
-            $max: {
+          // One small entry per order — first/last/latest are decided in JS
+          // by ORDER DATE (order_date is free text, so Mongo can't compare
+          // it; parseFlexibleDate reads it the same way everywhere).
+          orderMeta: {
+            $push: {
+              od: '$order_date',
               ts: '$upload_timestamp',
               ref: '$portal_order_ref',
               currency: '$parsed_data.financials.currency',
@@ -182,6 +217,7 @@ async function buildCustomerSummaries() {
 
   return rows.map((c) => {
     const inv = invoiced.get(c._id);
+    const { first: firstOrderDate, last: lastOrderDate, latest } = summarizeOrderDates(c.orderMeta);
     return {
       customerName: c._id,
       orderCount: c.orderCount,
@@ -189,11 +225,11 @@ async function buildCustomerSummaries() {
       avgOrderValue: c.orderCount ? round2(c.totalRevenue / c.orderCount) : 0,
       totalQuantity: c.totalQuantity || 0,
       highestOrderValue: c.highestOrderValue || 0,
-      currency: c.latest?.currency || 'GBP',
-      firstOrderDate: c.firstOrderDate,
-      lastOrderDate: c.lastOrderDate,
-      latestOrderRef: c.latest?.ref,
-      postCode: c.latest?.postCode || '',
+      currency: latest?.currency || 'GBP',
+      firstOrderDate,
+      lastOrderDate,
+      latestOrderRef: latest?.ref,
+      postCode: latest?.postCode || '',
       invoicedValue: round2(inv?.value || 0),
       invoicedOrderCount: inv?.count || 0,
     };
@@ -234,7 +270,7 @@ const RESOLUTION_STATUSES = ['needs_review', 'partially_resolved', 'resolved'];
 //   itemNo      — customers with a CONFIRMED catalog match for this item
 //                 number (results[].match.itemNo — not suggestedProduct,
 //                 which is only a candidate, never a confirmed purchase)
-//   dateFrom/dateTo       — restrict to orders uploaded within this range
+//   dateFrom/dateTo       — restrict to orders whose Order Date is within this range
 //   status                — customers with an order in this resolution_status
 //
 // Column filters (match the Customer List table, all optional):
@@ -278,15 +314,22 @@ async function getOrderLevelQualifyingNames({ orderNumber, product, itemNo, stat
     m['resolution_data.results'] = { $elemMatch: { 'match.itemNo': String(itemNo).trim() } };
   }
   if (status && RESOLUTION_STATUSES.includes(status)) m.resolution_status = status;
-  const dm = {};
-  const from = dateParam(dateFrom);
-  if (from) dm.$gte = from;
-  const to = dateParam(dateTo);
-  if (to) {
-    to.setHours(23, 59, 59, 999);
-    dm.$lte = to;
+  // Date range — matched against each order's Order Date (inclusive). It's
+  // free text, so candidates are fetched and checked in JS; an order with an
+  // unreadable Order Date never matches while a date range is set.
+  const from = dateFrom ? parseFlexibleDate(String(dateFrom)) : null;
+  const to = dateTo ? parseFlexibleDate(String(dateTo)) : null;
+  if (from || to) {
+    const candidates = await Order.find(m, { _id: 0, customer_name: 1, order_date: 1 }).lean();
+    return new Set(
+      candidates
+        .filter((o) => {
+          const d = orderDateOf(o);
+          return d && (!from || d >= from) && (!to || d <= to);
+        })
+        .map((o) => o.customer_name)
+    );
   }
-  if (Object.keys(dm).length) m.upload_timestamp = dm;
   if (!Object.keys(m).length) return null;
   return new Set(await Order.distinct('customer_name', m));
 }
@@ -394,6 +437,8 @@ export async function listCustomers({
     if (invStatus === 'yes' && !hasInvoiced) return false;
     if (invStatus === 'no' && hasInvoiced) return false;
     if (!inRange(c.invoicedValue, invMin, invMax)) return false; // none = 0
+    // No readable Order Date at all → can't say when they last ordered.
+    if ((since || before) && !c.lastOrderDate) return false;
     const last = time(c.lastOrderDate);
     if (since && last < since.getTime()) return false;
     if (before && last >= before.getTime()) return false;
@@ -428,7 +473,9 @@ export async function listCustomers({
       if (!members.length) continue;
       const orderCount = members.reduce((s, c) => s + c.orderCount, 0);
       const totalRevenue = members.reduce((s, c) => s + c.totalRevenue, 0);
-      const pick = (field, better) => members.reduce((m, c) => (m === null || better(time(c[field]), time(m)) ? c[field] : m), null);
+      // Members with no Order Date (null) are skipped, not treated as "earliest".
+      const pick = (field, better) =>
+        members.reduce((m, c) => (c[field] && (m === null || better(time(c[field]), time(m))) ? c[field] : m), null);
       rows.push({
         isGroup: true,
         groupId: g.id,
@@ -520,44 +567,136 @@ export async function getCustomerProfile(customerName) {
       upload_timestamp: 1,
       total_products: 1,
       resolution_status: 1,
+      // Fulfilment tab — the same fields the Analytics Dashboard's
+      // Invoiced / Lost / Pending tiles read (getValueBreakdown).
+      order_status: 1,
+      order_source: 1,
+      lit_invoice: 1,
+      'resolution_data.results.lineId': 1,
+      'resolution_data.results.source': 1,
+      product_comments: 1,
+      product_fulfillment: 1,
       'parsed_data.financials': 1,
       'parsed_data.line_items': 1,
       'parsed_data.delivery_address': 1,
       'parsed_data.billing_address': 1,
     }
-  )
-    .sort({ upload_timestamp: -1 })
-    .lean();
+  ).lean();
 
   if (!orders.length) {
     throw new AppError('NOT_FOUND', `No customer found with name "${name}".`, { status: 404 });
   }
 
+  // Newest first by ORDER DATE (undated orders last) — the purchase history,
+  // timeline, "latest" status/address and currency all follow this order.
+  orders.sort(compareByOrderDateDesc);
+  for (const o of orders) o._od = orderDateOf(o); // parsed once, reused below
+  const datedOrders = orders.filter((o) => o._od);
+
   const currency = orders[0]?.parsed_data?.financials?.currency || 'GBP';
   const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.parsed_data?.financials?.total) || 0), 0);
   const orderCount = orders.length;
 
-  // Monthly revenue trend keyed on upload_timestamp — the one field every
-  // order has as a real Date; order_date is free text copied from the email
-  // (locale/format varies) and is not reliably parseable.
+  // Monthly revenue trend keyed on the Order Date month (orders with no
+  // readable Order Date can't be placed in a month and are left out).
   const monthlyMap = new Map();
-  for (const o of orders) {
-    const d = o.upload_timestamp instanceof Date ? o.upload_timestamp : new Date(o.upload_timestamp);
-    if (Number.isNaN(d.getTime())) continue;
+  const monthlyCount = new Map(); // orders per Order Date month (Finance tab)
+  for (const o of datedOrders) {
+    const d = o._od;
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const total = Number(o.parsed_data?.financials?.total) || 0;
     monthlyMap.set(key, (monthlyMap.get(key) || 0) + total);
+    monthlyCount.set(key, (monthlyCount.get(key) || 0) + 1);
   }
+  // ── Fulfilment (same definitions as the Analytics Dashboard tiles) ──────
+  //   Invoiced  = Σ Lit Invoice amount over Lit-Invoice-ticked orders
+  //   Lost      = cancelled orders: Σ qty × unit_price over every line;
+  //               other orders: Σ qty × |unit_price| over Not Found lines
+  //   Pending   = OS lines in non-cancelled orders: pendingQty × |unit_price|
+  //   Rate      = Invoiced ÷ Ordered (lifetime revenue) × 100
+  let invoicedValue = 0;
+  let lostValue = 0;
+  let pendingValue = 0;
+  let invoicedOrders = 0;
+  const invoicedByMonth = new Map();
+  const osLines = [];
+  const notFoundLines = [];
+  const cancelledOrders = [];
+  for (const o of orders) {
+    const lineItems = Array.isArray(o.parsed_data?.line_items) ? o.parsed_data.line_items : [];
+    o._lit = o.lit_invoice === true ? litInvoiceTotal(o) : null;
+    if (o._lit !== null) {
+      invoicedValue += o._lit;
+      invoicedOrders += 1;
+      if (o._od) {
+        const key = `${o._od.getFullYear()}-${String(o._od.getMonth() + 1).padStart(2, '0')}`;
+        invoicedByMonth.set(key, (invoicedByMonth.get(key) || 0) + o._lit);
+      }
+    }
+
+    if (o.order_status === 'Order Cancelled') {
+      let value = 0;
+      for (const item of lineItems) value += (Number(item?.qty) || 0) * (Number(item?.unit_price) || 0);
+      lostValue += value;
+      cancelledOrders.push({
+        portalOrderRef: o.portal_order_ref,
+        orderDate: o.order_date || '',
+        products: lineItems.length,
+        value: round2(value),
+      });
+      continue;
+    }
+
+    const results = Array.isArray(o.resolution_data?.results) ? o.resolution_data.results : [];
+    const comments = o.product_comments || {};
+    const fulfillment = o.product_fulfillment || {};
+    for (const r of results) {
+      const comment = comments[r.lineId];
+      if (comment !== 'Not Found' && comment !== 'OS') continue;
+      const lineIndex = Number(String(r.lineId).split('-').pop()) - 1;
+      const item = (Number.isInteger(lineIndex) && lineIndex >= 0 && lineItems[lineIndex]) || null;
+      if (!item) continue;
+      const qty = Number(item.qty) || 0;
+      const unitPrice = Math.abs(Number(item.unit_price) || 0);
+      const base = {
+        portalOrderRef: o.portal_order_ref,
+        orderDate: o.order_date || '',
+        product: item.description || 'Unknown',
+        qty,
+        unitPrice: round2(unitPrice),
+      };
+      if (comment === 'Not Found') {
+        const value = qty * unitPrice;
+        lostValue += value;
+        notFoundLines.push({ ...base, value: round2(value) });
+      } else {
+        const pendingQty = osPendingQty(fulfillment[r.lineId]?.pendingQty, qty);
+        const value = pendingQty * unitPrice;
+        pendingValue += value;
+        osLines.push({ ...base, pendingQty, value: round2(value) });
+      }
+    }
+  }
+
   const monthlyRevenue = [...monthlyMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, revenue]) => ({ month, revenue: round2(revenue) }));
+  // Ordered vs Invoiced by Order Date month — for the Finance tab's chart.
+  // Kept separate from monthlyRevenue, whose { month, revenue } shape the
+  // Financial Report reuses as-is.
+  const monthlyValues = [...new Set([...monthlyMap.keys(), ...invoicedByMonth.keys()])]
+    .sort((a, b) => a.localeCompare(b))
+    .map((month) => ({
+      month,
+      orders: monthlyCount.get(month) || 0,
+      ordered: round2(monthlyMap.get(month) || 0),
+      invoiced: round2(invoicedByMonth.get(month) || 0),
+    }));
 
   // Yearly revenue — same shape as monthlyRevenue, one calendar year per row.
   const yearlyMap = new Map();
-  for (const o of orders) {
-    const d = o.upload_timestamp instanceof Date ? o.upload_timestamp : new Date(o.upload_timestamp);
-    if (Number.isNaN(d.getTime())) continue;
-    const key = String(d.getFullYear());
+  for (const o of datedOrders) {
+    const key = String(o._od.getFullYear());
     const total = Number(o.parsed_data?.financials?.total) || 0;
     yearlyMap.set(key, (yearlyMap.get(key) || 0) + total);
   }
@@ -583,6 +722,7 @@ export async function getCustomerProfile(customerName) {
     .map((o) => ({
       portalOrderRef: o.portal_order_ref,
       total: Number(o.parsed_data?.financials?.total) || 0,
+      orderDate: o.order_date || '',
       uploadTimestamp: toIso(o.upload_timestamp),
     }))
     .filter((o) => o.total > 0);
@@ -593,13 +733,34 @@ export async function getCustomerProfile(customerName) {
     ? ordersWithTotal.reduce((a, b) => (b.total < a.total ? b : a))
     : null;
 
+  // Order Rhythm — average days between consecutive DISTINCT Order Dates
+  // (several orders on one day count as one ordering day). Every order counts,
+  // cancelled ones included; undated orders can't be placed and are skipped.
+  // Next expected = latest Order Date + average gap. "Overdue by" is worked
+  // out in the browser against the viewer's today. null below 2 dates.
+  const orderDays = [...new Set(datedOrders.map((o) => o._od.getTime()))].sort((a, b) => a - b);
+  let orderRhythm = null;
+  if (orderDays.length >= 2) {
+    const first = new Date(orderDays[0]);
+    const last = new Date(orderDays[orderDays.length - 1]);
+    const avgGapDays = daysBetween(last, first) / (orderDays.length - 1);
+    const next = new Date(last);
+    next.setDate(next.getDate() + Math.round(avgGapDays));
+    orderRhythm = {
+      avgGapDays: Math.round(avgGapDays * 10) / 10,
+      orderingDays: orderDays.length,
+      lastOrderDate: toIso(last),
+      nextExpectedDate: toIso(next),
+    };
+  }
+
   // Most purchased products — grouped by the parsed line-item description.
   // Phase 1 uses the raw parsed name rather than resolving to a catalog item
   // number: resolution_data only covers products a user has approved/matched,
   // so grouping by it would silently under-count anything left unresolved.
   const productMap = new Map();
   for (const o of orders) {
-    const ts = o.upload_timestamp instanceof Date ? o.upload_timestamp : new Date(o.upload_timestamp);
+    const ts = o._od; // Order Date (null when unreadable — doesn't set "last purchased")
     for (const item of o.parsed_data?.line_items || []) {
       const key = item.description || 'Unknown';
       const entry = productMap.get(key) || {
@@ -612,7 +773,7 @@ export async function getCustomerProfile(customerName) {
       entry.totalQty += Number(item.qty) || 0;
       entry.totalSpent += Number(item.total) || 0;
       entry.orderCount += 1;
-      if (!entry.lastPurchaseDate || ts > entry.lastPurchaseDate) entry.lastPurchaseDate = ts;
+      if (ts && (!entry.lastPurchaseDate || ts > entry.lastPurchaseDate)) entry.lastPurchaseDate = ts;
       productMap.set(key, entry);
     }
   }
@@ -638,12 +799,18 @@ export async function getCustomerProfile(customerName) {
   const purchaseHistory = orders.map((o) => ({
     portalOrderRef: o.portal_order_ref,
     orderDate: o.order_date,
+    // Parsed Order Date (ISO) — what the timeline groups years by; null when
+    // the order has no readable Order Date.
+    orderDateIso: o._od ? toIso(o._od) : null,
     uploadTimestamp: toIso(o.upload_timestamp),
     totalProducts: o.total_products,
     total: round2(Number(o.parsed_data?.financials?.total) || 0),
     currency: o.parsed_data?.financials?.currency || currency,
     resolutionStatus: o.resolution_status,
     processedBy: o.processed_by || '',
+    orderStatus: o.order_status || '',
+    // Lit Invoice amount when the order is Lit-Invoice ticked, else null.
+    invoicedValue: o._lit === null ? null : round2(o._lit),
   }));
 
   return {
@@ -653,8 +820,9 @@ export async function getCustomerProfile(customerName) {
       totalRevenue: round2(totalRevenue),
       orderCount,
       avgOrderValue: orderCount ? round2(totalRevenue / orderCount) : 0,
-      firstOrderDate: toIso(orders[orders.length - 1].upload_timestamp),
-      lastOrderDate: toIso(orders[0].upload_timestamp),
+      // Earliest / latest Order Date (null when no order has a readable one).
+      firstOrderDate: datedOrders.length ? toIso(datedOrders[datedOrders.length - 1]._od) : null,
+      lastOrderDate: datedOrders.length ? toIso(datedOrders[0]._od) : null,
       // Phase 2 additions — all derived from the same order set above.
       totalProductsPurchased,
       totalQuantityPurchased,
@@ -665,7 +833,23 @@ export async function getCustomerProfile(customerName) {
       revenueGrowthPct,
     },
     monthlyRevenue,
+    monthlyValues,
     yearlyRevenue,
+    // Fulfilment tab — kept out of `financials` because the Customer Report
+    // prints every financials field in its summary block.
+    fulfilment: {
+      orderedValue: round2(totalRevenue),
+      invoicedValue: round2(invoicedValue),
+      lostValue: round2(lostValue),
+      pendingValue: round2(pendingValue),
+      fulfilmentRatePct: totalRevenue ? round2((invoicedValue / totalRevenue) * 100) : null,
+      invoicedOrders,
+      osLines,
+      notFoundLines,
+      cancelledOrders,
+    },
+    // Kept out of `financials` for the same reason (Customer Report).
+    orderRhythm,
     topProducts,
     purchaseHistory,
     lastKnownAddress: orders[0]?.parsed_data?.delivery_address || orders[0]?.parsed_data?.billing_address || null,

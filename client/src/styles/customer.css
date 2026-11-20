@@ -118,6 +118,16 @@
 }
 .ci-stat-value{font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
 .ci-stat-caption{font-size:11px;color:var(--muted);margin-top:6px}
+/* Tiles are flex columns so an optional hint sits at the very bottom — hints
+   line up across a row even when some tiles have a caption and others don't. */
+.ci-stat-tile{display:flex;flex-direction:column}
+.ci-stat-hint{
+  margin-top:auto;padding-top:10px;
+  font-size:11px;line-height:1.35;color:var(--muted);font-style:italic;
+}
+.ci-stat-tile .ci-stat-hint::before{
+  content:'';display:block;border-top:1px dashed var(--border);margin:2px 0 8px;
+}
 
 /* Profile detail sections (purchase history / monthly revenue / top products) */
 .ci-profile-grid{display:flex;flex-direction:column;gap:22px}
@@ -204,6 +214,13 @@
 
 /* ── Product analytics tabs — Phase 2 ── */
 .ci-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+/* Plain-English note under a tab row explaining what the active tab shows. */
+.ci-tab-desc{
+  margin:-4px 0 14px;padding:10px 14px;
+  background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--accent);
+  border-radius:var(--radius-sm);font-size:13px;line-height:1.45;color:var(--ink-2);
+}
+.ci-tab-desc strong{color:var(--ink)}
 .ci-tab{
   background:var(--surface-2);color:var(--ink-2);
   border:1px solid var(--border-strong);border-radius:999px;
@@ -221,6 +238,66 @@
 .ci-hbar-fill{height:100%;border-radius:999px;transition:width .3s ease}
 .ci-hbar-value{font-size:12px;font-weight:700;color:var(--ink-2);white-space:nowrap;font-variant-numeric:tabular-nums}
 
+/* Ordered vs Invoiced revenue trend (RevenueTrendChart) */
+.ci-trend{width:100%}
+.ci-trend-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-bottom:10px;font-size:12px;color:var(--ink-2)}
+.ci-trend-legend-item{display:inline-flex;align-items:center;gap:6px}
+.ci-trend-swatch{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+.ci-trend-plot{position:relative;width:100%}
+.ci-trend-svg{display:block;overflow:visible}
+.ci-trend-tick{font-size:10.5px;fill:var(--muted)}
+.ci-trend-labels-track{position:relative;height:16px;margin-top:4px}
+.ci-trend-label{position:absolute;top:0;font-size:10.5px;color:var(--muted);white-space:nowrap}
+.ci-trend-note{font-size:11.5px;color:var(--muted);margin:10px 0 0}
+.ci-trend-empty{font-size:12.5px;color:var(--muted);padding:40px 0;text-align:center}
+.ci-trend-tip{
+  position:absolute;top:8px;pointer-events:none;z-index:2;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  box-shadow:var(--shadow-sm);padding:8px 10px;font-size:12px;color:var(--ink);min-width:170px;
+}
+.ci-trend-tip-title{font-weight:700;margin-bottom:6px}
+.ci-trend-tip-row{display:flex;align-items:center;gap:6px;margin-top:3px}
+.ci-trend-tip-label{color:var(--ink-2)}
+.ci-trend-tip-value{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600}
+
+/* Analytics Dashboard filter bar + export */
+.ci-dash-filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:10px}
+.ci-dash-filters .ci-filter-field{width:170px}
+.ci-dash-filters .ci-filter-field.ci-dash-narrow{width:140px}
+.ci-dash-filters .ci-filter-field select:disabled{opacity:.6;cursor:not-allowed}
+.ci-dash-filters .ci-filter-field input,.ci-dash-filters .ci-filter-field select{height:42px;box-sizing:border-box}
+.ci-dash-clear{
+  height:42px;padding:0 14px;background:transparent;border:1.5px solid var(--border-strong);
+  border-radius:var(--radius-sm);font-family:var(--font-ui);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;
+}
+.ci-dash-clear:hover{border-color:var(--accent);color:var(--accent)}
+.ci-dash-clear:focus-visible{outline:none;box-shadow:var(--ring)}
+.ci-dash-export{margin-left:auto}
+.ci-dash-filter-note{font-size:12px;color:var(--ink-2);margin-bottom:14px}
+.ci-dash-body{transition:opacity .15s}
+.ci-dash-body.is-loading{opacity:.55;pointer-events:none}
+@media (max-width:640px){
+  .ci-dash-filters .ci-filter-field,.ci-dash-filters .ci-filter-field.ci-dash-narrow{width:calc(50% - 6px)}
+  .ci-dash-export{margin-left:0}
+}
+
+/* At-risk customers list (Analytics Dashboard) */
+.ci-atrisk-list{list-style:none;margin:0;padding:0}
+.ci-atrisk-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:8px 0;font-size:13.5px}
+.ci-atrisk-row + .ci-atrisk-row{border-top:1px solid var(--border)}
+.ci-atrisk-name{color:var(--ink);text-decoration:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-atrisk-name:hover{color:var(--accent);text-decoration:underline}
+.ci-atrisk-meta{font-weight:700;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ci-atrisk-more{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.ci-atrisk-count{font-size:12px;color:var(--muted)}
+.ci-atrisk-btn{
+  font:inherit;font-size:12.5px;font-weight:600;color:var(--accent);background:transparent;
+  border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer;
+}
+.ci-atrisk-btn:hover{border-color:var(--accent);background:var(--surface)}
+.ci-atrisk-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ci-atrisk-empty{font-size:12.5px;color:var(--muted);padding:24px 0;text-align:center}
+
 .ci-linechart{width:100%}
 .ci-linechart-svg{width:100%;height:180px;display:block}
 .ci-linechart-labels{display:flex;justify-content:space-between;margin-top:4px;padding:0 4px}
@@ -236,6 +313,12 @@
   display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
   gap:14px;margin-bottom:24px;
 }
+/* Laptop & desktop: the 10 dashboard tiles sit in exactly two rows of 5.
+   Long £ values wrap instead of overflowing the narrower tiles. */
+@media (min-width:1024px){
+  .ci-analytics-cards{grid-template-columns:repeat(5,minmax(0,1fr))}
+}
+.ci-analytics-cards .ci-stat-value{overflow-wrap:anywhere}
 .ci-charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
 @media (max-width:900px){ .ci-charts-grid{grid-template-columns:1fr} }
 
@@ -472,3 +555,55 @@
   .ci-hbar-row{grid-template-columns:1fr;gap:4px}
   .ci-hbar-value{text-align:right}
 }
+
+/* ── Customer Profile tabs (Overview / Orders / Products / Fulfilment / Finance) ── */
+.ci-profile-tabs{
+  display:flex;gap:4px;border-bottom:1px solid var(--border);
+  margin:0 0 20px;overflow-x:auto;scrollbar-width:none;
+}
+.ci-profile-tabs::-webkit-scrollbar{display:none}
+.ci-profile-tab{
+  flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;
+  margin-bottom:-1px;padding:10px 16px;cursor:pointer;
+  font:inherit;font-size:14px;font-weight:600;color:var(--muted);
+  transition:color .15s,border-color .15s;
+}
+.ci-profile-tab:hover{color:var(--ink)}
+.ci-profile-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.ci-profile-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:4px}
+.ci-profile-tabpanel{min-width:0}
+/* Two cards side by side on laptop/desktop, stacked below that. */
+.ci-profile-split{display:grid;grid-template-columns:1fr;gap:22px;min-width:0}
+.ci-profile-split > *{min-width:0}
+@media (min-width:1024px){ .ci-profile-split{grid-template-columns:1fr 1fr;align-items:start} }
+/* Fulfilment tab's own tile row — the grid gap already spaces it. */
+.ci-stat-row.ci-stat-row--tab{margin:0}
+/* Profile header row: 10 tiles → two even rows of 5 on wide screens. */
+@media (min-width:1200px){ .ci-stat-row.ci-stat-row--profile{grid-template-columns:repeat(5,minmax(0,1fr))} }
+@media (min-width:1024px){ .ci-stat-row.ci-stat-row--tab{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.ci-profile-viewall{
+  display:inline-block;margin-top:12px;background:none;border:0;padding:0;cursor:pointer;
+  font:inherit;font-size:13px;font-weight:600;color:var(--accent);
+}
+.ci-profile-viewall:hover{text-decoration:underline}
+@media (max-width:640px){ .ci-profile-tab{padding:10px 12px;font-size:13px} }
+
+/* ── Dashboard cards that fill their grid row (chart + key-figure strip) ── */
+.ci-card--fill{display:flex;flex-direction:column;min-width:0}
+.ci-card-body{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;min-height:0}
+.ci-card-body--center{align-items:center}
+.ci-chart-stats{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;
+  margin:16px 0 0;padding-top:14px;border-top:1px solid var(--border);
+}
+.ci-chart-stat{min-width:0}
+.ci-chart-stat dt{
+  font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.03em;margin-bottom:4px;overflow-wrap:anywhere;
+}
+.ci-chart-stat dd{
+  margin:0;font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--ink);
+  overflow-wrap:anywhere;
+}
+.ci-chart-stat-sub{display:block;font-family:inherit;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
+@media (max-width:640px){ .ci-chart-stats{grid-template-columns:repeat(2,minmax(0,1fr))} }

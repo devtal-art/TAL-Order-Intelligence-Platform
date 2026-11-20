@@ -5,7 +5,14 @@ import { apiClient } from '../apiClient.js';
 //   GET /api/v1/customer-analytics/overview   — dashboard cards + chart series
 //   GET /api/v1/customer-analytics/rankings   — customer leaderboards
 export const analyticsService = {
-  overview: (months = 12) => apiClient.get(`/v1/customer-analytics/overview?months=${encodeURIComponent(months)}`),
+  // filters (all optional): { dateFrom, dateTo ('YYYY-MM-DD', by Order Date), channel, group }
+  overview: (months = 12, filters = {}) => {
+    const params = new URLSearchParams({ months: String(months) });
+    for (const k of ['dateFrom', 'dateTo', 'channel', 'group']) {
+      if (filters[k]) params.set(k, filters[k]);
+    }
+    return apiClient.get(`/v1/customer-analytics/overview?${params.toString()}`);
+  },
 
   // metric: 'revenue' | 'orders' | 'orderValue' | 'quantity' | 'frequency'
   rankings: ({ metric = 'revenue', limit = 10 } = {}) =>

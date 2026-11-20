@@ -172,11 +172,11 @@ export default function CustomerReports() {
             {activeType.hasDateRange && (
               <>
                 <div className="ci-filter-field">
-                  <label htmlFor="cr-from">Date From</label>
+                  <label htmlFor="cr-from">Order Date From</label>
                   <input id="cr-from" type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} />
                 </div>
                 <div className="ci-filter-field">
-                  <label htmlFor="cr-to">Date To</label>
+                  <label htmlFor="cr-to">Order Date To</label>
                   <input id="cr-to" type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} />
                 </div>
               </>

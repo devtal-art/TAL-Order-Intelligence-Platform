@@ -1,17 +1,11 @@
 import { currencySymbol } from '../../../utils/format.js';
 import { statusMeta } from '../../../utils/order.js';
 
-function formatDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
 // Visual chronological order timeline (Phase 2, feature 2). Orders are
-// grouped under a year marker, newest first — mirrors purchaseHistory's
-// existing sort order (customerService.getCustomerProfile sorts orders
-// upload_timestamp desc), so no re-sort is needed here.
+// grouped under their ORDER DATE year, newest first — mirrors
+// purchaseHistory's sort order (getCustomerProfile sorts by Order Date desc,
+// undated orders last), so no re-sort is needed here. Orders with no
+// readable Order Date are grouped under "No Order Date".
 export default function CustomerTimeline({ purchaseHistory, currency, onOpenOrder, openBusyRef }) {
   const sym = currencySymbol(currency);
   const money = (n) => `${sym}${Number(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -19,8 +13,8 @@ export default function CustomerTimeline({ purchaseHistory, currency, onOpenOrde
   const groups = [];
   let currentYear = null;
   for (const o of purchaseHistory) {
-    const year = new Date(o.uploadTimestamp).getFullYear();
-    const yearLabel = Number.isNaN(year) ? 'Unknown' : String(year);
+    const year = o.orderDateIso ? new Date(o.orderDateIso).getFullYear() : NaN;
+    const yearLabel = Number.isNaN(year) ? 'No Order Date' : String(year);
     if (yearLabel !== currentYear) {
       groups.push({ year: yearLabel, orders: [] });
       currentYear = yearLabel;
@@ -46,7 +40,7 @@ export default function CustomerTimeline({ purchaseHistory, currency, onOpenOrde
                   <div className="ci-timeline-content">
                     <div className="ci-timeline-row-top">
                       <span className="ci-timeline-ref">Order #{o.portalOrderRef}</span>
-                      <span className="ci-timeline-date">{o.orderDate || formatDate(o.uploadTimestamp)}</span>
+                      <span className="ci-timeline-date">{o.orderDate || '—'}</span>
                     </div>
                     <div className="ci-timeline-row-mid">
                       <span className={`og-status og-status-${meta.tone}`}>{meta.label}</span>

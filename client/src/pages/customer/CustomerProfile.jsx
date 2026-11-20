@@ -1,27 +1,38 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import CustomerLayout from '../../components/customer/CustomerLayout.jsx';
 import ProfileHeader from '../../components/customer/ProfileHeader.jsx';
 import CustomerFinancialSummary from '../../components/customer/CustomerFinancialSummary.jsx';
 import CustomerPurchaseHistory from '../../components/customer/CustomerPurchaseHistory.jsx';
 import CustomerTimeline from '../../components/customer/timeline/CustomerTimeline.jsx';
-import CustomerInsightsList from '../../components/customer/insights/CustomerInsightsList.jsx';
 import ProductAnalytics from '../../components/customer/analytics/ProductAnalytics.jsx';
+import ProfileOverviewTab from '../../components/customer/profile/ProfileOverviewTab.jsx';
+import ProfileFulfilmentTab from '../../components/customer/profile/ProfileFulfilmentTab.jsx';
+import ProfileFinanceTab from '../../components/customer/profile/ProfileFinanceTab.jsx';
 import { SavedOrderDetailModal, downloadOrderExcel } from '../../components/SavedOrderLookup.jsx';
 import { customerService } from '../../services/customer/customerService.js';
 import { orderService } from '../../services/orderService.js';
 
+const TABS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'orders', label: 'Orders' },
+  { key: 'products', label: 'Products' },
+  { key: 'fulfilment', label: 'Fulfilment' },
+  { key: 'finance', label: 'Finance' },
+];
+
 // Customer Intelligence — Customer Profile.
-// Phase 1 shipped financial summary, purchase history, and top products.
-// Phase 2 adds: profile header (avatar + since/last-active/status badges),
-// business insights, a visual order timeline, a richer sortable product
-// analytics table, and the extended financial dashboard (yearly/monthly
-// trend, highest/lowest order, revenue growth).
+// Layout: profile header and stat tiles always on top; everything else is
+// split into tabs (Overview / Orders / Products / Fulfilment / Finance).
+// The active tab lives in the URL (?tab=…), so a refresh or a shared link
+// keeps it.
 // Order detail viewing reuses the exact same modal/download path as the
 // Order Processing Dashboard/Search pages (SavedOrderDetailModal) — no new
 // order-viewing code, no risk of the two modules drifting out of sync.
 export default function CustomerProfile() {
   const { name } = useParams();
+  const [params, setParams] = useSearchParams();
+  const tab = TABS.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'overview';
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -62,6 +73,30 @@ export default function CustomerProfile() {
     }
   }, []);
 
+  const goToTab = useCallback(
+    (key) => {
+      const next = new URLSearchParams(params);
+      if (key === 'overview') next.delete('tab');
+      else next.set('tab', key);
+      setParams(next, { replace: true });
+    },
+    [params, setParams]
+  );
+
+  // Arrow keys move between tabs (WAI-ARIA tabs pattern).
+  function onTabKeyDown(e) {
+    const i = TABS.findIndex((t) => t.key === tab);
+    let j = null;
+    if (e.key === 'ArrowRight') j = (i + 1) % TABS.length;
+    else if (e.key === 'ArrowLeft') j = (i - 1 + TABS.length) % TABS.length;
+    else if (e.key === 'Home') j = 0;
+    else if (e.key === 'End') j = TABS.length - 1;
+    if (j === null) return;
+    e.preventDefault();
+    goToTab(TABS[j].key);
+    document.getElementById(`cp-tab-${TABS[j].key}`)?.focus();
+  }
+
   return (
     <CustomerLayout>
       <div className="screen active" id="s-customer-profile">
@@ -79,29 +114,56 @@ export default function CustomerProfile() {
           <>
             <ProfileHeader profile={profile} />
 
-            <CustomerFinancialSummary
-              financials={profile.financials}
-              monthlyRevenue={profile.monthlyRevenue}
-              currency={profile.currency}
-            />
+            <CustomerFinancialSummary profile={profile} />
 
-            <CustomerInsightsList customerName={profile.customerName} />
+            <div className="ci-profile-tabs" role="tablist" aria-label="Customer profile sections" onKeyDown={onTabKeyDown}>
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  id={`cp-tab-${t.key}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.key}
+                  aria-controls="cp-tabpanel"
+                  tabIndex={tab === t.key ? 0 : -1}
+                  className={`ci-profile-tab${tab === t.key ? ' active' : ''}`}
+                  onClick={() => goToTab(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
-            <section className="ci-card" aria-label="Order timeline">
-              <div className="ci-card-head">
-                <h3>Order Timeline</h3>
-              </div>
-              <CustomerTimeline
-                purchaseHistory={profile.purchaseHistory}
-                currency={profile.currency}
-                onOpenOrder={openOrder}
-                openBusyRef={viewBusyRef}
-              />
-            </section>
+            <div id="cp-tabpanel" role="tabpanel" aria-labelledby={`cp-tab-${tab}`} className="ci-profile-tabpanel">
+              {tab === 'overview' && (
+                <ProfileOverviewTab profile={profile} onOpenOrder={openOrder} openBusyRef={viewBusyRef} goToTab={goToTab} />
+              )}
 
-            <ProductAnalytics topProducts={profile.topProducts} currency={profile.currency} />
+              {tab === 'orders' && (
+                <div className="ci-profile-grid">
+                  <CustomerPurchaseHistory profile={profile} onOpenOrder={openOrder} openBusyRef={viewBusyRef} />
+                  <section className="ci-card" aria-label="Order timeline">
+                    <div className="ci-card-head">
+                      <h3>Order Timeline</h3>
+                    </div>
+                    <CustomerTimeline
+                      purchaseHistory={profile.purchaseHistory}
+                      currency={profile.currency}
+                      onOpenOrder={openOrder}
+                      openBusyRef={viewBusyRef}
+                    />
+                  </section>
+                </div>
+              )}
 
-            <CustomerPurchaseHistory profile={profile} onOpenOrder={openOrder} openBusyRef={viewBusyRef} />
+              {tab === 'products' && <ProductAnalytics topProducts={profile.topProducts} currency={profile.currency} />}
+
+              {tab === 'fulfilment' && (
+                <ProfileFulfilmentTab profile={profile} onOpenOrder={openOrder} openBusyRef={viewBusyRef} />
+              )}
+
+              {tab === 'finance' && <ProfileFinanceTab profile={profile} />}
+            </div>
           </>
         )}
 

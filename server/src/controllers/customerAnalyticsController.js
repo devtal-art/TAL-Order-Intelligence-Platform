@@ -7,7 +7,12 @@ export async function getOverview(req, res, next) {
   try {
     ensureDb();
     const months = Math.min(Math.max(Math.floor(Number(req.query.months)) || 12, 3), 24);
-    const result = await customerAnalyticsService.getAnalyticsOverview({ trendMonths: months });
+    // Optional dashboard filters (validated inside the service).
+    const { dateFrom, dateTo, channel, group } = req.query;
+    const result = await customerAnalyticsService.getAnalyticsOverview({
+      trendMonths: months,
+      filters: { dateFrom, dateTo, channel, group },
+    });
     res.status(200).json(result);
   } catch (err) {
     next(err);

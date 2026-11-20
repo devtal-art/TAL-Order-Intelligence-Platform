@@ -1,5 +1,6 @@
 import { Order } from '../models/order.model.js';
 import { AppError } from '../utils/AppError.js';
+import { parseFlexibleDate, daysBetween } from '../utils/dateUtil.js';
 
 // ────────────────────────────────────────────────
 //  CUSTOMER INSIGHTS SERVICE (Phase 2 — new, independent, read-only)
@@ -38,23 +39,27 @@ export async function getCustomerInsights(customerName) {
     throw new AppError('VALIDATION_ERROR', 'Customer name is required.', { status: 400 });
   }
 
-  // Ascending order — the cadence/trend math below reads more naturally
-  // walking forward through time.
-  const orders = await Order.find(
+  // Every date here is the order's ORDER DATE (the date written on the
+  // order, read with the shared parseFlexibleDate) — not upload time. Orders
+  // with no readable Order Date are left out of the date-based insights.
+  const allOrders = await Order.find(
     { customer_name: name },
-    { portal_order_ref: 1, upload_timestamp: 1, 'parsed_data.financials.total': 1 }
-  )
-    .sort({ upload_timestamp: 1 })
-    .lean();
+    { portal_order_ref: 1, order_date: 1, 'parsed_data.financials.total': 1 }
+  ).lean();
 
-  if (!orders.length) {
+  if (!allOrders.length) {
     throw new AppError('NOT_FOUND', `No customer found with name "${name}".`, { status: 404 });
   }
 
+  // Ascending by Order Date — the cadence/trend math below reads more
+  // naturally walking forward through time.
+  const orders = allOrders
+    .map((o) => ({ ...o, _od: parseFlexibleDate(o.order_date) }))
+    .filter((o) => o._od)
+    .sort((a, b) => a._od - b._od);
+
   const insights = [];
-  const dates = orders
-    .map((o) => (o.upload_timestamp instanceof Date ? o.upload_timestamp : new Date(o.upload_timestamp)))
-    .filter((d) => !Number.isNaN(d.getTime()));
+  const dates = orders.map((o) => o._od);
 
   // 1. Order cadence — average days between consecutive orders.
   let avgCadenceDays = null;
@@ -67,7 +72,8 @@ export async function getCustomerInsights(customerName) {
 
   // 2. Dormancy — days since the most recent order, relative to their usual cadence.
   const lastOrderDate = dates[dates.length - 1];
-  const daysSinceLastOrder = lastOrderDate ? Math.floor((Date.now() - lastOrderDate.getTime()) / 86400000) : null;
+  // Whole calendar days, the same count the Analytics Dashboard's at-risk list uses.
+  const daysSinceLastOrder = lastOrderDate ? daysBetween(new Date(), lastOrderDate) : null;
   const dormancyThreshold = avgCadenceDays ? Math.max(30, avgCadenceDays * 1.5) : 30;
   if (daysSinceLastOrder !== null && daysSinceLastOrder > dormancyThreshold) {
     insights.push({
@@ -81,8 +87,7 @@ export async function getCustomerInsights(customerName) {
   // 3. Spending trend — the last two calendar months with any activity.
   const monthlyMap = new Map();
   for (const o of orders) {
-    const d = o.upload_timestamp instanceof Date ? o.upload_timestamp : new Date(o.upload_timestamp);
-    if (Number.isNaN(d.getTime())) continue;
+    const d = o._od;
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const total = Number(o.parsed_data?.financials?.total) || 0;
     monthlyMap.set(key, (monthlyMap.get(key) || 0) + total);
@@ -103,7 +108,8 @@ export async function getCustomerInsights(customerName) {
   }
 
   // 4. High-value flag — lifetime revenue well above the platform average.
-  const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.parsed_data?.financials?.total) || 0), 0);
+  // Not date-based — every order counts, dated or not.
+  const totalRevenue = allOrders.reduce((sum, o) => sum + (Number(o.parsed_data?.financials?.total) || 0), 0);
   const avgPlatformRevenue = await getPlatformAverageRevenue();
   if (avgPlatformRevenue > 0 && totalRevenue >= avgPlatformRevenue * 1.5) {
     insights.push({
@@ -124,8 +130,8 @@ export async function getCustomerInsights(customerName) {
   }
 
   // 6. Repeat customer.
-  if (orders.length > 1) {
-    insights.push({ type: 'repeat_customer', text: `Repeat customer with ${orders.length} orders placed to date.` });
+  if (allOrders.length > 1) {
+    insights.push({ type: 'repeat_customer', text: `Repeat customer with ${allOrders.length} orders placed to date.` });
   }
 
   return { customerName: name, insights };

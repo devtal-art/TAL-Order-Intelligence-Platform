@@ -4,12 +4,30 @@ import CustomerLayout from '../../components/customer/CustomerLayout.jsx';
 import { analyticsService } from '../../services/customer/analyticsService.js';
 import { currencySymbol } from '../../utils/format.js';
 
+// `description` explains each tab's figure in plain English — it must match
+// how getCustomerRankings (server/src/services/customerAnalyticsService.js)
+// actually computes and sorts it.
 const METRICS = [
-  { key: 'revenue', label: 'Highest Spending', valueKey: 'totalRevenue', kind: 'money' },
-  { key: 'orders', label: 'Most Active (Order Count)', valueKey: 'orderCount', kind: 'number' },
-  { key: 'orderValue', label: 'Highest Order Value', valueKey: 'highestOrderValue', kind: 'money' },
-  { key: 'quantity', label: 'Largest Quantity Purchased', valueKey: 'totalQuantity', kind: 'number' },
-  { key: 'frequency', label: 'Most Frequent (Shortest Cycle)', valueKey: 'avgDaysBetweenOrders', kind: 'days' },
+  {
+    key: 'revenue', label: 'Highest Spending', valueKey: 'totalRevenue', kind: 'money',
+    description: 'Customers ranked by the total value of all their orders added together (Ordered Value), highest first.',
+  },
+  {
+    key: 'orders', label: 'Most Active (Order Count)', valueKey: 'orderCount', kind: 'number',
+    description: 'Customers ranked by how many orders they have placed in total, most first.',
+  },
+  {
+    key: 'orderValue', label: 'Highest Order Value', valueKey: 'highestOrderValue', kind: 'money',
+    description: 'Customers ranked by their single biggest order (by order total), highest first.',
+  },
+  {
+    key: 'quantity', label: 'Largest Quantity Purchased', valueKey: 'totalQuantity', kind: 'number',
+    description: 'Customers ranked by the total number of units bought — every product quantity across all their orders added together, highest first.',
+  },
+  {
+    key: 'frequency', label: 'Most Frequent (Shortest Cycle)', valueKey: 'avgDaysBetweenOrders', kind: 'days',
+    description: 'Customers ranked by the average number of days between their orders (by Order Date), shortest first. Customers with only one dated order appear last.',
+  },
 ];
 
 // Customer Rankings / leaderboards (Phase 2, feature 9). One page, five
@@ -69,6 +87,10 @@ export default function CustomerRankings() {
             </button>
           ))}
         </div>
+
+        <p className="ci-tab-desc" aria-live="polite">
+          <strong>{activeMetric.label}:</strong> {activeMetric.description} Showing the top 20.
+        </p>
 
         {error && <div className="sol-error">{error}</div>}
 

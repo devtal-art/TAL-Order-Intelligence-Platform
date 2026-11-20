@@ -1,4 +1,5 @@
 import { AppError } from '../utils/AppError.js';
+import { parseFlexibleDate } from '../utils/dateUtil.js';
 import * as customerService from './customerIntelligenceService.js';
 import * as customerAnalyticsService from './customerAnalyticsService.js';
 
@@ -15,13 +16,17 @@ import * as customerAnalyticsService from './customerAnalyticsService.js';
 
 const REPORT_TYPES = ['customer', 'financial', 'purchase', 'revenue', 'top-products', 'top-customers'];
 
+// Date range (inclusive) against each row's ORDER DATE — the date written on
+// the order, read with the shared parseFlexibleDate(). A row whose Order Date
+// is blank/unreadable is left out while a range is set.
 function filterByDateRange(rows, dateFrom, dateTo) {
   if (!dateFrom && !dateTo) return rows;
-  const from = dateFrom ? new Date(dateFrom) : null;
-  const to = dateTo ? new Date(dateTo) : null;
-  if (to) to.setHours(23, 59, 59, 999);
+  const from = dateFrom ? parseFlexibleDate(String(dateFrom)) : null;
+  const to = dateTo ? parseFlexibleDate(String(dateTo)) : null;
+  if (!from && !to) return rows;
   return rows.filter((r) => {
-    const d = new Date(r.uploadTimestamp);
+    const d = parseFlexibleDate(r.orderDate);
+    if (!d) return false;
     if (from && d < from) return false;
     if (to && d > to) return false;
     return true;
